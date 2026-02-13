@@ -4,7 +4,26 @@ const db = require('../../db/database');
 const bcrypt = require('bcrypt');
 const { insertAdmin } = require('../helpers/fixtures');
 
-// Lightweight mock of req/res/session for route handler tests
+// Collect route handlers registered by the admin router
+const mockHandlers = {};
+jest.mock('express', () => {
+  const realExpress = jest.requireActual('express');
+  const fakeRouter = {
+    get(path, ...fns) { mockHandlers['GET ' + path] = fns[fns.length - 1]; },
+    post(path, ...fns) { mockHandlers['POST ' + path] = fns[fns.length - 1]; },
+    use() {},
+  };
+  return {
+    ...realExpress,
+    Router: () => fakeRouter,
+  };
+});
+
+jest.mock('../../services/storage', () => ({
+  isConfigured: () => false,
+  uploadFile: jest.fn(),
+}));
+
 function mockReq(overrides = {}) {
   return {
     body: {},
@@ -23,61 +42,37 @@ function mockRes() {
   return res;
 }
 
-// Pull in the router module so we can extract the handler functions.
-// The router registers handlers via router.get/post — we intercept those.
-let handlers = {};
-jest.mock('express', () => {
-  const realExpress = jest.requireActual('express');
-  const fakeRouter = {
-    get(path, ...fns) { handlers['GET ' + path] = fns[fns.length - 1]; },
-    post(path, ...fns) { handlers['POST ' + path] = fns[fns.length - 1]; },
-    use() {},
-  };
-  return {
-    ...realExpress,
-    Router: () => fakeRouter,
-  };
-});
-
-// Stub services that may be required at import time
-jest.mock('../../services/storage', () => ({
-  isConfigured: () => false,
-  uploadFile: jest.fn(),
-}));
-
 beforeEach(() => {
   db.__resetTestDb();
-  handlers = {};
-  // Re-import to get fresh handlers with reset DB
+  Object.keys(mockHandlers).forEach(k => delete mockHandlers[k]);
   jest.isolateModules(() => {
     require('../../routes/admin');
   });
 });
 
 describe('POST /login (OTP generation)', () => {
-  test('stores bcrypt-hashed OTP for admin member', async () => {
+  test('stores bcrypt-hashed OTP that matches 000000 in dev', async () => {
     const admin = insertAdmin(db);
     const req = mockReq({ body: { email: admin.email } });
     const res = mockRes();
 
-    await handlers['POST /login'](req, res);
+    await mockHandlers['POST /login'](req, res);
 
     const row = db.prepare('SELECT otp_hash, otp_expires_at, otp_attempts FROM members WHERE id = ?').get(admin.id);
     expect(row.otp_hash).toBeTruthy();
     expect(row.otp_expires_at).toBeTruthy();
     expect(row.otp_attempts).toBe(0);
 
-    // The dev OTP 000000 should match the stored hash
     const match = await bcrypt.compare('000000', row.otp_hash);
     expect(match).toBe(true);
   });
 
-  test('sets session.otpEmail to lowercased email', async () => {
+  test('sets session.otpEmail to lowercased trimmed email', async () => {
     insertAdmin(db, { email: 'admin@example.com' });
     const req = mockReq({ body: { email: '  Admin@Example.COM  ' } });
     const res = mockRes();
 
-    await handlers['POST /login'](req, res);
+    await mockHandlers['POST /login'](req, res);
 
     expect(req.session.otpEmail).toBe('admin@example.com');
   });
@@ -87,7 +82,7 @@ describe('POST /login (OTP generation)', () => {
     const req = mockReq({ body: { email: 'admin@example.com' } });
     const res = mockRes();
 
-    await handlers['POST /login'](req, res);
+    await mockHandlers['POST /login'](req, res);
 
     expect(res._redirectUrl).toBe('/admin/login/verify');
   });
@@ -98,7 +93,6 @@ describe('POST /login/verify (OTP verification)', () => {
 
   beforeEach(async () => {
     admin = insertAdmin(db);
-    // Simulate what POST /login does: hash OTP and store it
     const otpHash = await bcrypt.hash('000000', 10);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     db.prepare(
@@ -113,7 +107,7 @@ describe('POST /login/verify (OTP verification)', () => {
     });
     const res = mockRes();
 
-    await handlers['POST /login/verify'](req, res);
+    await mockHandlers['POST /login/verify'](req, res);
 
     expect(req.session.adminId).toBe(admin.id);
     expect(req.session.adminRole).toBe('super_admin');
@@ -128,7 +122,7 @@ describe('POST /login/verify (OTP verification)', () => {
     });
     const res = mockRes();
 
-    await handlers['POST /login/verify'](req, res);
+    await mockHandlers['POST /login/verify'](req, res);
 
     const row = db.prepare('SELECT otp_hash, otp_expires_at FROM members WHERE id = ?').get(admin.id);
     expect(row.otp_hash).toBeNull();
@@ -142,7 +136,7 @@ describe('POST /login/verify (OTP verification)', () => {
     });
     const res = mockRes();
 
-    await handlers['POST /login/verify'](req, res);
+    await mockHandlers['POST /login/verify'](req, res);
 
     expect(req.session.adminId).toBeUndefined();
     expect(req.session.flash_error).toBe('Invalid code.');
@@ -153,7 +147,6 @@ describe('POST /login/verify (OTP verification)', () => {
   });
 
   test('expired OTP shows expiry error', async () => {
-    // Set expiry to the past
     const expired = new Date(Date.now() - 60 * 1000).toISOString();
     db.prepare("UPDATE members SET otp_expires_at = ? WHERE id = ?").run(expired, admin.id);
 
@@ -163,7 +156,7 @@ describe('POST /login/verify (OTP verification)', () => {
     });
     const res = mockRes();
 
-    await handlers['POST /login/verify'](req, res);
+    await mockHandlers['POST /login/verify'](req, res);
 
     expect(req.session.adminId).toBeUndefined();
     expect(req.session.flash_error).toBe('Code has expired. Please request a new code.');
@@ -176,7 +169,7 @@ describe('POST /login/verify (OTP verification)', () => {
     });
     const res = mockRes();
 
-    await handlers['POST /login/verify'](req, res);
+    await mockHandlers['POST /login/verify'](req, res);
 
     expect(res._redirectUrl).toBe('/admin/login');
   });
@@ -190,7 +183,7 @@ describe('POST /login/verify (OTP verification)', () => {
     });
     const res = mockRes();
 
-    await handlers['POST /login/verify'](req, res);
+    await mockHandlers['POST /login/verify'](req, res);
 
     expect(req.session.adminId).toBeUndefined();
     expect(req.session.flash_error).toBe('Too many attempts. Please request a new code.');
@@ -203,7 +196,7 @@ describe('POST /login/verify (OTP verification)', () => {
     });
     const res = mockRes();
 
-    await handlers['POST /login/verify'](req, res);
+    await mockHandlers['POST /login/verify'](req, res);
 
     expect(req.session.adminId).toBe(admin.id);
     expect(res._redirectUrl).toBe('/admin/members');
