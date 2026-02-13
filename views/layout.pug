@@ -1,0 +1,59 @@
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title Yellowstone Sea Hawkers
+    link(rel="stylesheet" href="/css/style.css")
+  body
+    nav.navbar
+      .nav-brand
+        a(href="/")
+          img.nav-logo(src="/img/logo.png" alt="Yellowstone Sea Hawkers")
+      button.nav-toggle(aria-label="Toggle navigation") &#9776;
+      ul.nav-menu
+        li: a(href="/") Home
+        li.dropdown
+          a.dropdown-toggle(href="/#about") About YSH
+          ul.dropdown-menu
+            li: a(href="/bios") Board Member Bios
+        li: a(href="/#news") Team News
+        li: a(href="/membership") Membership
+        li: a(href="/#charitable") Charitable Activity
+        li: a(href="/#contact") Contact
+        if isAdmin
+          li: a(href="/admin/dashboard" style="color: #69be28") Admin
+
+    if flash_success
+      .flash.flash-success
+        .container= flash_success
+    if flash_error
+      .flash.flash-error
+        .container= flash_error
+
+    block content
+
+    footer#footer
+      .footer-content
+        .footer-section
+          h3 Yellowstone Sea Hawkers
+          p Montana's proudest and most dedicated Seahawks fan club. A non-profit supporting the Seattle Seahawks and the NFL.
+        .footer-section
+          h3 Links
+          ul
+            li: a(href="https://seahawks.com" target="_blank") Seattle Seahawks
+            li: a(href="https://www.seahawkers.org/" target="_blank") Sea Hawkers Booster Club
+            li: a(href="/admin/login") Admin
+        .footer-section
+          h3 Documents
+          ul
+            li: a(href="/assets/conduct.pdf" target="_blank") Code of Conduct
+            li: a(href="/assets/unity.pdf" target="_blank") Code of Unity
+            li: a(href="/assets/bylaws.pdf" target="_blank") Chapter Bylaws
+      .footer-bottom
+        p &copy; 2026 #[a(href="https://jessewheeler.dev" target="_blank") Built with love by a local 12.]
+
+    script.
+      document.querySelector('.nav-toggle').addEventListener('click', function() {
+        document.querySelector('.nav-menu').classList.toggle('active');
+      });

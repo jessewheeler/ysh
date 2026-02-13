@@ -1,0 +1,445 @@
+/* === Reset & Base === */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #333;
+  line-height: 1.6;
+}
+
+a {
+  color: #002a5c;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* === Navbar === */
+.navbar {
+  background: #002a5c;
+  display: flex;
+  align-items: center;
+  padding: 0 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.nav-brand a {
+  display: flex;
+  align-items: center;
+}
+
+.nav-logo {
+  height: 50px;
+  margin: 0.5rem 0;
+}
+
+.nav-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  line-height: 40px;
+  text-align: center;
+}
+
+.nav-menu {
+  display: flex;
+  list-style: none;
+  margin-left: auto;
+}
+
+.nav-menu li {
+  position: relative;
+}
+
+.nav-menu a {
+  color: #fff;
+  padding: 1rem 1.1rem;
+  display: block;
+  white-space: nowrap;
+  font-size: 0.95rem;
+}
+
+.nav-menu a:hover {
+  background: rgba(255, 255, 255, 0.1);
+  text-decoration: none;
+}
+
+/* Dropdown */
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #002a5c;
+  list-style: none;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.dropdown:hover .dropdown-menu {
+  display: block;
+}
+
+.dropdown-menu a {
+  padding: 0.75rem 1.25rem;
+}
+
+/* === Sections === */
+.section {
+  padding: 4rem 1.5rem;
+}
+
+.alt-bg {
+  background: #f8f8f8;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.section h2 {
+  color: #002a5c;
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.text-center {
+  text-align: center;
+}
+
+/* === Hero === */
+.hero {
+  background: #002a5c;
+  color: #fff;
+  text-align: center;
+  padding: 6rem 2rem;
+}
+
+.hero h1 {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  font-size: 1.2rem;
+  max-width: 640px;
+  margin: 0 auto 2rem;
+  opacity: 0.9;
+}
+
+/* === Buttons === */
+.btn {
+  display: inline-block;
+  background: #69be28;
+  color: #fff;
+  padding: 0.75rem 1.75rem;
+  border-radius: 4px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.btn:hover {
+  background: #5aa622;
+  text-decoration: none;
+  color: #fff;
+}
+
+.btn-outline {
+  display: inline-block;
+  border: 2px solid #002a5c;
+  color: #002a5c;
+  padding: 0.5rem 1.25rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.btn-outline:hover {
+  background: #002a5c;
+  color: #fff;
+  text-decoration: none;
+}
+
+/* === Cards === */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.cards-three {
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+.card-body h3 {
+  color: #002a5c;
+  margin-bottom: 0.5rem;
+}
+
+.card-body p {
+  margin-bottom: 1rem;
+  color: #555;
+}
+
+/* === Blockquote === */
+blockquote {
+  border-left: 5px solid #002a5c;
+  padding: 10px 20px;
+  margin: 0 0 1.5rem;
+  font-style: italic;
+  color: #444;
+  font-size: 1.1rem;
+}
+
+/* === Gallery === */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.gallery-grid img {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+/* === Contact Form === */
+.contact-form {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-weight: 600;
+  color: #002a5c;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #002a5c;
+}
+
+/* === Bios === */
+.bios-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.bio-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.bio-photo {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 1rem;
+}
+
+.bio-card h3 {
+  color: #002a5c;
+  margin-bottom: 0.25rem;
+}
+
+.bio-role {
+  color: #69be28;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.bio-card p {
+  text-align: left;
+  color: #555;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+/* === Footer === */
+footer {
+  background: #002a5c;
+  color: #fff;
+  padding: 3rem 2rem 1rem;
+}
+
+.footer-content {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+}
+
+.footer-section h3 {
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.footer-section p {
+  opacity: 0.85;
+  line-height: 1.7;
+}
+
+.footer-section ul {
+  list-style: none;
+}
+
+.footer-section ul li {
+  margin-bottom: 0.5rem;
+}
+
+.footer-section a {
+  color: #69be28;
+}
+
+.footer-section a:hover {
+  color: #fff;
+}
+
+.footer-bottom {
+  text-align: center;
+  padding-top: 2rem;
+  margin-top: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+
+.footer-bottom a {
+  color: #69be28;
+}
+
+/* === Flash Messages === */
+.flash {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+}
+
+.flash-success {
+  background: #d4edda;
+  color: #155724;
+}
+
+.flash-error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .nav-toggle {
+    display: block;
+    margin-left: auto;
+  }
+
+  .nav-menu {
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #002a5c;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .nav-menu.active {
+    display: flex;
+  }
+
+  .nav-menu a {
+    padding: 0.9rem 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .dropdown-menu {
+    position: static;
+    box-shadow: none;
+  }
+
+  .dropdown:hover .dropdown-menu {
+    display: block;
+  }
+
+  .hero h1 {
+    font-size: 2rem;
+  }
+
+  .hero p {
+    font-size: 1rem;
+  }
+
+  .section {
+    padding: 2.5rem 1rem;
+  }
+
+  .bios-grid {
+    grid-template-columns: 1fr;
+  }
+}

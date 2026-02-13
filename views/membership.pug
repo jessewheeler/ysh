@@ -1,0 +1,38 @@
+extends layout
+
+block content
+  section.section.alt-bg
+    .container
+      h2 Become a Member
+      p.text-center Join the Yellowstone Sea Hawkers and receive your official membership card!
+      if site.dues_amount_cents
+        p.text-center
+          strong Annual Dues: $#{(parseInt(site.dues_amount_cents) / 100).toFixed(2)}
+
+      form.contact-form(method="POST" action="/membership")
+        input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+        .form-group
+          label(for="first_name") First Name
+          input#first_name(type="text" name="first_name" required)
+        .form-group
+          label(for="last_name") Last Name
+          input#last_name(type="text" name="last_name" required)
+        .form-group
+          label(for="email") Email
+          input#email(type="email" name="email" required)
+        .form-group
+          label(for="phone") Phone (optional)
+          input#phone(type="tel" name="phone")
+        .form-group
+          label(for="address_street") Street Address (optional)
+          input#address_street(type="text" name="address_street")
+        .form-group
+          label(for="address_city") City
+          input#address_city(type="text" name="address_city")
+        .form-group
+          label(for="address_state") State
+          input#address_state(type="text" name="address_state" value="MT")
+        .form-group
+          label(for="address_zip") ZIP Code
+          input#address_zip(type="text" name="address_zip")
+        button.btn(type="submit") Continue to Payment

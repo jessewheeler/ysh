@@ -1,0 +1,60 @@
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title Admin — Yellowstone Sea Hawkers
+    link(rel="stylesheet" href="/css/style.css")
+    link(rel="stylesheet" href="/css/admin.css")
+  body.admin-body
+    .admin-wrapper
+      aside.admin-sidebar
+        .sidebar-brand
+          a(href="/admin/dashboard")
+            img(src="/img/logo.png" alt="YSH" style="height:40px")
+            span YSH Admin
+        nav.sidebar-nav
+          a(href="/admin/dashboard" class=(currentPath === '/admin/dashboard' ? 'active' : '')) Dashboard
+          a(href="/admin/members" class=(currentPath && currentPath.startsWith('/admin/members') ? 'active' : '')) Members
+          a(href="/admin/announcements" class=(currentPath && currentPath.startsWith('/admin/announcements') ? 'active' : '')) Announcements
+          a(href="/admin/gallery" class=(currentPath && currentPath.startsWith('/admin/gallery') ? 'active' : '')) Gallery
+          a(href="/admin/bios" class=(currentPath && currentPath.startsWith('/admin/bios') ? 'active' : '')) Bios
+          a(href="/admin/payments" class=(currentPath && currentPath.startsWith('/admin/payments') ? 'active' : '')) Payments
+          a(href="/admin/emails" class=(currentPath && currentPath.startsWith('/admin/emails') ? 'active' : '')) Emails
+          if adminRole === 'super_admin'
+            a(href="/admin/settings" class=(currentPath === '/admin/settings' ? 'active' : '')) Settings
+            a(href="/admin/admins" class=(currentPath && currentPath.startsWith('/admin/admins') ? 'active' : '')) Admins
+          hr
+          a(href="/") View Site
+          form(method="POST" action="/admin/logout" style="display:inline")
+            button.sidebar-logout(type="submit") Logout
+
+      main.admin-main
+        .admin-topbar
+          h1.admin-page-title
+            block page_title
+          button.admin-sidebar-toggle(aria-label="Toggle sidebar") &#9776;
+
+        if flash_success
+          .flash.flash-success= flash_success
+        if flash_error
+          .flash.flash-error= flash_error
+
+        .admin-content
+          block content
+
+    script(src="/js/admin.js")
+    script.
+      document.querySelector('.admin-sidebar-toggle').addEventListener('click', function() {
+        document.querySelector('.admin-wrapper').classList.toggle('sidebar-open');
+      });
+      // Auto-inject CSRF tokens into all POST forms
+      document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(form) {
+        if (!form.querySelector('input[name="_csrf"]')) {
+          var input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = '_csrf';
+          input.value = '#{csrfToken}';
+          form.prepend(input);
+        }
+      });

@@ -1,0 +1,51 @@
+extends layout
+
+block page_title
+  | Site Settings
+
+block content
+  form(method="POST" action="/admin/settings")
+    h3 Hero Section
+    .form-group
+      label(for="hero_title") Hero Title
+      input#hero_title(type="text" name="hero_title" value=(site.hero_title || ''))
+    .form-group
+      label(for="hero_subtitle") Hero Subtitle
+      textarea#hero_subtitle(name="hero_subtitle" rows="2")= site.hero_subtitle || ''
+    .form-group
+      label(for="hero_button_text") Hero Button Text
+      input#hero_button_text(type="text" name="hero_button_text" value=(site.hero_button_text || ''))
+    .form-group
+      label(for="hero_button_url") Hero Button URL
+      input#hero_button_url(type="text" name="hero_button_url" value=(site.hero_button_url || ''))
+
+    h3 About Section
+    .form-group
+      label(for="about_quote") About Quote
+      textarea#about_quote(name="about_quote" rows="2")= site.about_quote || ''
+    .form-group
+      label(for="about_text") About Text
+      textarea#about_text(name="about_text" rows="3")= site.about_text || ''
+
+    h3 Gallery
+    .form-group
+      label(for="gallery_album_url") Full Album URL
+      input#gallery_album_url(type="text" name="gallery_album_url" value=(site.gallery_album_url || ''))
+
+    h3 Membership
+    .form-group
+      label(for="dues_amount_cents") Annual Dues (cents, e.g. 2500 = $25.00)
+      input#dues_amount_cents(type="number" name="dues_amount_cents" value=(site.dues_amount_cents || '2500'))
+
+    h3 Contact
+    .form-group
+      label(for="contact_email") Contact Email (receives contact form submissions)
+      input#contact_email(type="email" name="contact_email" value=(site.contact_email || ''))
+
+    h3 Stripe
+    .form-group
+      label(for="stripe_publishable_key") Stripe Publishable Key (for frontend)
+      input#stripe_publishable_key(type="text" name="stripe_publishable_key" value=(site.stripe_publishable_key || ''))
+
+    .form-actions
+      button.btn(type="submit") Save Settings

@@ -1,0 +1,35 @@
+extends ../layout
+
+block page_title
+  | Bios
+
+block content
+  .admin-toolbar
+    a.btn(href="/admin/bios/new") + New Bio
+
+  if bios.length
+    table.admin-table
+      thead
+        tr
+          th Photo
+          th Name
+          th Role
+          th Visible
+          th Order
+          th Actions
+      tbody
+        each bio in bios
+          tr
+            td
+              if bio.photo_path
+                img(src=bio.photo_path alt=bio.name style="width:40px; height:40px; border-radius:50%; object-fit:cover")
+            td: a(href=`/admin/bios/${bio.id}`)= bio.name
+            td= bio.role || '—'
+            td= bio.is_visible ? 'Yes' : 'No'
+            td= bio.sort_order
+            td
+              a.btn-sm(href=`/admin/bios/${bio.id}`) Edit
+              form(method="POST" action=`/admin/bios/${bio.id}/delete` style="display:inline" data-confirm="Delete this bio?")
+                button.btn-sm.btn-danger(type="submit") Delete
+  else
+    p.text-muted No bios yet.

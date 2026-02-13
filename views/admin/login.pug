@@ -1,0 +1,22 @@
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title Admin Login — Yellowstone Sea Hawkers
+    link(rel="stylesheet" href="/css/style.css")
+    link(rel="stylesheet" href="/css/admin.css")
+  body.admin-login-body
+    .admin-login-card
+      img(src="/img/logo.png" alt="YSH" style="height:60px; margin-bottom:1rem")
+      h2 Admin Login
+      if flash_success
+        .flash.flash-success= flash_success
+      if flash_error
+        .flash.flash-error= flash_error
+      form(method="POST" action="/admin/login")
+        input(type="hidden" name="_csrf" value=csrfToken)
+        .form-group
+          label(for="email") Email
+          input#email(type="email" name="email" required autofocus placeholder="admin@example.com")
+        button.btn(type="submit" style="width:100%") Send Login Code

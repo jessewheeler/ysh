@@ -1,0 +1,38 @@
+extends ../layout
+
+block page_title
+  if bio
+    | Edit Bio
+  else
+    | New Bio
+
+block content
+  form(method="POST" action=bio ? `/admin/bios/${bio.id}` : '/admin/bios' enctype="multipart/form-data" data-draft="bio")
+    .form-group
+      label(for="name") Name *
+      input#name(type="text" name="name" value=(bio ? bio.name : '') required)
+    .form-group
+      label(for="role") Role
+      input#role(type="text" name="role" value=(bio ? bio.role : ''))
+    .form-group
+      label(for="bio_text") Biography
+      textarea#bio_text(name="bio_text" rows="6")= bio ? bio.bio_text : ''
+    .form-group
+      label(for="image") Photo
+      input#image(type="file" name="image" accept="image/*")
+      if bio && bio.photo_path
+        .image-preview
+          img(src=bio.photo_path alt="Current photo" style="max-height:120px; margin-top:0.5rem; border-radius:50%")
+          input(type="hidden" name="existing_photo" value=bio.photo_path)
+    .form-grid
+      .form-group
+        label(for="sort_order") Sort Order
+        input#sort_order(type="number" name="sort_order" value=(bio ? bio.sort_order : 0))
+      .form-group
+        label
+          input(type="checkbox" name="is_visible" value="1" checked=(bio ? bio.is_visible : true))
+          |  Visible
+
+    .form-actions
+      button.btn(type="submit")= bio ? 'Update' : 'Create'
+      a.btn-outline(href="/admin/bios") Cancel

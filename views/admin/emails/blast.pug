@@ -1,0 +1,20 @@
+extends ../layout
+
+block page_title
+  | Email Blast
+
+block content
+  p Sending to #[strong #{activeCount}] active member#{activeCount !== 1 ? 's' : ''}.
+
+  form(method="POST" action="/admin/emails/blast" data-confirm="Send this email to all active members?" data-draft="email blast")
+    .form-group
+      label(for="subject") Subject *
+      input#subject(type="text" name="subject" required)
+    .form-group
+      label(for="body_html") Body (HTML)
+      textarea#body_html(name="body_html" rows="10" required)
+      p.text-muted You can use basic HTML tags for formatting.
+
+    .form-actions
+      button.btn(type="submit") Send to All Active Members
+      a.btn-outline(href="/admin/emails") Cancel

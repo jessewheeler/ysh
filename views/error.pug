@@ -1,0 +1,10 @@
+extends layout
+
+block content
+  section.section.alt-bg
+    .container
+      .text-center
+        h2= status || 'Error'
+        p= message || 'Something went wrong.'
+        br
+        a.btn(href="/") Back to Home

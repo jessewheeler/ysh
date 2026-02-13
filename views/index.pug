@@ -1,0 +1,89 @@
+extends layout
+
+block content
+  section#home-slider.hero
+    .hero-content
+      h1= site.hero_title || 'Yellowstone Sea Hawkers'
+      p= site.hero_subtitle || ''
+      if site.hero_button_url
+        a.btn(href=site.hero_button_url target="_blank")= site.hero_button_text || 'Learn More'
+
+  section#news.section
+    .container
+      h2 Announcements
+      .cards
+        each ann in announcements
+          .card
+            if ann.image_path
+              img(src=ann.image_path alt=ann.title)
+            .card-body
+              h3= ann.title
+              p= ann.body
+              if ann.link_url
+                a.btn-outline(href=ann.link_url target="_blank")= ann.link_text || 'Learn More'
+
+  section#about.section.alt-bg
+    .container
+      h2 About YSH
+      if site.about_quote
+        blockquote= site.about_quote
+      if site.about_text
+        p= site.about_text
+
+  section#gallery.section
+    .container
+      h2 Event Gallery
+      .gallery-grid
+        each img in gallery
+          img(src=img.filename alt=img.alt_text || 'Gallery photo')
+      if site.gallery_album_url
+        p.text-center
+          a.btn(href=site.gallery_album_url target="_blank") View Full Album
+
+  section#membership.section.alt-bg
+    .container
+      h2 Membership
+      .cards.cards-three
+        .card
+          .card-body
+            h3 Join the Yellowstone Sea Hawkers
+            p Become an official member and get your membership card!
+            a.btn(href="/membership") Sign Up & Pay Dues
+
+  section#charitable.section
+    .container
+      h2 Charitable Activity
+      .cards
+        .card
+          .card-body
+            h3 Report Charitable Activity
+            p Submit your charitable activity hours and details.
+            a.btn-outline(href="https://forms.office.com/r/0HGbiXg01L" target="_blank") Report Activity
+        .card
+          .card-body
+            h3 Dog Tag Buddies
+            p Learn about and support Dog Tag Buddies.
+            a.btn-outline(href="https://www.dogtagbuddies.org" target="_blank") Visit Site
+            | &nbsp;
+            a.btn-outline(href="https://tinyurl.com/DogTag-Buddies" target="_blank") Donate
+        .card
+          .card-body
+            h3 Family Services of Billings
+            p Supporting families in the Billings community.
+            a.btn-outline(href="https://billingsfamilyservice.org/" target="_blank") Visit Site
+
+  section#contact.section.alt-bg
+    .container
+      h2 Contact Us
+      form.contact-form(method="POST" action="/contact")
+        input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+        .form-group
+          label(for="name") Name
+          input#name(type="text" name="name" placeholder="Your name" required)
+        .form-group
+          label(for="email") Email
+          input#email(type="email" name="email" placeholder="Your email" required)
+        .form-group
+          label(for="message") Message
+          textarea#message(name="message" rows="5" placeholder="Your message" required)
+        button.btn(type="submit") Send Message

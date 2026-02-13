@@ -1,0 +1,49 @@
+extends layout
+
+block page_title
+  | Admin Accounts
+
+block content
+  h2 Admin Accounts
+
+  table.admin-table
+    thead
+      tr
+        th Name
+        th Email
+        th Role
+        th Created
+        th Actions
+    tbody
+      each admin in admins
+        tr
+          td #{admin.first_name} #{admin.last_name}
+          td= admin.email
+          td= admin.role === 'super_admin' ? 'Super Admin' : 'Editor'
+          td= admin.created_at
+          td
+            form(method="POST" action=`/admin/admins/${admin.id}/delete` style="display:inline")
+              input(type="hidden" name="_csrf" value=csrfToken)
+              button.btn.btn-sm.btn-danger(type="submit" onclick="return confirm('Demote this admin?')") Demote
+
+  hr
+
+  h3 Add Admin
+  form(method="POST" action="/admin/admins")
+    input(type="hidden" name="_csrf" value=csrfToken)
+    .form-row
+      .form-group
+        label(for="first_name") First Name
+        input#first_name(type="text" name="first_name" required)
+      .form-group
+        label(for="last_name") Last Name
+        input#last_name(type="text" name="last_name" required)
+      .form-group
+        label(for="email") Email
+        input#email(type="email" name="email" required)
+      .form-group
+        label(for="role") Role
+        select#role(name="role")
+          option(value="editor") Editor
+          option(value="super_admin") Super Admin
+    button.btn(type="submit") Add Admin

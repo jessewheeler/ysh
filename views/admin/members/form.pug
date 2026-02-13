@@ -1,0 +1,52 @@
+extends ../layout
+
+block page_title
+  if member
+    | Edit Member
+  else
+    | New Member
+
+block content
+  form(method="POST" action=member ? `/admin/members/${member.id}` : '/admin/members')
+    .form-grid
+      .form-group
+        label(for="first_name") First Name *
+        input#first_name(type="text" name="first_name" value=(member ? member.first_name : '') required)
+      .form-group
+        label(for="last_name") Last Name *
+        input#last_name(type="text" name="last_name" value=(member ? member.last_name : '') required)
+      .form-group
+        label(for="email") Email *
+        input#email(type="email" name="email" value=(member ? member.email : '') required)
+      .form-group
+        label(for="phone") Phone
+        input#phone(type="tel" name="phone" value=(member ? member.phone : ''))
+      .form-group
+        label(for="address_street") Street
+        input#address_street(type="text" name="address_street" value=(member ? member.address_street : ''))
+      .form-group
+        label(for="address_city") City
+        input#address_city(type="text" name="address_city" value=(member ? member.address_city : ''))
+      .form-group
+        label(for="address_state") State
+        input#address_state(type="text" name="address_state" value=(member ? member.address_state : 'MT'))
+      .form-group
+        label(for="address_zip") ZIP
+        input#address_zip(type="text" name="address_zip" value=(member ? member.address_zip : ''))
+      .form-group
+        label(for="membership_year") Membership Year
+        input#membership_year(type="number" name="membership_year" value=(member ? member.membership_year : new Date().getFullYear()))
+      .form-group
+        label(for="status") Status
+        select#status(name="status")
+          option(value="pending" selected=(member && member.status === 'pending')) Pending
+          option(value="active" selected=(member && member.status === 'active')) Active
+          option(value="expired" selected=(member && member.status === 'expired')) Expired
+          option(value="cancelled" selected=(member && member.status === 'cancelled')) Cancelled
+    .form-group
+      label(for="notes") Notes
+      textarea#notes(name="notes" rows="3")= member ? member.notes : ''
+
+    .form-actions
+      button.btn(type="submit")= member ? 'Update Member' : 'Create Member'
+      a.btn-outline(href="/admin/members") Cancel

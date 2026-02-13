@@ -1,0 +1,131 @@
+extends ../layout
+
+block page_title
+  | #{member.first_name} #{member.last_name}
+
+block content
+  .admin-grid
+    .admin-panel
+      h3 Member Details
+      table.detail-table
+        tr
+          th Member Number
+          td= member.member_number
+        tr
+          th Name
+          td= `${member.first_name} ${member.last_name}`
+        tr
+          th Email
+          td= member.email
+        tr
+          th Phone
+          td= member.phone || '—'
+        tr
+          th Address
+          td= [member.address_street, member.address_city, member.address_state, member.address_zip].filter(Boolean).join(', ') || '—'
+        tr
+          th Year
+          td= member.membership_year
+        tr
+          th Status
+          td
+            span(class=`badge badge-${member.status}`)= member.status
+        tr
+          th Notes
+          td= member.notes || '—'
+        tr
+          th Created
+          td= member.created_at
+        tr
+          th Updated
+          td= member.updated_at
+
+      .form-actions
+        a.btn(href=`/admin/members/${member.id}?edit=1`) Edit
+        form(method="POST" action=`/admin/members/${member.id}/card` style="display:inline")
+          button.btn-outline(type="submit") Generate Card
+        form(method="POST" action=`/admin/members/${member.id}/delete` style="display:inline" data-confirm="Delete this member?")
+          button.btn-danger(type="submit") Delete
+
+    .admin-panel
+      h3 Membership Cards
+      if cards.length
+        each card in cards
+          .card-row
+            span Year: #{card.year}
+            if card.pdf_path
+              a.btn-sm(href=`/admin/members/${member.id}/card/pdf`) PDF
+            if card.png_path
+              a.btn-sm(href=`/admin/members/${member.id}/card/png`) PNG
+            form(method="POST" action=`/admin/members/${member.id}/email-card` style="display:inline")
+              button.btn-sm(type="submit") Email Card
+      else
+        p.text-muted No cards generated yet.
+
+  .admin-panel
+    h3 Payments
+    if payments.length
+      table.admin-table
+        thead
+          tr
+            th Amount
+            th Status
+            th Method
+            th Description
+            th Date
+        tbody
+          each p in payments
+            tr
+              td $#{(p.amount_cents / 100).toFixed(2)}
+              td
+                span(class=`badge badge-${p.status}`)= p.status
+              td= p.payment_method || 'stripe'
+              td= p.description || '—'
+              td= p.created_at
+    else
+      p.text-muted No payments yet.
+
+  .admin-panel
+    h3 Record Offline Payment
+    form(method="POST" action=`/admin/members/${member.id}/payments`)
+      .form-group
+        label(for="amount") Amount ($)
+        input#amount.form-control(type="number" name="amount" step="0.01" min="0.01" required)
+      .form-group
+        label(for="payment_method") Payment Method
+        select#payment_method.form-control(name="payment_method")
+          option(value="cash") Cash
+          option(value="check") Check
+          option(value="other") Other
+      .form-group
+        label(for="description") Description
+        input#description.form-control(type="text" name="description" placeholder="Membership dues")
+      .form-group
+        label
+          if member.status !== 'active'
+            input(type="checkbox" name="activate_member" checked)
+          else
+            input(type="checkbox" name="activate_member")
+          |  Activate member
+      .form-actions
+        button.btn(type="submit") Record Payment
+
+  .admin-panel
+    h3 Recent Emails
+    if emails.length
+      table.admin-table
+        thead
+          tr
+            th Subject
+            th Type
+            th Status
+            th Date
+        tbody
+          each e in emails
+            tr
+              td= e.subject
+              td= e.email_type
+              td= e.status
+              td= e.created_at
+    else
+      p.text-muted No emails sent yet.

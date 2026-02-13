@@ -1,0 +1,44 @@
+{
+  "name": "ysh",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "NODE_ENV=development nodemon server.js",
+    "seed": "node db/seed.js",
+    "migrate": "node db/migrate.js",
+    "create-admin": "node scripts/create-admin.js",
+    "lint": "eslint .",
+    "test": "jest --verbose --forceExit"
+  },
+  "keywords": [],
+  "author": "Jesse Wheeler",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
+  "description": "Web application for the Yellowstone Sea Hawkers - Montana's official Seattle Seahawks booster club chapter. Manages memberships, announcements, and community engagement for dedicated Seahawks fans.",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.967.0",
+    "@sendgrid/mail": "^8.1.6",
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^11.10.0",
+    "canvas": "^3.2.1",
+    "connect-sqlite3": "^0.9.16",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "express-session": "^1.19.0",
+    "helmet": "^8.1.0",
+    "multer": "^2.0.2",
+    "pdfkit": "^0.17.2",
+    "pug": "^3.0.3",
+    "stripe": "^20.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "eslint": "^9.39.2",
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.11"
+  }
+}

@@ -1,0 +1,8 @@
+node_modules/
+.env
+data/
+uploads/
+.idea/
+*.db
+coverage/
+robot/results/

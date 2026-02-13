@@ -1,0 +1,44 @@
+extends ../layout
+
+block page_title
+  | Members
+
+block content
+  .admin-toolbar
+    form.search-form(method="GET" action="/admin/members")
+      input(type="text" name="search" placeholder="Search members..." value=search)
+      button.btn(type="submit") Search
+    a.btn(href="/admin/members/new") + New Member
+    a.btn-outline(href="/admin/members/export") Export CSV
+
+  if members.length
+    table.admin-table
+      thead
+        tr
+          th Number
+          th Name
+          th Email
+          th Status
+          th Year
+          th Actions
+      tbody
+        each m in members
+          tr
+            td= m.member_number
+            td: a(href=`/admin/members/${m.id}`)= `${m.first_name} ${m.last_name}`
+            td= m.email
+            td
+              span(class=`badge badge-${m.status}`)= m.status
+            td= m.membership_year
+            td
+              a.btn-sm(href=`/admin/members/${m.id}`) Edit
+
+    if totalPages > 1
+      .pagination
+        if page > 1
+          a(href=`/admin/members?page=${page - 1}&search=${search}`) &laquo; Prev
+        span Page #{page} of #{totalPages} (#{total} total)
+        if page < totalPages
+          a(href=`/admin/members?page=${page + 1}&search=${search}`) Next &raquo;
+  else
+    p.text-muted No members found.

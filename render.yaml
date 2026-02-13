@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: ysh
+    runtime: node
+    plan: starter
+    buildCommand: >
+      apt-get update && apt-get install -y
+      build-essential libcairo2-dev libjpeg-dev libpango1.0-dev libgif-dev librsvg2-dev
+      && npm ci
+    startCommand: npm start
+    disk:
+      name: ysh-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: BASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
+      - key: B2_ENDPOINT
+        sync: false
+      - key: B2_REGION
+        sync: false
+      - key: B2_BUCKET
+        sync: false
+      - key: B2_KEY_ID
+        sync: false
+      - key: B2_APP_KEY
+        sync: false
+      - key: B2_PUBLIC_URL
+        sync: false

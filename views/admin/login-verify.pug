@@ -1,0 +1,29 @@
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title Verify Login — Yellowstone Sea Hawkers
+    link(rel="stylesheet" href="/css/style.css")
+    link(rel="stylesheet" href="/css/admin.css")
+  body.admin-login-body
+    .admin-login-card
+      img(src="/img/logo.png" alt="YSH" style="height:60px; margin-bottom:1rem")
+      h2 Enter Login Code
+      p.text-muted If this address is an admin, a verification code was sent to #{maskedEmail}
+      if flash_success
+        .flash.flash-success= flash_success
+      if flash_error
+        .flash.flash-error= flash_error
+      form(method="POST" action="/admin/login/verify")
+        input(type="hidden" name="_csrf" value=csrfToken)
+        .form-group
+          label(for="code") 6-Digit Code
+          input#code(type="text" name="code" required autofocus maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" style="text-align:center; font-size:1.5rem; letter-spacing:0.5rem")
+        button.btn(type="submit" style="width:100%") Verify
+      .text-center(style="margin-top:1rem")
+        form(method="POST" action="/admin/login/resend" style="display:inline")
+          input(type="hidden" name="_csrf" value=csrfToken)
+          button.btn-link(type="submit") Resend code
+        span  |
+        a(href="/admin/login") Use a different email

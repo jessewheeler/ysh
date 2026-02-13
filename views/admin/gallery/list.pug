@@ -1,0 +1,23 @@
+extends ../layout
+
+block page_title
+  | Gallery
+
+block content
+  .admin-toolbar
+    a.btn(href="/admin/gallery/new") + Add Image
+
+  if images.length
+    .gallery-admin-grid
+      each img in images
+        .gallery-admin-card
+          img(src=img.filename alt=img.alt_text || 'Gallery image' style="width:100%; height:150px; object-fit:cover; border-radius:4px")
+          .gallery-admin-info
+            p= img.alt_text || 'No alt text'
+            span.text-muted Order: #{img.sort_order} | #{img.is_visible ? 'Visible' : 'Hidden'}
+          .gallery-admin-actions
+            a.btn-sm(href=`/admin/gallery/${img.id}`) Edit
+            form(method="POST" action=`/admin/gallery/${img.id}/delete` style="display:inline" data-confirm="Delete this image?")
+              button.btn-sm.btn-danger(type="submit") Delete
+  else
+    p.text-muted No gallery images yet.

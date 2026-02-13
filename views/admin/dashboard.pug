@@ -1,0 +1,64 @@
+extends layout
+
+block page_title
+  | Dashboard
+
+block content
+  .stats-grid
+    .stat-card
+      .stat-number= stats.totalMembers
+      .stat-label Total Members
+    .stat-card
+      .stat-number= stats.activeMembers
+      .stat-label Active Members
+    .stat-card
+      .stat-number $#{(stats.totalRevenue / 100).toFixed(2)}
+      .stat-label Total Revenue
+    .stat-card
+      .stat-number= stats.emailsSent
+      .stat-label Emails Sent
+
+  .admin-grid
+    .admin-panel
+      h3 Recent Members
+      if recentMembers.length
+        table.admin-table
+          thead
+            tr
+              th Name
+              th Number
+              th Status
+              th Date
+          tbody
+            each m in recentMembers
+              tr
+                td: a(href=`/admin/members/${m.id}`)= `${m.first_name} ${m.last_name}`
+                td= m.member_number
+                td
+                  span(class=`badge badge-${m.status}`)= m.status
+                td= m.created_at ? m.created_at.split('T')[0] : ''
+      else
+        p.text-muted No members yet.
+      p: a(href="/admin/members") View all members &rarr;
+
+    .admin-panel
+      h3 Recent Payments
+      if recentPayments.length
+        table.admin-table
+          thead
+            tr
+              th Member
+              th Amount
+              th Status
+              th Date
+          tbody
+            each p in recentPayments
+              tr
+                td= p.first_name ? `${p.first_name} ${p.last_name}` : 'N/A'
+                td $#{(p.amount_cents / 100).toFixed(2)}
+                td
+                  span(class=`badge badge-${p.status}`)= p.status
+                td= p.created_at ? p.created_at.split('T')[0] : ''
+      else
+        p.text-muted No payments yet.
+      p: a(href="/admin/payments") View all payments &rarr;

@@ -1,0 +1,39 @@
+extends layout
+
+block page_title
+  | Payments
+
+block content
+  .admin-toolbar
+    a.btn-outline(href="/admin/payments/export") Export CSV
+
+  if payments.length
+    table.admin-table
+      thead
+        tr
+          th Member
+          th Number
+          th Amount
+          th Status
+          th Method
+          th Date
+      tbody
+        each p in payments
+          tr
+            td= p.first_name ? `${p.first_name} ${p.last_name}` : 'N/A'
+            td= p.member_number || '—'
+            td $#{(p.amount_cents / 100).toFixed(2)}
+            td
+              span(class=`badge badge-${p.status}`)= p.status
+            td= p.payment_method || 'stripe'
+            td= p.created_at
+
+    if totalPages > 1
+      .pagination
+        if page > 1
+          a(href=`/admin/payments?page=${page - 1}`) &laquo; Prev
+        span Page #{page} of #{totalPages} (#{total} total)
+        if page < totalPages
+          a(href=`/admin/payments?page=${page + 1}`) Next &raquo;
+  else
+    p.text-muted No payments yet.

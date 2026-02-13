@@ -1,0 +1,16 @@
+extends layout
+
+block content
+  section#bios.section
+    .container
+      h2 Board Member Bios
+      .bios-grid
+        each bio in bios
+          .bio-card
+            if bio.photo_path
+              img.bio-photo(src=bio.photo_path alt=bio.name)
+            h3= bio.name
+            if bio.role
+              .bio-role= bio.role
+            if bio.bio_text
+              p= bio.bio_text

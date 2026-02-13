@@ -1,0 +1,35 @@
+extends ../layout
+
+block page_title
+  if image
+    | Edit Image
+  else
+    | Add Image
+
+block content
+  form(method="POST" action=image ? `/admin/gallery/${image.id}` : '/admin/gallery' enctype="multipart/form-data")
+    .form-group
+      label(for="image") Image File#{image ? '' : ' *'}
+      input#image(type="file" name="image" accept="image/*")
+      if image && image.filename
+        .image-preview
+          img(src=image.filename alt="Current image" style="max-height:120px; margin-top:0.5rem")
+          input(type="hidden" name="existing_image" value=image.filename)
+    .form-group
+      label(for="alt_text") Alt Text
+      input#alt_text(type="text" name="alt_text" value=(image ? image.alt_text : ''))
+    .form-group
+      label(for="caption") Caption
+      input#caption(type="text" name="caption" value=(image ? image.caption : ''))
+    .form-grid
+      .form-group
+        label(for="sort_order") Sort Order
+        input#sort_order(type="number" name="sort_order" value=(image ? image.sort_order : 0))
+      .form-group
+        label
+          input(type="checkbox" name="is_visible" value="1" checked=(image ? image.is_visible : true))
+          |  Visible
+
+    .form-actions
+      button.btn(type="submit")= image ? 'Update' : 'Add Image'
+      a.btn-outline(href="/admin/gallery") Cancel
