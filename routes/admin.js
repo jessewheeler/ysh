@@ -116,8 +116,8 @@ router.post('/login/verify', async (req, res) => {
   req.session.adminEmail = admin.email;
   delete req.session.otpEmail;
 
-  const returnTo = req.session.returnTo || '/admin/dashboard';
   delete req.session.returnTo;
+  const returnTo = '/admin/dashboard';
   res.redirect(returnTo);
 });
 

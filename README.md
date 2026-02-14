@@ -52,16 +52,24 @@ Each directory contains its own README with details on its contents.
 
 Configured in `.env`. See `.env.example` for the full list.
 
-| Variable                 | Purpose                                     |
-|--------------------------|---------------------------------------------|
-| `PORT`                   | Server port (default `3000`)                |
-| `BASE_URL`               | Full base URL for Stripe redirect URLs      |
-| `SESSION_SECRET`         | Secret for signing session cookies          |
-| `STRIPE_SECRET_KEY`      | Stripe secret key (`sk_test_...`)           |
-| `STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (`pk_test_...`)      |
-| `STRIPE_WEBHOOK_SECRET`  | Stripe webhook signing secret (`whsec_...`) |
-| `SENDGRID_API_KEY`       | SendGrid API key (`SG...`)                  |
-| `FROM_EMAIL`             | Sender address for all outbound emails      |
+| Variable                | Purpose                                              |
+|-------------------------|------------------------------------------------------|
+| `NODE_ENV`              | Environment: `development`, `test`, or `production`  |
+| `PORT`                  | Server port (default `3000`)                         |
+| `BASE_URL`              | Full base URL for Stripe redirect URLs               |
+| `SESSION_SECRET`        | Secret for signing session cookies                   |
+| `STRIPE_SECRET_KEY`     | Stripe secret key (`sk_test_...`)                    |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (`whsec_...`)          |
+| `SENDGRID_API_KEY`      | SendGrid API key (`SG...`)                           |
+| `FROM_EMAIL`            | Sender address for all outbound emails               |
+| `B2_ENDPOINT`           | Backblaze B2 S3 endpoint (optional)                  |
+| `B2_REGION`             | Backblaze B2 region (optional)                       |
+| `B2_BUCKET`             | Backblaze B2 bucket name (optional)                  |
+| `B2_KEY_ID`             | Backblaze B2 access key ID (optional)                |
+| `B2_APP_KEY`            | Backblaze B2 application key (optional)              |
+| `B2_PUBLIC_URL`         | Backblaze B2 public URL prefix (optional)            |
+
+> **Note:** The Stripe publishable key is configured in **Admin > Settings**, not as an environment variable. B2 storage vars are optional — the app falls back to local disk when they're not set.
 
 ## Features
 

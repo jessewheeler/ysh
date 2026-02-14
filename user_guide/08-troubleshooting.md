@@ -61,7 +61,7 @@
 
 **Problem:** Visitors see an error on the membership signup page.
 
-- Confirm `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY` are set correctly in `.env` and **Settings**.
+- Confirm `STRIPE_SECRET_KEY` is set correctly in `.env` and the Stripe publishable key is configured in **Admin > Settings**.
 - Ensure the Stripe account is active and not in restricted mode.
 - Check that the webhook endpoint URL is configured in Stripe's Dashboard and points to your server's `/stripe/webhook` route.
 
