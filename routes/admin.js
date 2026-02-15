@@ -198,6 +198,10 @@ router.get('/members/:id', (req, res) => {
   const member = memberRepo.findById(req.params.id);
   if (!member) { req.session.flash_error = 'Member not found.'; return res.redirect('/admin/members'); }
 
+  if (req.query.edit) {
+    return res.render('admin/members/form', { member });
+  }
+  
   const payments = paymentRepo.findByMemberId(member.id);
   const cards = cardsRepo.findByMemberId(member.id);
   const emails = emailLogRepo.listByMemberId(member.id, 10);
