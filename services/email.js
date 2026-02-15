@@ -1,10 +1,8 @@
-const sgMail = require('@sendgrid/mail');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db/database');
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
+const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@yellowstoneseahawkers.com';
 
 function getContactEmail() {
@@ -48,9 +46,41 @@ function logEmail({ to_email, to_name, subject, body_html, email_type, status, e
   ).run(to_email, to_name || null, subject, body_html || null, email_type, status || 'sent', error || null, member_id || null);
 }
 
+async function mailersendSend({ to, toName, from, subject, html, attachments }) {
+  const body = {
+    from: { email: from.email, name: from.name },
+    to: [{ email: to, name: toName || to }],
+    subject,
+    html,
+  };
+  if (attachments && attachments.length > 0) {
+    body.attachments = attachments.map(a => ({
+      content: a.content,
+      filename: a.filename,
+      disposition: a.disposition || 'attachment',
+    }));
+  }
+
+  const res = await fetch('https://api.mailersend.com/v1/email', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${MAILERSEND_API_KEY}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    const errMsg = errBody.message || `HTTP ${res.status}`;
+    throw new Error(errMsg);
+  }
+}
+
 async function sendEmail({ to, toName, subject, html, email_type, member_id, attachments }) {
   const msg = {
     to,
+    toName,
     from: { email: FROM_EMAIL, name: 'Yellowstone Sea Hawkers' },
     subject,
     html: emailWrapper(html),
@@ -58,11 +88,11 @@ async function sendEmail({ to, toName, subject, html, email_type, member_id, att
   if (attachments) msg.attachments = attachments;
 
   try {
-    await sgMail.send(msg);
+    await mailersendSend(msg);
     logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'sent', member_id });
   } catch (err) {
-    const errMsg = err.response?.body?.errors?.[0]?.message || err.message;
-    console.error(`SendGrid error (${email_type}):`, errMsg);
+    const errMsg = err.message;
+    console.error(`MailerSend error (${email_type}):`, errMsg);
     logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
     throw err;
   }

@@ -8,7 +8,7 @@
   ```
   npm run create-admin you@example.com super_admin "Your Name"
   ```
-- If you are not receiving the login code email, check your spam folder and verify that `SENDGRID_API_KEY` and `FROM_EMAIL` are configured correctly in `.env`.
+- If you are not receiving the login code email, check your spam folder and verify that `MAILERSEND_API_KEY` and `FROM_EMAIL` are configured correctly in `.env`.
 - Each OTP code expires after 10 minutes. If your code has expired, click **Resend code** on the verification page.
 - After 5 failed code attempts, the code is locked. Click **Resend code** to get a fresh one.
 - Login is rate-limited to 10 attempts per 15 minutes. If you have been locked out, wait 15 minutes and try again.
@@ -30,9 +30,9 @@
 
 **Problem:** Emails show as failed in the email log.
 
-- Confirm `SENDGRID_API_KEY` and `FROM_EMAIL` are set in your `.env` file.
-- Ensure the sender address (`FROM_EMAIL`) is verified in your SendGrid account under Sender Authentication.
-- Check SendGrid's Activity Feed for bounces, blocks, or suppressions.
+- Confirm `MAILERSEND_API_KEY` and `FROM_EMAIL` are set in your `.env` file.
+- Ensure the sender domain is verified in your MailerSend account under Domain Settings.
+- Check MailerSend's Activity log for bounces, blocks, or suppressions.
 - If the API key was recently rotated, restart the server after updating `.env`.
 
 ## Card Generation Fails

@@ -1,6 +1,6 @@
 # YSH — Yellowstone Sea Hawkers
 
-Member-management web app: Express 5, Pug templates, better-sqlite3, Stripe payments, SendGrid email, canvas/PDFKit membership cards.
+Member-management web app: Express 5, Pug templates, better-sqlite3, Stripe payments, MailerSend email, canvas/PDFKit membership cards.
 
 ## Commands
 
@@ -42,7 +42,7 @@ test/                  # Jest tests mirroring source structure
 
 - Tests live in `test/` mirroring source paths (e.g. `test/services/members.test.js`)
 - DB mocking: `jest.mock('../../db/database', () => require('../helpers/setupDb'))` — provides an in-memory SQLite proxy that resets between tests via `db.__resetTestDb()`
-- External services (Stripe, SendGrid) are mocked with `jest.fn()` at the module level
+- External services (Stripe, MailerSend) are mocked with `jest.fn()` at the module level
 - Fixtures: use `insertMember(db, overrides)` from `test/helpers/fixtures.js` to create test data
 
 ## Database

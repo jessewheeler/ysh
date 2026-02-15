@@ -38,9 +38,9 @@ Both functions upsert a `membership_cards` row (one row per member per year).
 - White body with member name, member number, season year, and "ACTIVE MEMBER" badge
 - Green (`#69be28`) bottom accent bar with "Go Hawks!"
 
-### email.js -- SendGrid Email
+### email.js -- MailerSend Email
 
-Requires `SENDGRID_API_KEY` and `FROM_EMAIL` in the environment. All emails are wrapped in a branded HTML template (navy header, white body, gray footer). Every send is logged to the `emails_log` table regardless of success or failure.
+Requires `MAILERSEND_API_KEY` and `FROM_EMAIL` in the environment. All emails are wrapped in a branded HTML template (navy header, white body, gray footer). Every send is logged to the `emails_log` table regardless of success or failure.
 
 | Function                  | Signature                                | Description                                                                            |
 |---------------------------|------------------------------------------|----------------------------------------------------------------------------------------|

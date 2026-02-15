@@ -2,7 +2,7 @@
 
 ## Overview
 
-YSH sends email through SendGrid. All outbound emails — whether automated or manually composed — use a branded HTML template with a navy header, white body, and gray footer.
+YSH sends email through MailerSend. All outbound emails — whether automated or manually composed — use a branded HTML template with a navy header, white body, and gray footer.
 
 Every email is logged to the database regardless of whether it succeeded or failed.
 
@@ -46,6 +46,6 @@ Use the log to verify that automated emails were delivered or to diagnose delive
 
 If emails show as **failed** in the log:
 
-1. Verify the `SENDGRID_API_KEY` and `FROM_EMAIL` environment variables are set correctly.
-2. Check that the sender email is verified in your SendGrid account.
-3. Review SendGrid's Activity Feed for bounce or block details.
+1. Verify the `MAILERSEND_API_KEY` and `FROM_EMAIL` environment variables are set correctly.
+2. Check that the sender domain is verified in your MailerSend account.
+3. Review MailerSend's Activity log for bounce or block details.

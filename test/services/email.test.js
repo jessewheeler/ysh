@@ -1,11 +1,5 @@
-jest.mock('@sendgrid/mail', () => ({
-  setApiKey: jest.fn(),
-  send: jest.fn().mockResolvedValue([{ statusCode: 202 }]),
-}));
-
 jest.mock('../../db/database', () => require('../helpers/setupDb'));
 
-const sgMail = require('@sendgrid/mail');
 const db = require('../../db/database');
 const { insertMember, insertSetting, insertCard } = require('../helpers/fixtures');
 
@@ -15,7 +9,7 @@ let testMember;
 beforeEach(() => {
   db.__resetTestDb();
   jest.clearAllMocks();
-  sgMail.send.mockResolvedValue([{ statusCode: 202 }]);
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 202 });
 
   // Re-require to get fresh module with mocked deps
   jest.isolateModules(() => {
@@ -33,19 +27,24 @@ beforeEach(() => {
   });
 });
 
+function getFetchBody() {
+  const callArgs = global.fetch.mock.calls[0];
+  return JSON.parse(callArgs[1].body);
+}
+
 describe('sendWelcomeEmail', () => {
   test('sends to correct recipient with correct subject', async () => {
     await emailService.sendWelcomeEmail(testMember);
-    const msg = sgMail.send.mock.calls[0][0];
-    expect(msg.to).toBe('member@test.com');
-    expect(msg.subject).toBe('Welcome to the Yellowstone Sea Hawkers!');
+    const body = getFetchBody();
+    expect(body.to[0].email).toBe('member@test.com');
+    expect(body.subject).toBe('Welcome to the Yellowstone Sea Hawkers!');
   });
 
   test('includes member info in body', async () => {
     await emailService.sendWelcomeEmail(testMember);
-    const msg = sgMail.send.mock.calls[0][0];
-    expect(msg.html).toContain('YSH-2025-0001');
-    expect(msg.html).toContain('John');
+    const body = getFetchBody();
+    expect(body.html).toContain('YSH-2025-0001');
+    expect(body.html).toContain('John');
   });
 
   test('logs with type welcome', async () => {
@@ -56,31 +55,39 @@ describe('sendWelcomeEmail', () => {
     expect(log.status).toBe('sent');
   });
 
-  test('re-throws on SendGrid failure', async () => {
-    sgMail.send.mockRejectedValueOnce(new Error('SendGrid down'));
-    await expect(emailService.sendWelcomeEmail(testMember)).rejects.toThrow('SendGrid down');
+  test('re-throws on MailerSend failure', async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ message: 'MailerSend error' }),
+    });
+    await expect(emailService.sendWelcomeEmail(testMember)).rejects.toThrow('MailerSend error');
   });
 
-  test('logs failure when SendGrid errors', async () => {
-    sgMail.send.mockRejectedValueOnce(new Error('SendGrid down'));
+  test('logs failure when MailerSend errors', async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ message: 'MailerSend error' }),
+    });
     await emailService.sendWelcomeEmail(testMember).catch(() => {});
     const log = db.prepare("SELECT * FROM emails_log WHERE status = 'failed'").get();
     expect(log).toBeDefined();
-    expect(log.error).toContain('SendGrid down');
+    expect(log.error).toContain('MailerSend error');
   });
 });
 
 describe('sendPaymentConfirmation', () => {
   test('formats cents to dollars in email body', async () => {
     await emailService.sendPaymentConfirmation(testMember, { amount_total: 2500 });
-    const msg = sgMail.send.mock.calls[0][0];
-    expect(msg.html).toContain('$25.00');
+    const body = getFetchBody();
+    expect(body.html).toContain('$25.00');
   });
 
   test('handles missing amount_total', async () => {
     await emailService.sendPaymentConfirmation(testMember, {});
-    const msg = sgMail.send.mock.calls[0][0];
-    expect(msg.html).toContain('N/A');
+    const body = getFetchBody();
+    expect(body.html).toContain('N/A');
   });
 
   test('logs with type payment_confirmation', async () => {
@@ -107,7 +114,7 @@ describe('sendCardEmail', () => {
 
     // fs.existsSync will return false for these paths, so no attachments but email still sends
     await emailService.sendCardEmail(testMember);
-    expect(sgMail.send).toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalled();
   });
 
   test('logs with type card_delivery', async () => {
@@ -128,9 +135,9 @@ describe('sendCardEmail', () => {
 describe('sendBlastEmail', () => {
   test('passes subject and body through', async () => {
     await emailService.sendBlastEmail(testMember, 'Big News', '<p>Hello all!</p>');
-    const msg = sgMail.send.mock.calls[0][0];
-    expect(msg.subject).toBe('Big News');
-    expect(msg.html).toContain('Hello all!');
+    const body = getFetchBody();
+    expect(body.subject).toBe('Big News');
+    expect(body.html).toContain('Hello all!');
   });
 
   test('logs with type blast', async () => {
@@ -144,10 +151,10 @@ describe('sendBlastEmail', () => {
 describe('sendOtpEmail', () => {
   test('sends to correct recipient with OTP code in body', async () => {
     await emailService.sendOtpEmail({ to: 'admin@test.com', toName: 'Admin User', otp: '123456' });
-    const msg = sgMail.send.mock.calls[0][0];
-    expect(msg.to).toBe('admin@test.com');
-    expect(msg.html).toContain('123456');
-    expect(msg.subject).toContain('Login Code');
+    const body = getFetchBody();
+    expect(body.to[0].email).toBe('admin@test.com');
+    expect(body.html).toContain('123456');
+    expect(body.subject).toContain('Login Code');
   });
 
   test('logs with type otp', async () => {
@@ -164,9 +171,13 @@ describe('sendOtpEmail', () => {
     expect(log.member_id).toBeNull();
   });
 
-  test('re-throws on SendGrid failure', async () => {
-    sgMail.send.mockRejectedValueOnce(new Error('SendGrid down'));
-    await expect(emailService.sendOtpEmail({ to: 'a@b.com', toName: 'X', otp: '000000' })).rejects.toThrow('SendGrid down');
+  test('re-throws on MailerSend failure', async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ message: 'MailerSend error' }),
+    });
+    await expect(emailService.sendOtpEmail({ to: 'a@b.com', toName: 'X', otp: '000000' })).rejects.toThrow('MailerSend error');
   });
 });
 
@@ -176,21 +187,21 @@ describe('sendContactEmail', () => {
     insertSetting(testDb, 'contact_email', 'admin@ysh.org');
 
     await emailService.sendContactEmail({ name: 'Bob', email: 'bob@test.com', message: 'Hi there' });
-    const msg = sgMail.send.mock.calls[0][0];
-    expect(msg.to).toBe('admin@ysh.org');
+    const body = getFetchBody();
+    expect(body.to[0].email).toBe('admin@ysh.org');
   });
 
   test('falls back to FROM_EMAIL when no setting', async () => {
     await emailService.sendContactEmail({ name: 'Bob', email: 'bob@test.com', message: 'Hello' });
-    const msg = sgMail.send.mock.calls[0][0];
+    const body = getFetchBody();
     // Falls back to FROM_EMAIL (env var or default)
-    expect(msg.to).toBeTruthy();
+    expect(body.to[0].email).toBeTruthy();
   });
 
   test('converts newlines in message to <br>', async () => {
     await emailService.sendContactEmail({ name: 'Bob', email: 'bob@test.com', message: 'Line1\nLine2' });
-    const msg = sgMail.send.mock.calls[0][0];
-    expect(msg.html).toContain('Line1<br>Line2');
+    const body = getFetchBody();
+    expect(body.html).toContain('Line1<br>Line2');
   });
 
   test('logs with type contact', async () => {
@@ -201,7 +212,7 @@ describe('sendContactEmail', () => {
 
   test('includes sender name in subject', async () => {
     await emailService.sendContactEmail({ name: 'Alice', email: 'alice@test.com', message: 'Msg' });
-    const msg = sgMail.send.mock.calls[0][0];
-    expect(msg.subject).toContain('Alice');
+    const body = getFetchBody();
+    expect(body.subject).toContain('Alice');
   });
 });

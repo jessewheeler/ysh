@@ -31,7 +31,7 @@ class ServerManager:
         env['SESSION_SECRET'] = 'robot-test-secret'
         env['STRIPE_SECRET_KEY'] = 'sk_test_fake_key_for_robot_tests'
         env['STRIPE_WEBHOOK_SECRET'] = 'whsec_fake_key_for_robot_tests'
-        env['SENDGRID_API_KEY'] = 'SG.fake_key_for_robot_tests'
+        env['MAILERSEND_API_KEY'] = 'mlsn.fake_key_for_robot_tests'
         env['FROM_EMAIL'] = 'test@example.com'
         env['BASE_URL'] = base_url
         env['NODE_ENV'] = 'test'

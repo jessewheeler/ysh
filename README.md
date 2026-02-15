@@ -60,7 +60,7 @@ Configured in `.env`. See `.env.example` for the full list.
 | `SESSION_SECRET`        | Secret for signing session cookies                   |
 | `STRIPE_SECRET_KEY`     | Stripe secret key (`sk_test_...`)                    |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (`whsec_...`)          |
-| `SENDGRID_API_KEY`      | SendGrid API key (`SG...`)                           |
+| `MAILERSEND_API_KEY`    | MailerSend API key (`mlsn...`)                       |
 | `FROM_EMAIL`            | Sender address for all outbound emails               |
 | `B2_ENDPOINT`           | Backblaze B2 S3 endpoint (optional)                  |
 | `B2_REGION`             | Backblaze B2 region (optional)                       |
@@ -77,7 +77,7 @@ Configured in `.env`. See `.env.example` for the full list.
 - **Homepage** with announcements, about section, event gallery, membership signup, charitable partners, and contact form -- all rendered from the database
 - **Board bios** page driven by the DB
 - **Membership signup** with Stripe Checkout integration
-- **Contact form** that emails submissions via SendGrid
+- **Contact form** that emails submissions via MailerSend
 
 ### Admin CMS (`/admin`)
 - **Multi-admin accounts** with email-based OTP login (no shared password)
@@ -100,7 +100,7 @@ Configured in `.env`. See `.env.example` for the full list.
 ### Membership Cards
 Auto-generated as both PDF and PNG. Navy header with the Sea Hawkers logo, member name, member number (`YSH-2026-0001`), season year, and a green "Go Hawks!" footer bar. Stored in `data/cards/`, downloadable from admin, and emailable to the member.
 
-### Email (SendGrid)
+### Email (MailerSend)
 All emails use a branded HTML template (navy header, white body, gray footer). Types:
 - **Welcome** -- sent after payment with membership details
 - **Payment confirmation** -- receipt with amount, date, member number
@@ -130,7 +130,7 @@ Every send is logged to the `emails_log` table.
 | Database        | SQLite via better-sqlite3          |
 | Sessions        | express-session + connect-sqlite3  |
 | Payments        | Stripe Checkout                    |
-| Email           | SendGrid (@sendgrid/mail)          |
+| Email           | MailerSend (REST API via fetch)    |
 | Card generation | pdfkit (PDF) + canvas (PNG)        |
 | Security        | helmet, express-rate-limit, bcrypt |
 | File uploads    | multer                             |
