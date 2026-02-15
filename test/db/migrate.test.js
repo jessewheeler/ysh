@@ -5,11 +5,51 @@ jest.mock('../../db/database', () => {
 
   const proxy = new Proxy({}, {
     get(_, prop) {
+      if (prop === 'dialect') return 'sqlite';
       if (prop === '__resetBare') {
         return () => {
           try { _db.close(); } catch (_e) { /* ignore */ }
           _db = new Database(':memory:');
           _db.pragma('foreign_keys = ON');
+        };
+      }
+      if (prop === 'get') {
+        return async (sql, ...params) => {
+          const sanitized = params.map(p => p === undefined ? null : p);
+          return _db.prepare(sql).get(...sanitized);
+        };
+      }
+      if (prop === 'all') {
+        return async (sql, ...params) => {
+          const sanitized = params.map(p => p === undefined ? null : p);
+          return _db.prepare(sql).all(...sanitized);
+        };
+      }
+      if (prop === 'run') {
+        return async (sql, ...params) => {
+          const sanitized = params.map(p => p === undefined ? null : p);
+          return _db.prepare(sql).run(...sanitized);
+        };
+      }
+      if (prop === 'exec') {
+        return async (sql) => _db.exec(sql);
+      }
+      if (prop === 'transaction') {
+        return async (fn) => {
+          const isAsync = fn.constructor.name === 'AsyncFunction';
+          if (!isAsync) {
+            return _db.transaction(fn)();
+          } else {
+            _db.prepare('BEGIN').run();
+            try {
+              const result = await fn();
+              _db.prepare('COMMIT').run();
+              return result;
+            } catch (e) {
+              _db.prepare('ROLLBACK').run();
+              throw e;
+            }
+          }
         };
       }
       const val = _db[prop];

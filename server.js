@@ -3,8 +3,6 @@ const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
 const session = require('express-session');
-const PgSimpleStore = require('connect-pg-simple')(session);
-const SQLiteStore = require('connect-sqlite3')(session);
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const multer = require('multer');
@@ -75,11 +73,13 @@ const upload = multer({
 // Sessions
 let store;
 if (process.env.DATABASE_URL) {
+  const PgSimpleStore = require('connect-pg-simple')(session);
   store = new PgSimpleStore({
     conString: process.env.DATABASE_URL,
     createTableIfMissing: true,
   });
 } else {
+  const SQLiteStore = require('connect-sqlite3')(session);
   store = new SQLiteStore({ dir: path.join(__dirname, 'data'), db: 'sessions.db' });
 }
 

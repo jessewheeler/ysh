@@ -8,7 +8,8 @@ const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@yellowstoneseahawkers.com';
 
 async function getContactEmail() {
-  return (await settingsRepo.get('contact_email')) || FROM_EMAIL;
+  const contactEmail = await settingsRepo.get('contact_email');
+  return contactEmail || FROM_EMAIL;
 }
 
 function emailWrapper(bodyHtml) {
@@ -41,7 +42,29 @@ function emailWrapper(bodyHtml) {
 }
 
 async function logEmail({ to_email, to_name, subject, body_html, email_type, status, error, member_id }) {
-  await emailLogRepo.insert({ to_email, to_name, subject, body_html, email_type, status, error, member_id });
+  try {
+    const safeToEmail = to_email ? String(to_email) : 'unknown@example.com';
+    const safeToName = to_name ? String(to_name) : null;
+    const safeSubject = subject ? String(subject) : '(no subject)';
+    const safeBodyHtml = body_html ? String(body_html) : null;
+    const safeEmailType = email_type ? String(email_type) : null;
+    const safeStatus = status ? String(status) : 'sent';
+    const safeError = error ? String(error) : null;
+    const safeMemberId = (member_id !== undefined && member_id !== null) ? Number(member_id) : null;
+
+    await emailLogRepo.insert({
+      to_email: safeToEmail,
+      to_name: safeToName,
+      subject: safeSubject,
+      body_html: safeBodyHtml,
+      email_type: safeEmailType,
+      status: safeStatus,
+      error: safeError,
+      member_id: safeMemberId
+    });
+  } catch (err) {
+    console.error('Failed to log email to DB:', err);
+  }
 }
 
 async function mailersendSend({ to, toName, from, subject, html, attachments }) {
@@ -89,7 +112,7 @@ async function sendEmail({ to, toName, subject, html, email_type, member_id, att
     await mailersendSend(msg);
     await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'sent', member_id });
   } catch (err) {
-    const errMsg = err.message;
+    const errMsg = err.message || String(err);
     console.error(`MailerSend error (${email_type}):`, errMsg);
     await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
     throw err;
@@ -220,7 +243,7 @@ async function sendOtpEmail({ to, toName, otp }) {
 }
 
 async function sendContactEmail({ name, email, message }) {
-  const contactTo = getContactEmail();
+  const contactTo = await getContactEmail();
   const html = `
     <h2 style="color:#002a5c;">New Contact Form Submission</h2>
     <table style="margin:20px 0; font-size:14px;">

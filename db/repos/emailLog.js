@@ -4,7 +4,14 @@ async function insert({ to_email, to_name, subject, body_html, email_type, statu
   return await db.run(
     `INSERT INTO emails_log (to_email, to_name, subject, body_html, email_type, status, error, member_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    to_email, to_name || null, subject, body_html || null, email_type, status || 'sent', error || null, member_id || null
+    to_email || null,
+    to_name || null,
+    subject || null,
+    body_html || null,
+    email_type || null,
+    status || 'sent',
+    error || null,
+    member_id || null
   );
 }
 

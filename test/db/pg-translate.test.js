@@ -1,6 +1,24 @@
 const { translateParams, translateSql, addReturningId } = require('../../db/pg-translate');
+const { SCHEMA, toPgSchema } = require('../../db/schema');
 
 describe('pg-translate', () => {
+  test('toPgSchema converts AUTOINCREMENT to SERIAL', () => {
+    const pg = toPgSchema(SCHEMA);
+    expect(pg).not.toContain('AUTOINCREMENT');
+    expect(pg).toContain('SERIAL PRIMARY KEY');
+  });
+
+  test('toPgSchema converts datetime to NOW()', () => {
+    const pg = toPgSchema(SCHEMA);
+    expect(pg).not.toContain("datetime('now')");
+    expect(pg).toContain('NOW()');
+  });
+
+  test('toPgSchema uses TIMESTAMP for created_at/updated_at defaults', () => {
+    const pg = toPgSchema(SCHEMA);
+    expect(pg).toContain('TIMESTAMP DEFAULT NOW()');
+  });
+
   test('translateParams replaces ? with $n', () => {
     expect(translateParams('SELECT * FROM users WHERE id = ?')).toBe('SELECT * FROM users WHERE id = $1');
     expect(translateParams('INSERT INTO logs (msg, val) VALUES (?, ?)')).toBe('INSERT INTO logs (msg, val) VALUES ($1, $2)');

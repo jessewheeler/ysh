@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const { AsyncLocalStorage } = require('async_hooks');
 const { translateParams, translateSql, addReturningId } = require('./pg-translate');
 
 let db;
@@ -12,64 +13,54 @@ if (dialect === 'pg') {
     ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false }
   });
 
+  // AsyncLocalStorage lets db.get/all/run automatically use the transaction
+  // client when called inside db.transaction(), instead of going through the pool.
+  const txnStore = new AsyncLocalStorage();
+
+  function getQueryable() {
+    return txnStore.getStore() || pool;
+  }
+
   db = {
     dialect: 'pg',
     async get(sql, ...params) {
-      const res = await pool.query(translateParams(translateSql(sql)), params);
+      const sanitizedParams = params.map(p => p === undefined ? null : p);
+      const res = await getQueryable().query(translateParams(translateSql(sql)), sanitizedParams.length ? sanitizedParams : undefined);
       return res.rows[0];
     },
     async all(sql, ...params) {
-      const res = await pool.query(translateParams(translateSql(sql)), params);
+      const sanitizedParams = params.map(p => p === undefined ? null : p);
+      const res = await getQueryable().query(translateParams(translateSql(sql)), sanitizedParams.length ? sanitizedParams : undefined);
       return res.rows;
     },
     async run(sql, ...params) {
+      const sanitizedParams = params.map(p => p === undefined ? null : p);
       let pgSql = translateSql(sql);
       const isInsert = /^\s*INSERT INTO/i.test(pgSql);
       if (isInsert) {
         pgSql = addReturningId(pgSql);
       }
-      const res = await pool.query(translateParams(pgSql), params);
+      const res = await getQueryable().query(translateParams(pgSql), sanitizedParams.length ? sanitizedParams : undefined);
       return {
         lastInsertRowid: isInsert && res.rows[0] ? res.rows[0].id : null,
         changes: res.rowCount
       };
     },
     async exec(sql) {
-      await pool.query(translateSql(sql));
+      await getQueryable().query(translateSql(sql));
     },
     async transaction(fn) {
-      if (dialect === 'pg') {
-        const client = await pool.connect();
-        try {
-          await client.query('BEGIN');
-          const result = await fn(client);
-          await client.query('COMMIT');
-          return result;
-        } catch (e) {
-          await client.query('ROLLBACK');
-          throw e;
-        } finally {
-          client.release();
-        }
-      } else {
-        // SQLite: better-sqlite3 transactions are synchronous and cannot handle async functions.
-        // But for consistency in our unified API, we allow passing an async function.
-        // If it's a sync function, we use better-sqlite3's transaction.
-        // If it's an async function, we have to handle it manually with BEGIN/COMMIT to allow awaits.
-        const isAsync = fn.constructor.name === 'AsyncFunction';
-        if (!isAsync) {
-          return sqlite.transaction(fn)();
-        } else {
-          sqlite.prepare('BEGIN').run();
-          try {
-            const result = await fn();
-            sqlite.prepare('COMMIT').run();
-            return result;
-          } catch (e) {
-            sqlite.prepare('ROLLBACK').run();
-            throw e;
-          }
-        }
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await txnStore.run(client, () => fn());
+        await client.query('COMMIT');
+        return result;
+      } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+      } finally {
+        client.release();
       }
     },
     async close() {
@@ -89,13 +80,16 @@ if (dialect === 'pg') {
   db = {
     dialect: 'sqlite',
     async get(sql, ...params) {
-      return sqlite.prepare(sql).get(...params);
+      const sanitized = params.map(p => p === undefined ? null : p);
+      return sqlite.prepare(sql).get(...sanitized);
     },
     async all(sql, ...params) {
-      return sqlite.prepare(sql).all(...params);
+      const sanitized = params.map(p => p === undefined ? null : p);
+      return sqlite.prepare(sql).all(...sanitized);
     },
     async run(sql, ...params) {
-      const result = sqlite.prepare(sql).run(...params);
+      const sanitized = params.map(p => p === undefined ? null : p);
+      const result = sqlite.prepare(sql).run(...sanitized);
       return {
         lastInsertRowid: result.lastInsertRowid,
         changes: result.changes
@@ -105,10 +99,6 @@ if (dialect === 'pg') {
       sqlite.exec(sql);
     },
     async transaction(fn) {
-      // SQLite: better-sqlite3 transactions are synchronous and cannot handle async functions.
-      // But for consistency in our unified API, we allow passing an async function.
-      // If it's a sync function, we use better-sqlite3's transaction.
-      // If it's an async function, we have to handle it manually with BEGIN/COMMIT to allow awaits.
       const isAsync = fn.constructor.name === 'AsyncFunction';
       if (!isAsync) {
         return sqlite.transaction(fn)();
@@ -127,7 +117,6 @@ if (dialect === 'pg') {
     async close() {
       sqlite.close();
     },
-    // Expose prepare for test helpers that still need it
     prepare(sql) {
       return sqlite.prepare(sql);
     }

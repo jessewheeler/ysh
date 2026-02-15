@@ -35,83 +35,83 @@ function insertBio(overrides = {}) {
 }
 
 describe('Announcements', () => {
-  test('listAnnouncements returns all', () => {
+  test('listAnnouncements returns all', async () => {
     insertAnnouncement({ title: 'A' });
     insertAnnouncement({ title: 'B', is_published: 0 });
-    expect(contentService.listAnnouncements()).toHaveLength(2);
+    expect(await contentService.listAnnouncements()).toHaveLength(2);
   });
 
-  test('listPublishedAnnouncements filters unpublished', () => {
+  test('listPublishedAnnouncements filters unpublished', async () => {
     insertAnnouncement({ title: 'A' });
     insertAnnouncement({ title: 'B', is_published: 0 });
-    expect(contentService.listPublishedAnnouncements()).toHaveLength(1);
+    expect(await contentService.listPublishedAnnouncements()).toHaveLength(1);
   });
 
-  test('getAnnouncement returns by id', () => {
+  test('getAnnouncement returns by id', async () => {
     const a = insertAnnouncement({ title: 'Find me' });
-    expect(contentService.getAnnouncement(a.id).title).toBe('Find me');
+    expect((await contentService.getAnnouncement(a.id)).title).toBe('Find me');
   });
 
-  test('createAnnouncement inserts', () => {
-    contentService.createAnnouncement({ title: 'New', is_published: true, sort_order: 0 });
-    expect(contentService.listAnnouncements()).toHaveLength(1);
+  test('createAnnouncement inserts', async () => {
+    await contentService.createAnnouncement({ title: 'New', is_published: true, sort_order: 0 });
+    expect(await contentService.listAnnouncements()).toHaveLength(1);
   });
 
-  test('updateAnnouncement modifies', () => {
+  test('updateAnnouncement modifies', async () => {
     const a = insertAnnouncement({ title: 'Old' });
-    contentService.updateAnnouncement(a.id, { title: 'New', is_published: true, sort_order: 0 });
-    expect(contentService.getAnnouncement(a.id).title).toBe('New');
+    await contentService.updateAnnouncement(a.id, { title: 'New', is_published: true, sort_order: 0 });
+    expect((await contentService.getAnnouncement(a.id)).title).toBe('New');
   });
 
   test('deleteAnnouncement removes and cleans up image', async () => {
     const a = insertAnnouncement({ title: 'Del', image_path: '/img/old.jpg' });
     await contentService.deleteAnnouncement(a.id);
-    expect(contentService.getAnnouncement(a.id)).toBeUndefined();
+    expect(await contentService.getAnnouncement(a.id)).toBeUndefined();
     expect(storage.deleteFile).toHaveBeenCalledWith('/img/old.jpg');
   });
 });
 
 describe('Gallery', () => {
-  test('listGalleryImages / listVisibleGalleryImages', () => {
+  test('listGalleryImages / listVisibleGalleryImages', async () => {
     insertGalleryImage();
     insertGalleryImage({ filename: 'h.jpg', is_visible: 0 });
-    expect(contentService.listGalleryImages()).toHaveLength(2);
-    expect(contentService.listVisibleGalleryImages()).toHaveLength(1);
+    expect(await contentService.listGalleryImages()).toHaveLength(2);
+    expect(await contentService.listVisibleGalleryImages()).toHaveLength(1);
   });
 
   test('CRUD cycle', async () => {
-    contentService.createGalleryImage({ filename: 'new.jpg', is_visible: true, sort_order: 0 });
-    const all = contentService.listGalleryImages();
+    await contentService.createGalleryImage({ filename: 'new.jpg', is_visible: true, sort_order: 0 });
+    const all = await contentService.listGalleryImages();
     expect(all).toHaveLength(1);
 
     const id = all[0].id;
-    contentService.updateGalleryImage(id, { filename: 'upd.jpg', is_visible: true, sort_order: 0 });
-    expect(contentService.getGalleryImage(id).filename).toBe('upd.jpg');
+    await contentService.updateGalleryImage(id, { filename: 'upd.jpg', is_visible: true, sort_order: 0 });
+    expect((await contentService.getGalleryImage(id)).filename).toBe('upd.jpg');
 
     await contentService.deleteGalleryImage(id);
-    expect(contentService.getGalleryImage(id)).toBeUndefined();
+    expect(await contentService.getGalleryImage(id)).toBeUndefined();
   });
 });
 
 describe('Bios', () => {
-  test('listBios / listVisibleBios', () => {
+  test('listBios / listVisibleBios', async () => {
     insertBio();
     insertBio({ name: 'Hidden', is_visible: 0 });
-    expect(contentService.listBios()).toHaveLength(2);
-    expect(contentService.listVisibleBios()).toHaveLength(1);
+    expect(await contentService.listBios()).toHaveLength(2);
+    expect(await contentService.listVisibleBios()).toHaveLength(1);
   });
 
   test('CRUD cycle', async () => {
-    contentService.createBio({ name: 'New', is_visible: true, sort_order: 0 });
-    const all = contentService.listBios();
+    await contentService.createBio({ name: 'New', is_visible: true, sort_order: 0 });
+    const all = await contentService.listBios();
     expect(all).toHaveLength(1);
 
     const id = all[0].id;
-    contentService.updateBio(id, { name: 'Updated', is_visible: true, sort_order: 0 });
-    expect(contentService.getBio(id).name).toBe('Updated');
+    await contentService.updateBio(id, { name: 'Updated', is_visible: true, sort_order: 0 });
+    expect((await contentService.getBio(id)).name).toBe('Updated');
 
     await contentService.deleteBio(id);
-    expect(contentService.getBio(id)).toBeUndefined();
+    expect(await contentService.getBio(id)).toBeUndefined();
   });
 
   test('deleteBio cleans up photo', async () => {

@@ -10,16 +10,16 @@ beforeEach(() => {
 });
 
 describe('findAdminByEmail', () => {
-  test('returns admin member by email', () => {
+  test('returns admin member by email', async () => {
     const testDb = db.__getCurrentDb();
     insertAdmin(testDb, { email: 'admin@test.com' });
-    const admin = authService.findAdminByEmail('admin@test.com');
+    const admin = await authService.findAdminByEmail('admin@test.com');
     expect(admin).toBeDefined();
     expect(admin.role).toBe('super_admin');
   });
 
-  test('returns undefined for non-admin', () => {
-    expect(authService.findAdminByEmail('nobody@test.com')).toBeUndefined();
+  test('returns undefined for non-admin', async () => {
+    expect(await authService.findAdminByEmail('nobody@test.com')).toBeUndefined();
   });
 });
 
