@@ -1,13 +1,8 @@
-const db = require('../db/database');
+const settingsRepo = require('../db/repos/settings');
 
 function injectLocals(req, res, next) {
   // Site settings
-  const rows = db.prepare('SELECT key, value FROM site_settings').all();
-  const settings = {};
-  for (const row of rows) {
-    settings[row.key] = row.value;
-  }
-  res.locals.site = settings;
+  res.locals.site = settingsRepo.getAll();
   res.locals.isAdmin = !!(req.session && req.session.adminId);
   res.locals.adminRole = (req.session && req.session.adminRole) || null;
   res.locals.adminEmail = (req.session && req.session.adminEmail) || null;

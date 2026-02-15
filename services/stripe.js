@@ -1,5 +1,5 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const db = require('../db/database');
+const paymentRepo = require('../db/repos/payments');
 
 async function createCheckoutSession({ memberId, email, amountCents, baseUrl }) {
   const session = await stripe.checkout.sessions.create({
@@ -25,10 +25,14 @@ async function createCheckoutSession({ memberId, email, amountCents, baseUrl }) 
   });
 
   // Record the payment as pending
-  db.prepare(
-    `INSERT INTO payments (member_id, stripe_session_id, amount_cents, currency, status, description)
-     VALUES (?, ?, ?, 'usd', 'pending', ?)`
-  ).run(memberId, session.id, amountCents, `${new Date().getFullYear()} Membership Dues`);
+  paymentRepo.create({
+    member_id: memberId,
+    stripe_session_id: session.id,
+    amount_cents: amountCents,
+    currency: 'usd',
+    status: 'pending',
+    description: `${new Date().getFullYear()} Membership Dues`,
+  });
 
   return session;
 }

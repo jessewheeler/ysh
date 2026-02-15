@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db/database');
 const { activateMember, findMemberById } = require('../services/members');
+const paymentsService = require('../services/payments');
 
 router.post('/webhook', async (req, res) => {
   const sig = req.headers['stripe-signature'];
@@ -21,10 +21,7 @@ router.post('/webhook', async (req, res) => {
 
     if (memberId) {
       // Update payment record
-      db.prepare(
-        `UPDATE payments SET status = 'completed', stripe_payment_intent = ?, updated_at = datetime('now')
-         WHERE stripe_session_id = ?`
-      ).run(session.payment_intent, session.id);
+      paymentsService.completeStripePayment(session.id, session.payment_intent);
 
       // Activate member
       activateMember(memberId);

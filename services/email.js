@@ -1,13 +1,14 @@
 const fs = require('fs');
 const path = require('path');
-const db = require('../db/database');
+const settingsRepo = require('../db/repos/settings');
+const emailLogRepo = require('../db/repos/emailLog');
+const cardsRepo = require('../db/repos/cards');
 
 const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@yellowstoneseahawkers.com';
 
 function getContactEmail() {
-  const row = db.prepare("SELECT value FROM site_settings WHERE key = 'contact_email'").get();
-  return row?.value || FROM_EMAIL;
+  return settingsRepo.get('contact_email') || FROM_EMAIL;
 }
 
 function emailWrapper(bodyHtml) {
@@ -40,10 +41,7 @@ function emailWrapper(bodyHtml) {
 }
 
 function logEmail({ to_email, to_name, subject, body_html, email_type, status, error, member_id }) {
-  db.prepare(
-    `INSERT INTO emails_log (to_email, to_name, subject, body_html, email_type, status, error, member_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(to_email, to_name || null, subject, body_html || null, email_type, status || 'sent', error || null, member_id || null);
+  emailLogRepo.insert({ to_email, to_name, subject, body_html, email_type, status, error, member_id });
 }
 
 async function mailersendSend({ to, toName, from, subject, html, attachments }) {
@@ -147,9 +145,7 @@ async function sendPaymentConfirmation(member, stripeSession) {
 }
 
 async function sendCardEmail(member) {
-  const card = db.prepare(
-    'SELECT * FROM membership_cards WHERE member_id = ? ORDER BY created_at DESC LIMIT 1'
-  ).get(member.id);
+  const card = cardsRepo.findLatestByMemberId(member.id);
 
   if (!card) throw new Error('No card found for this member');
 
