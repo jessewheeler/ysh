@@ -201,7 +201,7 @@ router.get('/members/:id', (req, res) => {
   if (req.query.edit) {
     return res.render('admin/members/form', { member });
   }
-
+  
   const payments = paymentRepo.findByMemberId(member.id);
   const cards = cardsRepo.findByMemberId(member.id);
   const emails = emailLogRepo.listByMemberId(member.id, 10);
