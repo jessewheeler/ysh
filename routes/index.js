@@ -1,25 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db/database');
+const contentService = require('../services/content');
+const memberRepo = require('../db/repos/members');
+const settingsRepo = require('../db/repos/settings');
 const { generateMemberNumber } = require('../services/members');
 
 // Homepage
 router.get('/', (req, res) => {
-  const announcements = db.prepare(
-    'SELECT * FROM announcements WHERE is_published = 1 ORDER BY sort_order ASC'
-  ).all();
-  const gallery = db.prepare(
-    'SELECT * FROM gallery_images WHERE is_visible = 1 ORDER BY sort_order ASC'
-  ).all();
+  const announcements = contentService.listPublishedAnnouncements();
+  const gallery = contentService.listVisibleGalleryImages();
 
   res.render('index', { announcements, gallery });
 });
 
 // Board bios
 router.get('/bios', (req, res) => {
-  const bios = db.prepare(
-    'SELECT * FROM bios WHERE is_visible = 1 ORDER BY sort_order ASC'
-  ).all();
+  const bios = contentService.listVisibleBios();
   res.render('bios', { bios });
 });
 
@@ -39,7 +35,7 @@ router.post('/membership', async (req, res) => {
     }
 
     // Check for existing member with same email
-    const existing = db.prepare('SELECT id FROM members WHERE email = ?').get(email);
+    const existing = memberRepo.findByEmail(email);
     if (existing) {
       req.session.flash_error = 'An account with that email already exists. Please contact us for help.';
       return res.redirect('/membership');
@@ -48,16 +44,17 @@ router.post('/membership', async (req, res) => {
     const year = new Date().getFullYear();
     const member_number = generateMemberNumber(year);
 
-    const result = db.prepare(
-      `INSERT INTO members (member_number, first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`
-    ).run(member_number, first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, year);
+    const result = memberRepo.create({
+      member_number, first_name, last_name, email, phone,
+      address_street, address_city, address_state, address_zip,
+      membership_year: year, status: 'pending',
+    });
 
     const memberId = result.lastInsertRowid;
 
     // Get dues amount from settings
-    const duesSetting = db.prepare("SELECT value FROM site_settings WHERE key = 'dues_amount_cents'").get();
-    const amountCents = parseInt(duesSetting?.value) || 2500;
+    const duesValue = settingsRepo.get('dues_amount_cents');
+    const amountCents = parseInt(duesValue) || 2500;
 
     // Create Stripe checkout session
     const { createCheckoutSession } = require('../services/stripe');

@@ -2,7 +2,7 @@ const PDFDocument = require('pdfkit');
 const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs');
 const path = require('path');
-const db = require('../db/database');
+const cardsRepo = require('../db/repos/cards');
 
 const CARD_WIDTH = 1050;
 const CARD_HEIGHT = 600;
@@ -89,19 +89,7 @@ async function generatePNG(member) {
   fs.writeFileSync(filePath, buffer);
 
   const relativePath = `data/cards/${filename}`;
-
-  // Upsert card record
-  const existing = db.prepare(
-    'SELECT id FROM membership_cards WHERE member_id = ? AND year = ?'
-  ).get(member.id, member.membership_year);
-
-  if (existing) {
-    db.prepare('UPDATE membership_cards SET png_path = ? WHERE id = ?').run(relativePath, existing.id);
-  } else {
-    db.prepare(
-      'INSERT INTO membership_cards (member_id, png_path, year) VALUES (?, ?, ?)'
-    ).run(member.id, relativePath, member.membership_year);
-  }
+  cardsRepo.upsertPng(member.id, member.membership_year, relativePath);
 
   return filePath;
 }
@@ -160,19 +148,7 @@ async function generatePDF(member) {
 
     stream.on('finish', () => {
       const relativePath = `data/cards/${filename}`;
-
-      const existing = db.prepare(
-        'SELECT id FROM membership_cards WHERE member_id = ? AND year = ?'
-      ).get(member.id, member.membership_year);
-
-      if (existing) {
-        db.prepare('UPDATE membership_cards SET pdf_path = ? WHERE id = ?').run(relativePath, existing.id);
-      } else {
-        db.prepare(
-          'INSERT INTO membership_cards (member_id, pdf_path, year) VALUES (?, ?, ?)'
-        ).run(member.id, relativePath, member.membership_year);
-      }
-
+      cardsRepo.upsertPdf(member.id, member.membership_year, relativePath);
       resolve(filePath);
     });
 
