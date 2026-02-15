@@ -1,18 +1,18 @@
 const memberRepo = require('../db/repos/members');
 
-function listAdmins() {
-  return memberRepo.listAdmins();
+async function listAdmins() {
+  return await memberRepo.listAdmins();
 }
 
-function addAdmin({ email, first_name, last_name, role }) {
+async function addAdmin({ email, first_name, last_name, role }) {
   const adminRole = (role === 'super_admin') ? 'super_admin' : 'editor';
   const normalizedEmail = email.trim().toLowerCase();
 
-  const existing = memberRepo.findByEmail(normalizedEmail);
+  const existing = await memberRepo.findByEmail(normalizedEmail);
   if (existing) {
-    memberRepo.setRole(existing.id, adminRole);
+    await memberRepo.setRole(existing.id, adminRole);
   } else {
-    memberRepo.createAdmin({
+    await memberRepo.createAdmin({
       first_name: first_name.trim(),
       last_name: last_name.trim(),
       email: normalizedEmail,
@@ -21,8 +21,8 @@ function addAdmin({ email, first_name, last_name, role }) {
   }
 }
 
-function demoteAdmin(id) {
-  memberRepo.clearRole(id);
+async function demoteAdmin(id) {
+  await memberRepo.clearRole(id);
 }
 
 module.exports = {

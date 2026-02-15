@@ -39,7 +39,7 @@ router.post('/login', async (req, res) => {
     return res.redirect('/admin/login');
   }
 
-  const admin = authService.findAdminByEmail(email.trim().toLowerCase());
+  const admin = await authService.findAdminByEmail(email.trim().toLowerCase());
 
   // Always show generic message to prevent enumeration
   req.session.flash_success = 'If that email is registered, a login code has been sent.';
@@ -78,7 +78,7 @@ router.post('/login/verify', async (req, res) => {
 
   if (!email) return res.redirect('/admin/login');
 
-  const admin = authService.findAdminByEmail(email);
+  const admin = await authService.findAdminByEmail(email);
   const result = await authService.verifyOtp(admin, code);
 
   if (!result.success) {
@@ -100,7 +100,7 @@ router.post('/login/resend', async (req, res) => {
   const email = req.session.otpEmail;
   if (!email) return res.redirect('/admin/login');
 
-  const admin = authService.findAdminByEmail(email);
+  const admin = await authService.findAdminByEmail(email);
 
   if (admin) {
     const otp = await authService.generateAndStoreOtp(admin.id);
@@ -131,56 +131,68 @@ router.post('/logout', (req, res) => {
 router.use(requireAdmin);
 
 // --- Dashboard ---
-router.get('/dashboard', (req, res) => {
-  const stats = dashboardService.getStats();
-  const { recentMembers, recentPayments } = dashboardService.getRecentActivity();
+router.get('/dashboard', async (req, res, next) => {
+  try {
+    const stats = await dashboardService.getStats();
+    const { recentMembers, recentPayments } = await dashboardService.getRecentActivity();
 
-  res.render('admin/dashboard', {
-    stats,
-    recentMembers,
-    recentPayments,
-  });
+    res.render('admin/dashboard', {
+      stats,
+      recentMembers,
+      recentPayments,
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // --- Members CRUD ---
-router.get('/members', (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page) || 1);
-  const limit = 25;
-  const offset = (page - 1) * limit;
-  const search = req.query.search || '';
+router.get('/members', async (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = 25;
+    const offset = (page - 1) * limit;
+    const search = req.query.search || '';
 
-  const { members, total } = memberRepo.search({ search, limit, offset });
-  const totalPages = Math.ceil(total / limit);
+    const { members, total } = await memberRepo.search({ search, limit, offset });
+    const totalPages = Math.ceil(total / limit);
 
-  res.render('admin/members/list', { members, page, totalPages, search, total });
+    res.render('admin/members/list', { members, page, totalPages, search, total });
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get('/members/export', (req, res) => {
-  const { toCsv } = require('../services/csv');
-  const members = memberRepo.listAll();
-  const columns = ['member_number', 'first_name', 'last_name', 'email', 'phone', 'address_street', 'address_city', 'address_state', 'address_zip', 'membership_year', 'status', 'notes', 'created_at'];
-  const headers = ['Member Number', 'First Name', 'Last Name', 'Email', 'Phone', 'Street', 'City', 'State', 'Zip', 'Year', 'Status', 'Notes', 'Created'];
-  const csv = toCsv(members, columns, headers);
-  const date = new Date().toISOString().slice(0, 10);
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="ysh-members-${date}.csv"`);
-  res.send(csv);
+router.get('/members/export', async (req, res, next) => {
+  try {
+    const { toCsv } = require('../services/csv');
+    const members = await memberRepo.listAll();
+    const columns = ['member_number', 'first_name', 'last_name', 'email', 'phone', 'address_street', 'address_city', 'address_state', 'address_zip', 'membership_year', 'status', 'notes', 'created_at'];
+    const headers = ['Member Number', 'First Name', 'Last Name', 'Email', 'Phone', 'Street', 'City', 'State', 'Zip', 'Year', 'Status', 'Notes', 'Created'];
+    const csv = toCsv(members, columns, headers);
+    const date = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="ysh-members-${date}.csv"`);
+    res.send(csv);
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.get('/members/new', (req, res) => {
   res.render('admin/members/form', { member: null });
 });
 
-router.post('/members', (req, res) => {
+router.post('/members', async (req, res) => {
   const { first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, notes } = req.body;
 
   // Generate member number
   const year = membership_year || new Date().getFullYear();
   const { generateMemberNumber } = require('../services/members');
-  const member_number = generateMemberNumber(year);
+  const member_number = await generateMemberNumber(year);
 
   try {
-    memberRepo.create({
+    await memberRepo.create({
       member_number, first_name, last_name, email, phone,
       address_street, address_city, address_state, address_zip,
       membership_year: year, status: status || 'pending', notes,
@@ -188,31 +200,37 @@ router.post('/members', (req, res) => {
 
     req.session.flash_success = `Member ${first_name} ${last_name} created.`;
   } catch (e) {
-    req.session.flash_error = e.message.includes('UNIQUE') ? 'A member with that email already exists.' : e.message;
+    req.session.flash_error = (e.message.includes('UNIQUE') || e.code === '23505') ? 'A member with that email already exists.' : e.message;
     return res.redirect('/admin/members/new');
   }
   res.redirect('/admin/members');
 });
 
-router.get('/members/:id', (req, res) => {
-  const member = memberRepo.findById(req.params.id);
-  if (!member) { req.session.flash_error = 'Member not found.'; return res.redirect('/admin/members'); }
+router.get('/members/:id', async (req, res, next) => {
+  try {
+    const member = await memberRepo.findById(req.params.id);
+    if (!member) { req.session.flash_error = 'Member not found.'; return res.redirect('/admin/members'); }
 
-  if (req.query.edit) {
-    return res.render('admin/members/form', { member });
+    if (req.query.edit) {
+      return res.render('admin/members/form', { member });
+    }
+    
+    const [payments, cards, emails] = await Promise.all([
+      paymentRepo.findByMemberId(member.id),
+      cardsRepo.findByMemberId(member.id),
+      emailLogRepo.listByMemberId(member.id, 10)
+    ]);
+
+    res.render('admin/members/view', { member, payments, cards, emails });
+  } catch (err) {
+    next(err);
   }
-  
-  const payments = paymentRepo.findByMemberId(member.id);
-  const cards = cardsRepo.findByMemberId(member.id);
-  const emails = emailLogRepo.listByMemberId(member.id, 10);
-
-  res.render('admin/members/view', { member, payments, cards, emails });
 });
 
-router.post('/members/:id', (req, res) => {
+router.post('/members/:id', async (req, res) => {
   const { first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, notes } = req.body;
   try {
-    memberRepo.update(req.params.id, {
+    await memberRepo.update(req.params.id, {
       first_name, last_name, email, phone,
       address_street, address_city, address_state, address_zip,
       membership_year, status, notes,
@@ -224,15 +242,15 @@ router.post('/members/:id', (req, res) => {
   res.redirect(`/admin/members/${req.params.id}`);
 });
 
-router.post('/members/:id/delete', (req, res) => {
-  memberRepo.deleteById(req.params.id);
+router.post('/members/:id/delete', async (req, res) => {
+  await memberRepo.deleteById(req.params.id);
   req.session.flash_success = 'Member deleted.';
   res.redirect('/admin/members');
 });
 
 // --- Member Card Generation ---
 router.post('/members/:id/card', async (req, res) => {
-  const member = memberRepo.findById(req.params.id);
+  const member = await memberRepo.findById(req.params.id);
   if (!member) { req.session.flash_error = 'Member not found.'; return res.redirect('/admin/members'); }
   try {
     const { generatePDF, generatePNG } = require('../services/card');
@@ -246,20 +264,20 @@ router.post('/members/:id/card', async (req, res) => {
   res.redirect(`/admin/members/${req.params.id}`);
 });
 
-router.get('/members/:id/card/pdf', (req, res) => {
-  const card = cardsRepo.findLatestByMemberId(req.params.id);
+router.get('/members/:id/card/pdf', async (req, res) => {
+  const card = await cardsRepo.findLatestByMemberId(req.params.id);
   if (!card || !card.pdf_path) { req.session.flash_error = 'No card found.'; return res.redirect(`/admin/members/${req.params.id}`); }
   res.download(path.join(__dirname, '..', card.pdf_path));
 });
 
-router.get('/members/:id/card/png', (req, res) => {
-  const card = cardsRepo.findLatestByMemberId(req.params.id);
+router.get('/members/:id/card/png', async (req, res) => {
+  const card = await cardsRepo.findLatestByMemberId(req.params.id);
   if (!card || !card.png_path) { req.session.flash_error = 'No card found.'; return res.redirect(`/admin/members/${req.params.id}`); }
   res.download(path.join(__dirname, '..', card.png_path));
 });
 
 router.post('/members/:id/email-card', async (req, res) => {
-  const member = memberRepo.findById(req.params.id);
+  const member = await memberRepo.findById(req.params.id);
   if (!member) { req.session.flash_error = 'Member not found.'; return res.redirect('/admin/members'); }
   try {
     const emailService = require('../services/email');
@@ -273,8 +291,8 @@ router.post('/members/:id/email-card', async (req, res) => {
 });
 
 // --- Offline Payment ---
-router.post('/members/:id/payments', (req, res) => {
-  const member = memberRepo.findById(req.params.id);
+router.post('/members/:id/payments', async (req, res) => {
+  const member = await memberRepo.findById(req.params.id);
   if (!member) { req.session.flash_error = 'Member not found.'; return res.redirect('/admin/members'); }
 
   const { amount, payment_method, description, activate_member } = req.body;
@@ -285,7 +303,7 @@ router.post('/members/:id/payments', (req, res) => {
   }
 
   const amountCents = Math.round(dollars * 100);
-  paymentsService.recordOfflinePayment({
+  await paymentsService.recordOfflinePayment({
     memberId: member.id,
     amountCents,
     paymentMethod: payment_method,
@@ -298,8 +316,8 @@ router.post('/members/:id/payments', (req, res) => {
 });
 
 // --- Announcements CRUD ---
-router.get('/announcements', (req, res) => {
-  const announcements = contentService.listAnnouncements();
+router.get('/announcements', async (req, res) => {
+  const announcements = await contentService.listAnnouncements();
   res.render('admin/announcements/list', { announcements });
 });
 
@@ -310,20 +328,20 @@ router.get('/announcements/new', (req, res) => {
 router.post('/announcements', async (req, res) => {
   const { title, body, link_url, link_text, is_published, sort_order } = req.body;
   const image_path = req.file ? await handleUpload(req.file, 'announcements') : (req.body.existing_image || null);
-  contentService.createAnnouncement({ title, body, image_path, link_url, link_text, is_published, sort_order });
+  await contentService.createAnnouncement({ title, body, image_path, link_url, link_text, is_published, sort_order });
   req.session.flash_success = 'Announcement created.';
   res.redirect('/admin/announcements');
 });
 
-router.get('/announcements/:id', (req, res) => {
-  const announcement = contentService.getAnnouncement(req.params.id);
+router.get('/announcements/:id', async (req, res) => {
+  const announcement = await contentService.getAnnouncement(req.params.id);
   if (!announcement) { req.session.flash_error = 'Not found.'; return res.redirect('/admin/announcements'); }
   res.render('admin/announcements/form', { announcement });
 });
 
 router.post('/announcements/:id', async (req, res) => {
   const { title, body, link_url, link_text, is_published, sort_order } = req.body;
-  const existingImagePath = contentService.getAnnouncementImagePath(req.params.id);
+  const existingImagePath = await contentService.getAnnouncementImagePath(req.params.id);
   let image_path;
   if (req.file) {
     image_path = await handleUpload(req.file, 'announcements');
@@ -331,7 +349,7 @@ router.post('/announcements/:id', async (req, res) => {
   } else {
     image_path = req.body.existing_image || existingImagePath || null;
   }
-  contentService.updateAnnouncement(req.params.id, { title, body, image_path, link_url, link_text, is_published, sort_order });
+  await contentService.updateAnnouncement(req.params.id, { title, body, image_path, link_url, link_text, is_published, sort_order });
   req.session.flash_success = 'Announcement updated.';
   res.redirect('/admin/announcements');
 });
@@ -343,8 +361,8 @@ router.post('/announcements/:id/delete', async (req, res) => {
 });
 
 // --- Gallery CRUD ---
-router.get('/gallery', (req, res) => {
-  const images = contentService.listGalleryImages();
+router.get('/gallery', async (req, res) => {
+  const images = await contentService.listGalleryImages();
   res.render('admin/gallery/list', { images });
 });
 
@@ -356,20 +374,20 @@ router.post('/gallery', async (req, res) => {
   const { alt_text, caption, sort_order, is_visible } = req.body;
   const filename = req.file ? await handleUpload(req.file, 'gallery') : (req.body.existing_image || '');
   if (!filename) { req.session.flash_error = 'Image file is required.'; return res.redirect('/admin/gallery/new'); }
-  contentService.createGalleryImage({ filename, alt_text, caption, sort_order, is_visible });
+  await contentService.createGalleryImage({ filename, alt_text, caption, sort_order, is_visible });
   req.session.flash_success = 'Image added.';
   res.redirect('/admin/gallery');
 });
 
-router.get('/gallery/:id', (req, res) => {
-  const image = contentService.getGalleryImage(req.params.id);
+router.get('/gallery/:id', async (req, res) => {
+  const image = await contentService.getGalleryImage(req.params.id);
   if (!image) { req.session.flash_error = 'Not found.'; return res.redirect('/admin/gallery'); }
   res.render('admin/gallery/form', { image });
 });
 
 router.post('/gallery/:id', async (req, res) => {
   const { alt_text, caption, sort_order, is_visible } = req.body;
-  const existingFilename = contentService.getGalleryFilename(req.params.id);
+  const existingFilename = await contentService.getGalleryFilename(req.params.id);
   let filename;
   if (req.file) {
     filename = await handleUpload(req.file, 'gallery');
@@ -377,7 +395,7 @@ router.post('/gallery/:id', async (req, res) => {
   } else {
     filename = req.body.existing_image || existingFilename || '';
   }
-  contentService.updateGalleryImage(req.params.id, { filename, alt_text, caption, sort_order, is_visible });
+  await contentService.updateGalleryImage(req.params.id, { filename, alt_text, caption, sort_order, is_visible });
   req.session.flash_success = 'Image updated.';
   res.redirect('/admin/gallery');
 });
@@ -389,8 +407,8 @@ router.post('/gallery/:id/delete', async (req, res) => {
 });
 
 // --- Bios CRUD ---
-router.get('/bios', (req, res) => {
-  const bios = contentService.listBios();
+router.get('/bios', async (req, res) => {
+  const bios = await contentService.listBios();
   res.render('admin/bios/list', { bios });
 });
 
@@ -401,20 +419,20 @@ router.get('/bios/new', (req, res) => {
 router.post('/bios', async (req, res) => {
   const { name, role, bio_text, sort_order, is_visible } = req.body;
   const photo_path = req.file ? await handleUpload(req.file, 'bios') : (req.body.existing_photo || null);
-  contentService.createBio({ name, role, bio_text, photo_path, sort_order, is_visible });
+  await contentService.createBio({ name, role, bio_text, photo_path, sort_order, is_visible });
   req.session.flash_success = 'Bio created.';
   res.redirect('/admin/bios');
 });
 
-router.get('/bios/:id', (req, res) => {
-  const bio = contentService.getBio(req.params.id);
+router.get('/bios/:id', async (req, res) => {
+  const bio = await contentService.getBio(req.params.id);
   if (!bio) { req.session.flash_error = 'Not found.'; return res.redirect('/admin/bios'); }
   res.render('admin/bios/form', { bio });
 });
 
 router.post('/bios/:id', async (req, res) => {
   const { name, role, bio_text, sort_order, is_visible } = req.body;
-  const existingPhotoPath = contentService.getBioPhotoPath(req.params.id);
+  const existingPhotoPath = await contentService.getBioPhotoPath(req.params.id);
   let photo_path;
   if (req.file) {
     photo_path = await handleUpload(req.file, 'bios');
@@ -422,7 +440,7 @@ router.post('/bios/:id', async (req, res) => {
   } else {
     photo_path = req.body.existing_photo || existingPhotoPath || null;
   }
-  contentService.updateBio(req.params.id, { name, role, bio_text, photo_path, sort_order, is_visible });
+  await contentService.updateBio(req.params.id, { name, role, bio_text, photo_path, sort_order, is_visible });
   req.session.flash_success = 'Bio updated.';
   res.redirect('/admin/bios');
 });
@@ -438,7 +456,7 @@ router.get('/settings', requireSuperAdmin, (req, res) => {
   res.render('admin/settings');
 });
 
-router.post('/settings', requireSuperAdmin, (req, res) => {
+router.post('/settings', requireSuperAdmin, async (req, res) => {
   const keys = [
     'hero_title', 'hero_subtitle', 'hero_button_text', 'hero_button_url',
     'about_quote', 'about_text', 'gallery_album_url', 'dues_amount_cents',
@@ -450,47 +468,63 @@ router.post('/settings', requireSuperAdmin, (req, res) => {
       keyValues[key] = req.body[key];
     }
   }
-  settingsRepo.upsertMany(keyValues);
+  await settingsRepo.upsertMany(keyValues);
   req.session.flash_success = 'Settings saved.';
   res.redirect('/admin/settings');
 });
 
 // --- Payments list ---
-router.get('/payments', (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page) || 1);
-  const limit = 25;
-  const offset = (page - 1) * limit;
-  const { payments, total } = paymentRepo.listWithMembers({ limit, offset });
-  const totalPages = Math.ceil(total / limit);
-  res.render('admin/payments', { payments, page, totalPages, total });
+router.get('/payments', async (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = 25;
+    const offset = (page - 1) * limit;
+    const { payments, total } = await paymentRepo.listWithMembers({ limit, offset });
+    const totalPages = Math.ceil(total / limit);
+    res.render('admin/payments', { payments, page, totalPages, total });
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get('/payments/export', (req, res) => {
-  const { toCsv } = require('../services/csv');
-  const payments = paymentRepo.listAllWithMembers();
-  const columns = ['member_number', 'first_name', 'last_name', 'amount_cents', 'currency', 'status', 'payment_method', 'description', 'created_at'];
-  const headers = ['Member Number', 'First Name', 'Last Name', 'Amount (cents)', 'Currency', 'Status', 'Payment Method', 'Description', 'Date'];
-  const csv = toCsv(payments, columns, headers);
-  const date = new Date().toISOString().slice(0, 10);
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="ysh-payments-${date}.csv"`);
-  res.send(csv);
+router.get('/payments/export', async (req, res, next) => {
+  try {
+    const { toCsv } = require('../services/csv');
+    const payments = await paymentRepo.listAllWithMembers();
+    const columns = ['member_number', 'first_name', 'last_name', 'amount_cents', 'currency', 'status', 'payment_method', 'description', 'created_at'];
+    const headers = ['Member Number', 'First Name', 'Last Name', 'Amount (cents)', 'Currency', 'Status', 'Payment Method', 'Description', 'Date'];
+    const csv = toCsv(payments, columns, headers);
+    const date = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="ysh-payments-${date}.csv"`);
+    res.send(csv);
+  } catch (err) {
+    next(err);
+  }
 });
 
 // --- Email log ---
-router.get('/emails', (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page) || 1);
-  const limit = 25;
-  const offset = (page - 1) * limit;
-  const { emails, total } = emailLogRepo.list({ limit, offset });
-  const totalPages = Math.ceil(total / limit);
-  res.render('admin/emails/log', { emails, page, totalPages, total });
+router.get('/emails', async (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = 25;
+    const offset = (page - 1) * limit;
+    const { emails, total } = await emailLogRepo.list({ limit, offset });
+    const totalPages = Math.ceil(total / limit);
+    res.render('admin/emails/log', { emails, page, totalPages, total });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // --- Email blast ---
-router.get('/emails/blast', (req, res) => {
-  const activeCount = memberRepo.countActive();
-  res.render('admin/emails/blast', { activeCount });
+router.get('/emails/blast', async (req, res, next) => {
+  try {
+    const activeCount = await memberRepo.countActive();
+    res.render('admin/emails/blast', { activeCount });
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.post('/emails/blast', async (req, res) => {
@@ -501,7 +535,7 @@ router.post('/emails/blast', async (req, res) => {
   }
   try {
     const emailService = require('../services/email');
-    const members = memberRepo.listActiveMembers();
+    const members = await memberRepo.listActiveMembers();
     let sent = 0;
     for (const member of members) {
       try {
@@ -519,12 +553,16 @@ router.post('/emails/blast', async (req, res) => {
 });
 
 // --- Admin management (super_admin only) ---
-router.get('/admins', requireSuperAdmin, (req, res) => {
-  const admins = adminService.listAdmins();
-  res.render('admin/admins', { admins });
+router.get('/admins', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const admins = await adminService.listAdmins();
+    res.render('admin/admins', { admins });
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.post('/admins', requireSuperAdmin, (req, res) => {
+router.post('/admins', requireSuperAdmin, async (req, res) => {
   const { email, first_name, last_name, role } = req.body;
 
   if (!email || !first_name || !last_name) {
@@ -533,7 +571,7 @@ router.post('/admins', requireSuperAdmin, (req, res) => {
   }
 
   try {
-    adminService.addAdmin({ email, first_name, last_name, role });
+    await adminService.addAdmin({ email, first_name, last_name, role });
     req.session.flash_success = `Admin ${first_name} ${last_name} added.`;
   } catch (e) {
     req.session.flash_error = e.message;
@@ -541,13 +579,13 @@ router.post('/admins', requireSuperAdmin, (req, res) => {
   res.redirect('/admin/admins');
 });
 
-router.post('/admins/:id/delete', requireSuperAdmin, (req, res) => {
+router.post('/admins/:id/delete', requireSuperAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   if (id === req.session.adminId) {
     req.session.flash_error = 'You cannot demote your own account.';
     return res.redirect('/admin/admins');
   }
-  adminService.demoteAdmin(id);
+  await adminService.demoteAdmin(id);
   req.session.flash_success = 'Admin demoted.';
   res.redirect('/admin/admins');
 });

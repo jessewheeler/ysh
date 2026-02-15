@@ -9,85 +9,87 @@ beforeEach(() => {
 });
 
 describe('create', () => {
-  test('inserts a payment and returns result', () => {
+  test('inserts a payment and returns result', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
-    const result = paymentRepo.create({ member_id: m.id, amount_cents: 2500, currency: 'usd', status: 'pending', description: 'Dues' });
+    const result = await paymentRepo.create({ member_id: m.id, amount_cents: 2500, currency: 'usd', status: 'pending', description: 'Dues' });
     expect(Number(result.lastInsertRowid)).toBeGreaterThan(0);
   });
 });
 
 describe('completeBySessionId', () => {
-  test('marks payment as completed', () => {
+  test('marks payment as completed', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
     insertPayment(testDb, { member_id: m.id, stripe_session_id: 'sess_123', status: 'pending' });
 
-    paymentRepo.completeBySessionId('sess_123', 'pi_abc');
-    const payments = paymentRepo.findByMemberId(m.id);
+    await paymentRepo.completeBySessionId('sess_123', 'pi_abc');
+    const payments = await paymentRepo.findByMemberId(m.id);
     expect(payments[0].status).toBe('completed');
     expect(payments[0].stripe_payment_intent).toBe('pi_abc');
   });
 });
 
 describe('findByMemberId', () => {
-  test('returns payments for a member', () => {
+  test('returns payments for a member', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
     insertPayment(testDb, { member_id: m.id });
     insertPayment(testDb, { member_id: m.id, amount_cents: 5000 });
-    expect(paymentRepo.findByMemberId(m.id)).toHaveLength(2);
+    const payments = await paymentRepo.findByMemberId(m.id);
+    expect(payments).toHaveLength(2);
   });
 });
 
 describe('listWithMembers', () => {
-  test('returns paginated payments with member info', () => {
+  test('returns paginated payments with member info', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com', first_name: 'Jane' });
     insertPayment(testDb, { member_id: m.id });
-    const result = paymentRepo.listWithMembers({ limit: 25, offset: 0 });
+    const result = await paymentRepo.listWithMembers({ limit: 25, offset: 0 });
     expect(result.total).toBe(1);
     expect(result.payments[0].first_name).toBe('Jane');
   });
 });
 
 describe('listAllWithMembers', () => {
-  test('returns all payments with member info', () => {
+  test('returns all payments with member info', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
     insertPayment(testDb, { member_id: m.id });
-    const payments = paymentRepo.listAllWithMembers();
+    const payments = await paymentRepo.listAllWithMembers();
     expect(payments).toHaveLength(1);
     expect(payments[0].first_name).toBeDefined();
   });
 });
 
 describe('listRecent', () => {
-  test('returns limited recent payments', () => {
+  test('returns limited recent payments', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
     insertPayment(testDb, { member_id: m.id });
     insertPayment(testDb, { member_id: m.id, amount_cents: 5000 });
-    expect(paymentRepo.listRecent(1)).toHaveLength(1);
+    const payments = await paymentRepo.listRecent(1);
+    expect(payments).toHaveLength(1);
   });
 });
 
 describe('sumCompletedCents', () => {
-  test('sums completed payments only', () => {
+  test('sums completed payments only', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
     insertPayment(testDb, { member_id: m.id, amount_cents: 2500, status: 'completed' });
     insertPayment(testDb, { member_id: m.id, amount_cents: 1000, status: 'pending' });
-    expect(paymentRepo.sumCompletedCents()).toBe(2500);
+    expect(await paymentRepo.sumCompletedCents()).toBe(2500);
   });
 });
 
 describe('countAll', () => {
-  test('counts all payments', () => {
+  test('counts all payments', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
     insertPayment(testDb, { member_id: m.id });
     insertPayment(testDb, { member_id: m.id });
-    expect(paymentRepo.countAll()).toBe(2);
+    expect(await paymentRepo.countAll()).toBe(2);
   });
 });

@@ -6,17 +6,24 @@ const settingsRepo = require('../db/repos/settings');
 const { generateMemberNumber } = require('../services/members');
 
 // Homepage
-router.get('/', (req, res) => {
-  const announcements = contentService.listPublishedAnnouncements();
-  const gallery = contentService.listVisibleGalleryImages();
-
-  res.render('index', { announcements, gallery });
+router.get('/', async (req, res, next) => {
+  try {
+    const announcements = await contentService.listPublishedAnnouncements();
+    const gallery = await contentService.listVisibleGalleryImages();
+    res.render('index', { announcements, gallery });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Board bios
-router.get('/bios', (req, res) => {
-  const bios = contentService.listVisibleBios();
-  res.render('bios', { bios });
+router.get('/bios', async (req, res, next) => {
+  try {
+    const bios = await contentService.listVisibleBios();
+    res.render('bios', { bios });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Membership signup form
@@ -35,16 +42,16 @@ router.post('/membership', async (req, res) => {
     }
 
     // Check for existing member with same email
-    const existing = memberRepo.findByEmail(email);
+    const existing = await memberRepo.findByEmail(email);
     if (existing) {
       req.session.flash_error = 'An account with that email already exists. Please contact us for help.';
       return res.redirect('/membership');
     }
 
     const year = new Date().getFullYear();
-    const member_number = generateMemberNumber(year);
+    const member_number = await generateMemberNumber(year);
 
-    const result = memberRepo.create({
+    const result = await memberRepo.create({
       member_number, first_name, last_name, email, phone,
       address_street, address_city, address_state, address_zip,
       membership_year: year, status: 'pending',
@@ -53,7 +60,7 @@ router.post('/membership', async (req, res) => {
     const memberId = result.lastInsertRowid;
 
     // Get dues amount from settings
-    const duesValue = settingsRepo.get('dues_amount_cents');
+    const duesValue = await settingsRepo.get('dues_amount_cents');
     const amountCents = parseInt(duesValue) || 2500;
 
     // Create Stripe checkout session

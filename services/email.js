@@ -7,8 +7,8 @@ const cardsRepo = require('../db/repos/cards');
 const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@yellowstoneseahawkers.com';
 
-function getContactEmail() {
-  return settingsRepo.get('contact_email') || FROM_EMAIL;
+async function getContactEmail() {
+  return (await settingsRepo.get('contact_email')) || FROM_EMAIL;
 }
 
 function emailWrapper(bodyHtml) {
@@ -40,8 +40,8 @@ function emailWrapper(bodyHtml) {
 </html>`;
 }
 
-function logEmail({ to_email, to_name, subject, body_html, email_type, status, error, member_id }) {
-  emailLogRepo.insert({ to_email, to_name, subject, body_html, email_type, status, error, member_id });
+async function logEmail({ to_email, to_name, subject, body_html, email_type, status, error, member_id }) {
+  await emailLogRepo.insert({ to_email, to_name, subject, body_html, email_type, status, error, member_id });
 }
 
 async function mailersendSend({ to, toName, from, subject, html, attachments }) {
@@ -87,11 +87,11 @@ async function sendEmail({ to, toName, subject, html, email_type, member_id, att
 
   try {
     await mailersendSend(msg);
-    logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'sent', member_id });
+    await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'sent', member_id });
   } catch (err) {
     const errMsg = err.message;
     console.error(`MailerSend error (${email_type}):`, errMsg);
-    logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
+    await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
     throw err;
   }
 }
@@ -145,7 +145,7 @@ async function sendPaymentConfirmation(member, stripeSession) {
 }
 
 async function sendCardEmail(member) {
-  const card = cardsRepo.findLatestByMemberId(member.id);
+  const card = await cardsRepo.findLatestByMemberId(member.id);
 
   if (!card) throw new Error('No card found for this member');
 

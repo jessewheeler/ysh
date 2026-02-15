@@ -89,7 +89,7 @@ async function generatePNG(member) {
   fs.writeFileSync(filePath, buffer);
 
   const relativePath = `data/cards/${filename}`;
-  cardsRepo.upsertPng(member.id, member.membership_year, relativePath);
+  await cardsRepo.upsertPng(member.id, member.membership_year, relativePath);
 
   return filePath;
 }
@@ -146,10 +146,14 @@ async function generatePDF(member) {
 
     doc.end();
 
-    stream.on('finish', () => {
+    stream.on('finish', async () => {
       const relativePath = `data/cards/${filename}`;
-      cardsRepo.upsertPdf(member.id, member.membership_year, relativePath);
-      resolve(filePath);
+      try {
+        await cardsRepo.upsertPdf(member.id, member.membership_year, relativePath);
+        resolve(filePath);
+      } catch (err) {
+        reject(err);
+      }
     });
 
     stream.on('error', reject);

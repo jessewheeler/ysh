@@ -16,42 +16,46 @@ function insertImage(overrides = {}) {
 }
 
 describe('findAll / findAllVisible', () => {
-  test('filters by visibility', () => {
+  test('filters by visibility', async () => {
     insertImage({ is_visible: 1 });
     insertImage({ filename: 'hidden.jpg', is_visible: 0 });
-    expect(galleryRepo.findAll()).toHaveLength(2);
-    expect(galleryRepo.findAllVisible()).toHaveLength(1);
+    expect(await galleryRepo.findAll()).toHaveLength(2);
+    expect(await galleryRepo.findAllVisible()).toHaveLength(1);
   });
 });
 
 describe('findById', () => {
-  test('returns image by id', () => {
+  test('returns image by id', async () => {
     const g = insertImage({ filename: 'test.jpg' });
-    expect(galleryRepo.findById(g.id).filename).toBe('test.jpg');
+    const found = await galleryRepo.findById(g.id);
+    expect(found.filename).toBe('test.jpg');
   });
 });
 
 describe('getFilename', () => {
-  test('returns filename', () => {
+  test('returns filename', async () => {
     const g = insertImage({ filename: 'photo.png' });
-    expect(galleryRepo.getFilename(g.id)).toBe('photo.png');
+    expect(await galleryRepo.getFilename(g.id)).toBe('photo.png');
   });
 
-  test('returns null for missing id', () => {
-    expect(galleryRepo.getFilename(999)).toBeNull();
+  test('returns null for missing id', async () => {
+    expect(await galleryRepo.getFilename(999)).toBeNull();
   });
 });
 
 describe('create / update / deleteById', () => {
-  test('full CRUD cycle', () => {
-    const result = galleryRepo.create({ filename: 'new.jpg', is_visible: true, sort_order: 0 });
+  test('full CRUD cycle', async () => {
+    const result = await galleryRepo.create({ filename: 'new.jpg', is_visible: true, sort_order: 0 });
     const id = result.lastInsertRowid;
-    expect(galleryRepo.findById(id).filename).toBe('new.jpg');
+    const found = await galleryRepo.findById(id);
+    expect(found.filename).toBe('new.jpg');
 
-    galleryRepo.update(id, { filename: 'updated.jpg', is_visible: true, sort_order: 1 });
-    expect(galleryRepo.findById(id).filename).toBe('updated.jpg');
+    await galleryRepo.update(id, { filename: 'updated.jpg', is_visible: true, sort_order: 1 });
+    const updated = await galleryRepo.findById(id);
+    expect(updated.filename).toBe('updated.jpg');
 
-    galleryRepo.deleteById(id);
-    expect(galleryRepo.findById(id)).toBeUndefined();
+    await galleryRepo.deleteById(id);
+    const deleted = await galleryRepo.findById(id);
+    expect(deleted).toBeUndefined();
   });
 });

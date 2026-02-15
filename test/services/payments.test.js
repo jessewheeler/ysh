@@ -11,59 +11,61 @@ beforeEach(() => {
 });
 
 describe('recordOfflinePayment', () => {
-  test('creates a completed payment record', () => {
+  test('creates a completed payment record', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
 
-    paymentsService.recordOfflinePayment({
+    await paymentsService.recordOfflinePayment({
       memberId: m.id,
       amountCents: 2500,
       paymentMethod: 'check',
       description: 'Annual dues',
     });
 
-    const payments = paymentRepo.findByMemberId(m.id);
+    const payments = await paymentRepo.findByMemberId(m.id);
     expect(payments).toHaveLength(1);
     expect(payments[0].status).toBe('completed');
     expect(payments[0].amount_cents).toBe(2500);
     expect(payments[0].payment_method).toBe('check');
   });
 
-  test('activates member when activateMember is true', () => {
+  test('activates member when activateMember is true', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com', status: 'pending' });
 
-    paymentsService.recordOfflinePayment({
+    await paymentsService.recordOfflinePayment({
       memberId: m.id,
       amountCents: 2500,
       activateMember: true,
     });
 
-    expect(memberRepo.findById(m.id).status).toBe('active');
+    const updatedMember = await memberRepo.findById(m.id);
+    expect(updatedMember.status).toBe('active');
   });
 
-  test('does not activate when activateMember is falsy', () => {
+  test('does not activate when activateMember is falsy', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com', status: 'pending' });
 
-    paymentsService.recordOfflinePayment({
+    await paymentsService.recordOfflinePayment({
       memberId: m.id,
       amountCents: 2500,
     });
 
-    expect(memberRepo.findById(m.id).status).toBe('pending');
+    const updatedMember = await memberRepo.findById(m.id);
+    expect(updatedMember.status).toBe('pending');
   });
 });
 
 describe('completeStripePayment', () => {
-  test('marks payment as completed by session id', () => {
+  test('marks payment as completed by session id', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
     insertPayment(testDb, { member_id: m.id, stripe_session_id: 'sess_123', status: 'pending' });
 
-    paymentsService.completeStripePayment('sess_123', 'pi_abc');
+    await paymentsService.completeStripePayment('sess_123', 'pi_abc');
 
-    const payments = paymentRepo.findByMemberId(m.id);
+    const payments = await paymentRepo.findByMemberId(m.id);
     expect(payments[0].status).toBe('completed');
     expect(payments[0].stripe_payment_intent).toBe('pi_abc');
   });

@@ -1,36 +1,38 @@
 const db = require('../database');
 
-function findAll() {
-  return db.prepare('SELECT * FROM bios ORDER BY sort_order ASC').all();
+async function findAll() {
+  return await db.all('SELECT * FROM bios ORDER BY sort_order ASC');
 }
 
-function findAllVisible() {
-  return db.prepare('SELECT * FROM bios WHERE is_visible = 1 ORDER BY sort_order ASC').all();
+async function findAllVisible() {
+  return await db.all('SELECT * FROM bios WHERE is_visible = 1 ORDER BY sort_order ASC');
 }
 
-function findById(id) {
-  return db.prepare('SELECT * FROM bios WHERE id = ?').get(id);
+async function findById(id) {
+  return await db.get('SELECT * FROM bios WHERE id = ?', id);
 }
 
-function getPhotoPath(id) {
-  const row = db.prepare('SELECT photo_path FROM bios WHERE id = ?').get(id);
+async function getPhotoPath(id) {
+  const row = await db.get('SELECT photo_path FROM bios WHERE id = ?', id);
   return row?.photo_path || null;
 }
 
-function create({ name, role, bio_text, photo_path, sort_order, is_visible }) {
-  return db.prepare(
-    'INSERT INTO bios (name, role, bio_text, photo_path, sort_order, is_visible) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(name, role || null, bio_text || null, photo_path || null, parseInt(sort_order) || 0, is_visible ? 1 : 0);
+async function create({ name, role, bio_text, photo_path, sort_order, is_visible }) {
+  return await db.run(
+    'INSERT INTO bios (name, role, bio_text, photo_path, sort_order, is_visible) VALUES (?, ?, ?, ?, ?, ?)',
+    name, role || null, bio_text || null, photo_path || null, parseInt(sort_order) || 0, is_visible ? 1 : 0
+  );
 }
 
-function update(id, { name, role, bio_text, photo_path, sort_order, is_visible }) {
-  return db.prepare(
-    `UPDATE bios SET name=?, role=?, bio_text=?, photo_path=?, sort_order=?, is_visible=?, updated_at=datetime('now') WHERE id=?`
-  ).run(name, role || null, bio_text || null, photo_path || null, parseInt(sort_order) || 0, is_visible ? 1 : 0, id);
+async function update(id, { name, role, bio_text, photo_path, sort_order, is_visible }) {
+  return await db.run(
+    `UPDATE bios SET name=?, role=?, bio_text=?, photo_path=?, sort_order=?, is_visible=?, updated_at=datetime('now') WHERE id=?`,
+    name, role || null, bio_text || null, photo_path || null, parseInt(sort_order) || 0, is_visible ? 1 : 0, id
+  );
 }
 
-function deleteById(id) {
-  return db.prepare('DELETE FROM bios WHERE id = ?').run(id);
+async function deleteById(id) {
+  return await db.run('DELETE FROM bios WHERE id = ?', id);
 }
 
 module.exports = {
