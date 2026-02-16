@@ -53,7 +53,6 @@ router.post('/webhook', async (req, res) => {
             stack: e.stack
           });
         }
-      }
 
       // 5. Send emails
       try {
