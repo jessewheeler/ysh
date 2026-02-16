@@ -11,10 +11,10 @@ const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/cl
 const B2_ENV = {
   B2_ENDPOINT: 'https://s3.us-west-004.backblazeb2.com',
   B2_REGION: 'us-west-004',
-  B2_BUCKET: 'ysh-uploads',
+  B2_BUCKET: 'ysh-gallery',
   B2_KEY_ID: 'test-key-id',
   B2_APP_KEY: 'test-app-key',
-  B2_PUBLIC_URL: 'https://f005.backblazeb2.com/file/ysh-uploads',
+  B2_PUBLIC_URL: 'https://f005.backblazeb2.com/file/ysh-gallery',
 };
 
 let storage;
@@ -64,7 +64,7 @@ describe('uploadFile', () => {
 
     expect(PutObjectCommand).toHaveBeenCalledWith(
       expect.objectContaining({
-        Bucket: 'ysh-uploads',
+        Bucket: 'ysh-gallery',
         Body: buffer,
         ContentType: 'image/jpeg',
       })
@@ -75,7 +75,7 @@ describe('uploadFile', () => {
 
   test('returns public URL', async () => {
     const url = await storage.uploadFile(Buffer.from('data'), 'test.png', 'bios');
-    expect(url).toMatch(/^https:\/\/f005\.backblazeb2\.com\/file\/ysh-uploads\/bios\/\d+-[a-f0-9]+\.png$/);
+    expect(url).toMatch(/^https:\/\/f005\.backblazeb2\.com\/file\/ysh-gallery\/bios\/\d+-[a-f0-9]+\.png$/);
   });
 
   test('generates unique filenames', async () => {
@@ -111,10 +111,10 @@ describe('uploadFile', () => {
 
 describe('deleteFile', () => {
   test('sends DeleteObjectCommand for B2 URLs', async () => {
-    await storage.deleteFile('https://f005.backblazeb2.com/file/ysh-uploads/gallery/123-abc.jpg');
+    await storage.deleteFile('https://f005.backblazeb2.com/file/ysh-gallery/gallery/123-abc.jpg');
 
     expect(DeleteObjectCommand).toHaveBeenCalledWith({
-      Bucket: 'ysh-uploads',
+      Bucket: 'ysh-gallery',
       Key: 'gallery/123-abc.jpg',
     });
     expect(mockSend).toHaveBeenCalled();
@@ -142,14 +142,14 @@ describe('deleteFile', () => {
 
   test('skips when B2 is not configured', async () => {
     delete process.env.B2_BUCKET;
-    await storage.deleteFile('https://f005.backblazeb2.com/file/ysh-uploads/gallery/123.jpg');
+    await storage.deleteFile('https://f005.backblazeb2.com/file/ysh-gallery/gallery/123.jpg');
     expect(mockSend).not.toHaveBeenCalled();
   });
 
   test('propagates S3 errors', async () => {
     mockSend.mockRejectedValueOnce(new Error('Delete failed'));
     await expect(
-      storage.deleteFile('https://f005.backblazeb2.com/file/ysh-uploads/gallery/123.jpg')
+      storage.deleteFile('https://f005.backblazeb2.com/file/ysh-gallery/gallery/123.jpg')
     ).rejects.toThrow('Delete failed');
   });
 });
