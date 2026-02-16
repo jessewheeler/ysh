@@ -12,19 +12,19 @@ async function findAdminByEmail(email) {
   return await db.get('SELECT * FROM members WHERE email = ? AND role IS NOT NULL', email);
 }
 
-async function create({ member_number, first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, notes }) {
+async function create({ member_number, first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, join_date, status, notes }) {
   return await db.run(
-    `INSERT INTO members (member_number, first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    member_number, first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, status || 'pending', notes || null
+    `INSERT INTO members (member_number, first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, join_date, status, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, ?)`,
+    member_number, first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, join_date || null, status || 'pending', notes || null
   );
 }
 
-async function update(id, { first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, notes }) {
+async function update(id, { first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, join_date, status, notes }) {
   return await db.run(
-    `UPDATE members SET first_name=?, last_name=?, email=?, phone=?, address_street=?, address_city=?, address_state=?, address_zip=?, membership_year=?, status=?, notes=?, updated_at=datetime('now')
+    `UPDATE members SET first_name=?, last_name=?, email=?, phone=?, address_street=?, address_city=?, address_state=?, address_zip=?, membership_year=?, join_date=?, status=?, notes=?, updated_at=datetime('now')
      WHERE id=?`,
-    first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, status, notes || null, id
+    first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, join_date || null, status, notes || null, id
   );
 }
 
@@ -144,12 +144,12 @@ async function createWithFamily({ primaryMember, familyMembers = [], membershipT
     const primaryResult = await db.run(
       `INSERT INTO members (member_number, first_name, last_name, email, phone,
         address_street, address_city, address_state, address_zip,
-        membership_year, status, membership_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        membership_year, join_date, status, membership_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, ?)`,
       [primaryMemberNumber, primaryMember.first_name, primaryMember.last_name,
        primaryMember.email, primaryMember.phone || null, primaryMember.address_street || null,
        primaryMember.address_city || null, primaryMember.address_state || null, primaryMember.address_zip || null,
-       year, 'pending', membershipType]
+       year, primaryMember.join_date || null, 'pending', membershipType]
     );
 
     const primaryId = primaryResult.lastInsertRowid;

@@ -188,10 +188,11 @@ router.post('/members', async (req, res) => {
     membership_type = 'individual',
     first_name, last_name, email, phone,
     address_street, address_city, address_state, address_zip,
-    membership_year, status, notes
+    membership_year, join_date, status, notes
   } = req.body;
 
   const year = membership_year || new Date().getFullYear();
+  const normalizedJoinDate = join_date?.trim() || undefined;
 
   try {
     if (membership_type === 'family') {
@@ -212,7 +213,8 @@ router.post('/members', async (req, res) => {
       await memberRepo.createWithFamily({
         primaryMember: {
           first_name, last_name, email, phone,
-          address_street, address_city, address_state, address_zip
+          address_street, address_city, address_state, address_zip,
+          join_date: normalizedJoinDate
         },
         familyMembers,
         membershipType: 'family'
@@ -240,7 +242,7 @@ router.post('/members', async (req, res) => {
       await memberRepo.create({
         member_number, first_name, last_name, email, phone,
         address_street, address_city, address_state, address_zip,
-        membership_year: year, status: status || 'pending', notes,
+        membership_year: year, join_date: normalizedJoinDate, status: status || 'pending', notes,
       });
 
       req.session.flash_success = `Member ${first_name} ${last_name} created.`;
@@ -290,12 +292,13 @@ router.get('/members/:id', async (req, res, next) => {
 });
 
 router.post('/members/:id', async (req, res) => {
-  const { first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, notes } = req.body;
+  const { first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, join_date, status, notes } = req.body;
+  const normalizedJoinDate = join_date?.trim() || undefined;
   try {
     await memberRepo.update(req.params.id, {
       first_name, last_name, email, phone,
       address_street, address_city, address_state, address_zip,
-      membership_year, status, notes,
+      membership_year, join_date: normalizedJoinDate, status, notes,
     });
     req.session.flash_success = 'Member updated.';
   } catch (e) {

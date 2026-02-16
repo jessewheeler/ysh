@@ -27,6 +27,9 @@ block content
           th Year
           td= member.membership_year
         tr
+          th Join Date
+          td= formatDate(member.join_date)
+        tr
           th Status
           td
             span(class=`badge badge-${member.status}`)= member.status
