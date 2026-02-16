@@ -2,19 +2,31 @@ const memberRepo = require('../db/repos/members');
 const paymentRepo = require('../db/repos/payments');
 const emailLogRepo = require('../db/repos/emailLog');
 
-function getStats() {
+async function getStats() {
+  const [totalMembers, activeMembers, totalRevenue, emailsSent] = await Promise.all([
+    memberRepo.countAll(),
+    memberRepo.countActive(),
+    paymentRepo.sumCompletedCents(),
+    emailLogRepo.countAll()
+  ]);
+
   return {
-    totalMembers: memberRepo.countAll(),
-    activeMembers: memberRepo.countActive(),
-    totalRevenue: paymentRepo.sumCompletedCents(),
-    emailsSent: emailLogRepo.countAll(),
+    totalMembers,
+    activeMembers,
+    totalRevenue,
+    emailsSent,
   };
 }
 
-function getRecentActivity() {
+async function getRecentActivity() {
+  const [recentMembers, recentPayments] = await Promise.all([
+    memberRepo.listRecent(5),
+    paymentRepo.listRecent(5)
+  ]);
+
   return {
-    recentMembers: memberRepo.listRecent(5),
-    recentPayments: paymentRepo.listRecent(5),
+    recentMembers,
+    recentPayments,
   };
 }
 

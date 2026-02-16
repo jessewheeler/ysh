@@ -21,12 +21,12 @@ router.post('/webhook', async (req, res) => {
 
     if (memberId) {
       // Update payment record
-      paymentsService.completeStripePayment(session.id, session.payment_intent);
+      await paymentsService.completeStripePayment(session.id, session.payment_intent);
 
       // Activate member
-      activateMember(memberId);
+      await activateMember(memberId);
 
-      const member = findMemberById(memberId);
+      const member = await findMemberById(memberId);
 
       // Generate membership card
       try {

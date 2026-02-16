@@ -4,8 +4,8 @@ const memberRepo = require('../db/repos/members');
 
 const isDevOrTest = ['development', 'test', 'dev'].includes(process.env.NODE_ENV);
 
-function findAdminByEmail(email) {
-  return memberRepo.findAdminByEmail(email);
+async function findAdminByEmail(email) {
+  return await memberRepo.findAdminByEmail(email);
 }
 
 async function generateAndStoreOtp(adminId) {
@@ -13,7 +13,7 @@ async function generateAndStoreOtp(adminId) {
   const otpHash = await bcrypt.hash(otp, 10);
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-  memberRepo.setOtp(adminId, { otpHash, expiresAt });
+  await memberRepo.setOtp(adminId, { otpHash, expiresAt });
   return otp;
 }
 
@@ -33,11 +33,11 @@ async function verifyOtp(admin, code) {
   const match = await bcrypt.compare(code || '', admin.otp_hash);
 
   if (!match) {
-    memberRepo.incrementOtpAttempts(admin.id);
+    await memberRepo.incrementOtpAttempts(admin.id);
     return { success: false, error: 'Invalid code.' };
   }
 
-  memberRepo.clearOtp(admin.id);
+  await memberRepo.clearOtp(admin.id);
   return { success: true };
 }
 

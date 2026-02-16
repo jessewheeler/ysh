@@ -35,10 +35,10 @@ block content
           td= member.notes || '—'
         tr
           th Created
-          td= member.created_at
+          td= formatDate(member.created_at)
         tr
           th Updated
-          td= member.updated_at
+          td= formatDate(member.updated_at)
 
       .form-actions
         a.btn(href=`/admin/members/${member.id}?edit=1`) Edit
@@ -81,7 +81,7 @@ block content
                 span(class=`badge badge-${p.status}`)= p.status
               td= p.payment_method || 'stripe'
               td= p.description || '—'
-              td= p.created_at
+              td= formatDate(p.created_at)
     else
       p.text-muted No payments yet.
 
@@ -126,6 +126,6 @@ block content
               td= e.subject
               td= e.email_type
               td= e.status
-              td= e.created_at
+              td= formatDate(e.created_at)
     else
       p.text-muted No emails sent yet.

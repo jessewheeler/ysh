@@ -7,14 +7,15 @@ const cardsRepo = require('../db/repos/cards');
 const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@yellowstoneseahawkers.com';
 
-function getContactEmail() {
-  return settingsRepo.get('contact_email') || FROM_EMAIL;
+async function getContactEmail() {
+  const contactEmail = await settingsRepo.get('contact_email');
+  return contactEmail || FROM_EMAIL;
 }
 
 function emailWrapper(bodyHtml) {
   return `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head><meta charset="utf-8"></head>
 <body style="margin:0; padding:0; font-family: Arial, sans-serif; background:#f4f4f4;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;">
@@ -31,7 +32,7 @@ function emailWrapper(bodyHtml) {
         <!-- Footer -->
         <tr><td style="background:#f8f8f8; padding:15px 30px; text-align:center; font-size:12px; color:#999;">
           Yellowstone Sea Hawkers &bull; Billings, MT<br>
-          A non-profit supporting the Seattle Seahawks and the NFL.
+          A non-profit Booster Club supporting the Seattle Seahawks and our local community.</br>
         </td></tr>
       </table>
     </td></tr>
@@ -40,8 +41,30 @@ function emailWrapper(bodyHtml) {
 </html>`;
 }
 
-function logEmail({ to_email, to_name, subject, body_html, email_type, status, error, member_id }) {
-  emailLogRepo.insert({ to_email, to_name, subject, body_html, email_type, status, error, member_id });
+async function logEmail({ to_email, to_name, subject, body_html, email_type, status, error, member_id }) {
+  try {
+    const safeToEmail = to_email ? String(to_email) : 'unknown@example.com';
+    const safeToName = to_name ? String(to_name) : null;
+    const safeSubject = subject ? String(subject) : '(no subject)';
+    const safeBodyHtml = body_html ? String(body_html) : null;
+    const safeEmailType = email_type ? String(email_type) : null;
+    const safeStatus = status ? String(status) : 'sent';
+    const safeError = error ? String(error) : null;
+    const safeMemberId = (member_id !== undefined && member_id !== null) ? Number(member_id) : null;
+
+    await emailLogRepo.insert({
+      to_email: safeToEmail,
+      to_name: safeToName,
+      subject: safeSubject,
+      body_html: safeBodyHtml,
+      email_type: safeEmailType,
+      status: safeStatus,
+      error: safeError,
+      member_id: safeMemberId
+    });
+  } catch (err) {
+    console.error('Failed to log email to DB:', err);
+  }
 }
 
 async function mailersendSend({ to, toName, from, subject, html, attachments }) {
@@ -87,11 +110,11 @@ async function sendEmail({ to, toName, subject, html, email_type, member_id, att
 
   try {
     await mailersendSend(msg);
-    logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'sent', member_id });
+    await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'sent', member_id });
   } catch (err) {
-    const errMsg = err.message;
+    const errMsg = err.message || String(err);
     console.error(`MailerSend error (${email_type}):`, errMsg);
-    logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
+    await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
     throw err;
   }
 }
@@ -145,7 +168,7 @@ async function sendPaymentConfirmation(member, stripeSession) {
 }
 
 async function sendCardEmail(member) {
-  const card = cardsRepo.findLatestByMemberId(member.id);
+  const card = await cardsRepo.findLatestByMemberId(member.id);
 
   if (!card) throw new Error('No card found for this member');
 
@@ -220,7 +243,7 @@ async function sendOtpEmail({ to, toName, otp }) {
 }
 
 async function sendContactEmail({ name, email, message }) {
-  const contactTo = getContactEmail();
+  const contactTo = await getContactEmail() ?? 'jesse.stuart.wheeler@gmail.com';
   const html = `
     <h2 style="color:#002a5c;">New Contact Form Submission</h2>
     <table style="margin:20px 0; font-size:14px;">

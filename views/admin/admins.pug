@@ -20,7 +20,7 @@ block content
           td #{admin.first_name} #{admin.last_name}
           td= admin.email
           td= admin.role === 'super_admin' ? 'Super Admin' : 'Editor'
-          td= admin.created_at
+          td= formatDate(admin.created_at)
           td
             form(method="POST" action=`/admin/admins/${admin.id}/delete` style="display:inline")
               input(type="hidden" name="_csrf" value=csrfToken)

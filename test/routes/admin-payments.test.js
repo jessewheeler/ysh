@@ -48,12 +48,12 @@ describe('offline payment recording', () => {
     expect(payments.map(p => p.payment_method).sort()).toEqual(['cash', 'check']);
   });
 
-  test('payment with member activation changes status to active', () => {
+  test('payment with member activation changes status to active', async () => {
     const testDb = db.__getCurrentDb();
     const member = insertMember(testDb, { email: 'act@test.com', status: 'pending' });
 
     insertPayment(testDb, { member_id: member.id, amount_cents: 2500, payment_method: 'cash' });
-    activateMember(member.id);
+    await activateMember(member.id);
 
     const updated = testDb.prepare('SELECT * FROM members WHERE id = ?').get(member.id);
     expect(updated.status).toBe('active');

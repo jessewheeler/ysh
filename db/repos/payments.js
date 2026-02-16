@@ -1,55 +1,62 @@
 const db = require('../database');
 
-function create({ member_id, stripe_session_id, amount_cents, currency, status, description, payment_method }) {
-  return db.prepare(
+async function create({ member_id, stripe_session_id, amount_cents, currency, status, description, payment_method }) {
+  return await db.run(
     `INSERT INTO payments (member_id, stripe_session_id, amount_cents, currency, status, description, payment_method)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(member_id, stripe_session_id || null, amount_cents, currency || 'usd', status || 'pending', description || null, payment_method || 'stripe');
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    member_id, stripe_session_id || null, amount_cents, currency || 'usd', status || 'pending', description || null, payment_method || 'stripe'
+  );
 }
 
-function completeBySessionId(sessionId, paymentIntent) {
-  return db.prepare(
+async function completeBySessionId(sessionId, paymentIntent) {
+  return await db.run(
     `UPDATE payments SET status = 'completed', stripe_payment_intent = ?, updated_at = datetime('now')
-     WHERE stripe_session_id = ?`
-  ).run(paymentIntent, sessionId);
+     WHERE stripe_session_id = ?`,
+    paymentIntent, sessionId
+  );
 }
 
-function findByMemberId(memberId) {
-  return db.prepare('SELECT * FROM payments WHERE member_id = ? ORDER BY created_at DESC').all(memberId);
+async function findByMemberId(memberId) {
+  return await db.all('SELECT * FROM payments WHERE member_id = ? ORDER BY created_at DESC', memberId);
 }
 
-function listWithMembers({ limit, offset }) {
-  const total = db.prepare('SELECT COUNT(*) as c FROM payments').get().c;
-  const payments = db.prepare(
+async function listWithMembers({ limit, offset }) {
+  const totalRow = await db.get('SELECT COUNT(*) as c FROM payments');
+  const total = totalRow ? totalRow.c : 0;
+  const payments = await db.all(
     `SELECT p.*, m.first_name, m.last_name, m.member_number
      FROM payments p LEFT JOIN members m ON p.member_id = m.id
-     ORDER BY p.created_at DESC LIMIT ? OFFSET ?`
-  ).all(limit, offset);
+     ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
+    limit, offset
+  );
   return { payments, total };
 }
 
-function listAllWithMembers() {
-  return db.prepare(
+async function listAllWithMembers() {
+  return await db.all(
     `SELECT p.*, m.first_name, m.last_name, m.member_number
      FROM payments p LEFT JOIN members m ON p.member_id = m.id
      ORDER BY p.created_at DESC`
-  ).all();
+  );
 }
 
-function listRecent(limit) {
-  return db.prepare(
+async function listRecent(limit) {
+  return await db.all(
     `SELECT p.*, m.first_name, m.last_name, m.member_number
      FROM payments p LEFT JOIN members m ON p.member_id = m.id
-     ORDER BY p.created_at DESC LIMIT ?`
-  ).all(limit);
+     ORDER BY p.created_at DESC LIMIT ?`,
+    limit
+  );
 }
 
-function sumCompletedCents() {
-  return db.prepare("SELECT COALESCE(SUM(amount_cents), 0) as c FROM payments WHERE status = 'completed'").get().c;
+async function sumCompletedCents() {
+  const row = await db.get("SELECT COALESCE(SUM(amount_cents), 0) as c FROM payments WHERE status = 'completed'");
+  return row ? row.c : 0;
 }
 
-function countAll() {
-  return db.prepare('SELECT COUNT(*) as c FROM payments').get().c;
+async function countAll() {
+  const row = await db.get('SELECT COUNT(*) as c FROM payments');
+  return row ? row.c : 0;
 }
 
 module.exports = {

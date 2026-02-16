@@ -9,64 +9,66 @@ beforeEach(() => {
 });
 
 describe('findLatestByMemberId', () => {
-  test('returns most recent card by id', () => {
+  test('returns most recent card by id', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
     insertCard(testDb, { member_id: m.id, png_path: 'first.png', year: 2025 });
 
-    const card = cardsRepo.findLatestByMemberId(m.id);
+    const card = await cardsRepo.findLatestByMemberId(m.id);
     expect(card.png_path).toBe('first.png');
   });
 
-  test('returns undefined when no card', () => {
-    expect(cardsRepo.findLatestByMemberId(999)).toBeUndefined();
+  test('returns undefined when no card', async () => {
+    const card = await cardsRepo.findLatestByMemberId(999);
+    expect(card).toBeUndefined();
   });
 });
 
 describe('findByMemberId', () => {
-  test('returns all cards for member', () => {
+  test('returns all cards for member', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
     insertCard(testDb, { member_id: m.id, year: 2024 });
     insertCard(testDb, { member_id: m.id, year: 2025 });
-    expect(cardsRepo.findByMemberId(m.id)).toHaveLength(2);
+    const cards = await cardsRepo.findByMemberId(m.id);
+    expect(cards).toHaveLength(2);
   });
 });
 
 describe('upsertPng', () => {
-  test('inserts when no existing card', () => {
+  test('inserts when no existing card', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
-    cardsRepo.upsertPng(m.id, 2025, 'data/cards/card.png');
-    const card = cardsRepo.findLatestByMemberId(m.id);
+    await cardsRepo.upsertPng(m.id, 2025, 'data/cards/card.png');
+    const card = await cardsRepo.findLatestByMemberId(m.id);
     expect(card.png_path).toBe('data/cards/card.png');
   });
 
-  test('updates when card exists for year', () => {
+  test('updates when card exists for year', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
     insertCard(testDb, { member_id: m.id, png_path: 'old.png', year: 2025 });
-    cardsRepo.upsertPng(m.id, 2025, 'new.png');
-    const card = cardsRepo.findLatestByMemberId(m.id);
+    await cardsRepo.upsertPng(m.id, 2025, 'new.png');
+    const card = await cardsRepo.findLatestByMemberId(m.id);
     expect(card.png_path).toBe('new.png');
   });
 });
 
 describe('upsertPdf', () => {
-  test('inserts when no existing card', () => {
+  test('inserts when no existing card', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
-    cardsRepo.upsertPdf(m.id, 2025, 'data/cards/card.pdf');
-    const card = cardsRepo.findLatestByMemberId(m.id);
+    await cardsRepo.upsertPdf(m.id, 2025, 'data/cards/card.pdf');
+    const card = await cardsRepo.findLatestByMemberId(m.id);
     expect(card.pdf_path).toBe('data/cards/card.pdf');
   });
 
-  test('updates when card exists for year', () => {
+  test('updates when card exists for year', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com' });
     insertCard(testDb, { member_id: m.id, pdf_path: 'old.pdf', year: 2025 });
-    cardsRepo.upsertPdf(m.id, 2025, 'new.pdf');
-    const card = cardsRepo.findLatestByMemberId(m.id);
+    await cardsRepo.upsertPdf(m.id, 2025, 'new.pdf');
+    const card = await cardsRepo.findLatestByMemberId(m.id);
     expect(card.pdf_path).toBe('new.pdf');
   });
 });

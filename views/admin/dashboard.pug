@@ -36,7 +36,7 @@ block content
                 td= m.member_number
                 td
                   span(class=`badge badge-${m.status}`)= m.status
-                td= m.created_at ? m.created_at.split('T')[0] : ''
+                td= formatDate(m.created_at)
       else
         p.text-muted No members yet.
       p: a(href="/admin/members") View all members &rarr;
@@ -58,7 +58,7 @@ block content
                 td $#{(p.amount_cents / 100).toFixed(2)}
                 td
                   span(class=`badge badge-${p.status}`)= p.status
-                td= p.created_at ? p.created_at.split('T')[0] : ''
+                td= formatDate(p.created_at)
       else
         p.text-muted No payments yet.
       p: a(href="/admin/payments") View all payments &rarr;

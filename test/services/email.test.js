@@ -27,8 +27,9 @@ beforeEach(() => {
   });
 });
 
-function getFetchBody() {
-  const callArgs = global.fetch.mock.calls[0];
+function getFetchBody(callIndex = 0) {
+  const callArgs = global.fetch.mock.calls[callIndex];
+  if (!callArgs) return null;
   return JSON.parse(callArgs[1].body);
 }
 
@@ -49,7 +50,7 @@ describe('sendWelcomeEmail', () => {
 
   test('logs with type welcome', async () => {
     await emailService.sendWelcomeEmail(testMember);
-    const log = db.prepare("SELECT * FROM emails_log WHERE email_type = 'welcome'").get();
+    const log = await db.get("SELECT * FROM emails_log WHERE email_type = 'welcome'");
     expect(log).toBeDefined();
     expect(log.to_email).toBe('member@test.com');
     expect(log.status).toBe('sent');
@@ -71,7 +72,7 @@ describe('sendWelcomeEmail', () => {
       json: () => Promise.resolve({ message: 'MailerSend error' }),
     });
     await emailService.sendWelcomeEmail(testMember).catch(() => {});
-    const log = db.prepare("SELECT * FROM emails_log WHERE status = 'failed'").get();
+    const log = await db.get("SELECT * FROM emails_log WHERE status = 'failed'");
     expect(log).toBeDefined();
     expect(log.error).toContain('MailerSend error');
   });
@@ -92,7 +93,7 @@ describe('sendPaymentConfirmation', () => {
 
   test('logs with type payment_confirmation', async () => {
     await emailService.sendPaymentConfirmation(testMember, { amount_total: 2500 });
-    const log = db.prepare("SELECT * FROM emails_log WHERE email_type = 'payment_confirmation'").get();
+    const log = await db.get("SELECT * FROM emails_log WHERE email_type = 'payment_confirmation'");
     expect(log).toBeDefined();
     expect(log.status).toBe('sent');
   });
@@ -127,7 +128,7 @@ describe('sendCardEmail', () => {
     });
 
     await emailService.sendCardEmail(testMember);
-    const log = db.prepare("SELECT * FROM emails_log WHERE email_type = 'card_delivery'").get();
+    const log = await db.get("SELECT * FROM emails_log WHERE email_type = 'card_delivery'");
     expect(log).toBeDefined();
   });
 });
@@ -142,7 +143,7 @@ describe('sendBlastEmail', () => {
 
   test('logs with type blast', async () => {
     await emailService.sendBlastEmail(testMember, 'Subj', '<p>Body</p>');
-    const log = db.prepare("SELECT * FROM emails_log WHERE email_type = 'blast'").get();
+    const log = await db.get("SELECT * FROM emails_log WHERE email_type = 'blast'");
     expect(log).toBeDefined();
     expect(log.to_email).toBe('member@test.com');
   });
@@ -159,7 +160,7 @@ describe('sendOtpEmail', () => {
 
   test('logs with type otp', async () => {
     await emailService.sendOtpEmail({ to: 'admin@test.com', toName: 'Admin User', otp: '654321' });
-    const log = db.prepare("SELECT * FROM emails_log WHERE email_type = 'otp'").get();
+    const log = await db.get("SELECT * FROM emails_log WHERE email_type = 'otp'");
     expect(log).toBeDefined();
     expect(log.to_email).toBe('admin@test.com');
     expect(log.status).toBe('sent');
@@ -167,7 +168,7 @@ describe('sendOtpEmail', () => {
 
   test('does not include member_id', async () => {
     await emailService.sendOtpEmail({ to: 'admin@test.com', toName: 'Admin User', otp: '111111' });
-    const log = db.prepare("SELECT * FROM emails_log WHERE email_type = 'otp'").get();
+    const log = await db.get("SELECT * FROM emails_log WHERE email_type = 'otp'");
     expect(log.member_id).toBeNull();
   });
 
@@ -183,18 +184,23 @@ describe('sendOtpEmail', () => {
 
 describe('sendContactEmail', () => {
   test('sends to contact_email from settings', async () => {
+    // Reset DB for this specific test
+    db.__resetTestDb();
     const testDb = db.__getCurrentDb();
     insertSetting(testDb, 'contact_email', 'admin@ysh.org');
 
     await emailService.sendContactEmail({ name: 'Bob', email: 'bob@test.com', message: 'Hi there' });
-    const body = getFetchBody();
+    const calls = global.fetch.mock.calls;
+    const body = JSON.parse(calls[calls.length - 1][1].body);
     expect(body.to[0].email).toBe('admin@ysh.org');
   });
 
   test('falls back to FROM_EMAIL when no setting', async () => {
+    // Force a fresh DB state for this test
+    db.__resetTestDb();
     await emailService.sendContactEmail({ name: 'Bob', email: 'bob@test.com', message: 'Hello' });
-    const body = getFetchBody();
-    // Falls back to FROM_EMAIL (env var or default)
+    const calls = global.fetch.mock.calls;
+    const body = JSON.parse(calls[calls.length - 1][1].body);
     expect(body.to[0].email).toBeTruthy();
   });
 
@@ -206,13 +212,14 @@ describe('sendContactEmail', () => {
 
   test('logs with type contact', async () => {
     await emailService.sendContactEmail({ name: 'Bob', email: 'bob@test.com', message: 'Test' });
-    const log = db.prepare("SELECT * FROM emails_log WHERE email_type = 'contact'").get();
+    const log = await db.get("SELECT * FROM emails_log WHERE email_type = 'contact'");
     expect(log).toBeDefined();
   });
 
   test('includes sender name in subject', async () => {
     await emailService.sendContactEmail({ name: 'Alice', email: 'alice@test.com', message: 'Msg' });
-    const body = getFetchBody();
+    const calls = global.fetch.mock.calls;
+    const body = JSON.parse(calls[calls.length - 1][1].body);
     expect(body.subject).toContain('Alice');
   });
 });

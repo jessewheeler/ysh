@@ -1,11 +1,12 @@
 const db = require('./database');
 const migrate = require('./migrate');
 
-function seed() {
-  migrate();
+async function seed() {
+  await migrate();
 
   // Only seed if tables are empty
-  const bioCount = db.prepare('SELECT COUNT(*) as c FROM bios').get().c;
+  const bioCountRes = await db.get('SELECT COUNT(*) as c FROM bios');
+  const bioCount = bioCountRes ? bioCountRes.c : 0;
   if (bioCount > 0) {
     console.log('Database already seeded, skipping.');
     return;
@@ -14,9 +15,6 @@ function seed() {
   console.log('Seeding database...');
 
   // --- Bios ---
-  const insertBio = db.prepare(
-    'INSERT INTO bios (name, role, bio_text, photo_path, sort_order, is_visible) VALUES (?, ?, ?, ?, ?, 1)'
-  );
   const bios = [
     {
       name: 'John Fanzone',
@@ -69,14 +67,15 @@ function seed() {
     },
   ];
   for (const b of bios) {
-    insertBio.run(b.name, b.role, b.bio_text, b.photo_path, b.sort_order);
+    await db.run(
+      'INSERT INTO bios (name, role, bio_text, photo_path, sort_order, is_visible) VALUES (?, ?, ?, ?, ?, 1)',
+      b.name, b.role, b.bio_text, b.photo_path, b.sort_order
+    );
   }
 
   // --- Announcements ---
-  const insertAnn = db.prepare(
-    'INSERT INTO announcements (title, body, image_path, link_url, link_text, is_published, sort_order) VALUES (?, ?, ?, ?, ?, 1, ?)'
-  );
-  insertAnn.run(
+  await db.run(
+    'INSERT INTO announcements (title, body, image_path, link_url, link_text, is_published, sort_order) VALUES (?, ?, ?, ?, ?, 1, ?)',
     'YSH Turns Watch Party into a Fundraiser',
     'KTVQ In Billings reports on the Yellowstone Sea Hawkers watch party that was turned into a fundraiser for Family Services of Billings.',
     '/assets/fundr.jpg',
@@ -84,7 +83,8 @@ function seed() {
     'Watch Video',
     1
   );
-  insertAnn.run(
+  await db.run(
+    'INSERT INTO announcements (title, body, image_path, link_url, link_text, is_published, sort_order) VALUES (?, ?, ?, ?, ?, 1, ?)',
     'Dog Tag Buddies',
     'YSH is proud to announce that we are supporting Dog Tag Buddies for the 25-26 season. We invite you to visit their organization, learn about this wonderful organization and donate to an excellent cause.',
     '/assets/logo.png',
@@ -94,18 +94,12 @@ function seed() {
   );
 
   // --- Gallery images ---
-  const insertGal = db.prepare(
-    'INSERT INTO gallery_images (filename, alt_text, sort_order, is_visible) VALUES (?, ?, ?, 1)'
-  );
-  insertGal.run('/img/ysh_gallery.jpg', 'Gallery photo 1', 1);
-  insertGal.run('/img/ysh_gallery2.jpg', 'Gallery photo 2', 2);
-  insertGal.run('/img/ysh_gallery3.jpg', 'Gallery photo 3', 3);
-  insertGal.run('/img/ysh_gallery4.jpg', 'Gallery photo 4', 4);
+  await db.run('INSERT INTO gallery_images (filename, alt_text, sort_order, is_visible) VALUES (?, ?, ?, 1)', '/img/ysh_gallery.jpg', 'Gallery photo 1', 1);
+  await db.run('INSERT INTO gallery_images (filename, alt_text, sort_order, is_visible) VALUES (?, ?, ?, 1)', '/img/ysh_gallery2.jpg', 'Gallery photo 2', 2);
+  await db.run('INSERT INTO gallery_images (filename, alt_text, sort_order, is_visible) VALUES (?, ?, ?, 1)', '/img/ysh_gallery3.jpg', 'Gallery photo 3', 3);
+  await db.run('INSERT INTO gallery_images (filename, alt_text, sort_order, is_visible) VALUES (?, ?, ?, 1)', '/img/ysh_gallery4.jpg', 'Gallery photo 4', 4);
 
   // --- Site settings ---
-  const insertSetting = db.prepare(
-    'INSERT OR IGNORE INTO site_settings (key, value) VALUES (?, ?)'
-  );
   const settings = {
     hero_title: 'Yellowstone Sea Hawkers',
     hero_subtitle: 'Join your fellow Seahawks fans at the Red Door Lounge in Billings for our watch party! Enjoy the game day specials on food and drink, and lots of fun!',
@@ -119,7 +113,7 @@ function seed() {
     stripe_publishable_key: '',
   };
   for (const [k, v] of Object.entries(settings)) {
-    insertSetting.run(k, v);
+    await db.run('INSERT OR IGNORE INTO site_settings (key, value) VALUES (?, ?)', k, v);
   }
 
   console.log('Seed complete.');
@@ -128,5 +122,8 @@ function seed() {
 module.exports = seed;
 
 if (require.main === module) {
-  seed();
+  seed().catch(err => {
+    console.error('Seed failed:', err);
+    process.exit(1);
+  });
 }

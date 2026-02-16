@@ -5,98 +5,98 @@ const storage = require('./storage');
 
 // --- Announcements ---
 
-function listAnnouncements() {
-  return announcementRepo.findAll();
+async function listAnnouncements() {
+  return await announcementRepo.findAll();
 }
 
-function listPublishedAnnouncements() {
-  return announcementRepo.findAllPublished();
+async function listPublishedAnnouncements() {
+  return await announcementRepo.findAllPublished();
 }
 
-function getAnnouncement(id) {
-  return announcementRepo.findById(id);
+async function getAnnouncement(id) {
+  return await announcementRepo.findById(id);
 }
 
-function createAnnouncement(data) {
-  return announcementRepo.create(data);
+async function createAnnouncement(data) {
+  return await announcementRepo.create(data);
 }
 
-function updateAnnouncement(id, data) {
-  return announcementRepo.update(id, data);
+async function updateAnnouncement(id, data) {
+  return await announcementRepo.update(id, data);
 }
 
 async function deleteAnnouncement(id) {
-  const imagePath = announcementRepo.getImagePath(id);
+  const imagePath = await announcementRepo.getImagePath(id);
   storage.deleteFile(imagePath).catch(() => {});
-  announcementRepo.deleteById(id);
+  await announcementRepo.deleteById(id);
 }
 
-function getAnnouncementImagePath(id) {
-  return announcementRepo.getImagePath(id);
+async function getAnnouncementImagePath(id) {
+  return await announcementRepo.getImagePath(id);
 }
 
 // --- Gallery ---
 
-function listGalleryImages() {
-  return galleryRepo.findAll();
+async function listGalleryImages() {
+  return await galleryRepo.findAll();
 }
 
-function listVisibleGalleryImages() {
-  return galleryRepo.findAllVisible();
+async function listVisibleGalleryImages() {
+  return await galleryRepo.findAllVisible();
 }
 
-function getGalleryImage(id) {
-  return galleryRepo.findById(id);
+async function getGalleryImage(id) {
+  return await galleryRepo.findById(id);
 }
 
-function createGalleryImage(data) {
-  return galleryRepo.create(data);
+async function createGalleryImage(data) {
+  return await galleryRepo.create(data);
 }
 
-function updateGalleryImage(id, data) {
-  return galleryRepo.update(id, data);
+async function updateGalleryImage(id, data) {
+  return await galleryRepo.update(id, data);
 }
 
 async function deleteGalleryImage(id) {
-  const filename = galleryRepo.getFilename(id);
+  const filename = await galleryRepo.getFilename(id);
   storage.deleteFile(filename).catch(() => {});
-  galleryRepo.deleteById(id);
+  await galleryRepo.deleteById(id);
 }
 
-function getGalleryFilename(id) {
-  return galleryRepo.getFilename(id);
+async function getGalleryFilename(id) {
+  return await galleryRepo.getFilename(id);
 }
 
 // --- Bios ---
 
-function listBios() {
-  return biosRepo.findAll();
+async function listBios() {
+  return await biosRepo.findAll();
 }
 
-function listVisibleBios() {
-  return biosRepo.findAllVisible();
+async function listVisibleBios() {
+  return await biosRepo.findAllVisible();
 }
 
-function getBio(id) {
-  return biosRepo.findById(id);
+async function getBio(id) {
+  return await biosRepo.findById(id);
 }
 
-function createBio(data) {
-  return biosRepo.create(data);
+async function createBio(data) {
+  return await biosRepo.create(data);
 }
 
-function updateBio(id, data) {
-  return biosRepo.update(id, data);
+async function updateBio(id, data) {
+  return await biosRepo.update(id, data);
 }
 
 async function deleteBio(id) {
-  const photoPath = biosRepo.getPhotoPath(id);
+  const photoPath = await biosRepo.getPhotoPath(id);
   storage.deleteFile(photoPath).catch(() => {});
-  biosRepo.deleteById(id);
+  await biosRepo.deleteById(id);
 }
 
-function getBioPhotoPath(id) {
-  return biosRepo.getPhotoPath(id);
+async function getBioPhotoPath(id) {
+  return await biosRepo.getPhotoPath(id);
 }
 
 module.exports = {

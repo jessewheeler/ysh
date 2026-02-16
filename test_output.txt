@@ -1,0 +1,1723 @@
+
+> ysh@1.0.0 test
+> jest --verbose --forceExit --verbose
+
+PASS test/middleware/locals.test.js
+  injectLocals middleware
+    ✓ populates res.locals.site from site_settings table (3 ms)
+    ✓ res.locals.site is empty object when table is empty (1 ms)
+    ✓ sets isAdmin true when session.adminId is set
+    ✓ sets isAdmin false when session.adminId is missing (1 ms)
+    ✓ sets adminRole from session (10 ms)
+    ✓ sets adminRole to null when not logged in (1 ms)
+    ✓ sets adminEmail from session (1 ms)
+    ✓ sets adminEmail to null when not logged in
+    ✓ sets currentPath from req.path (1 ms)
+    ✓ copies flash_success to locals and deletes from session (1 ms)
+    ✓ copies flash_error to locals and deletes from session (1 ms)
+    ✓ handles missing flash messages gracefully
+    ✓ always calls next() (1 ms)
+
+  console.error
+    MailerSend error (welcome): MailerSend error
+
+      91 |   } catch (err) {
+      92 |     const errMsg = err.message;
+    > 93 |     console.error(`MailerSend error (${email_type}):`, errMsg);
+         |             ^
+      94 |     await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
+      95 |     throw err;
+      96 |   }
+
+      at error (services/email.js:93:13)
+      at Object.sendWelcomeEmail (services/email.js:112:3)
+      at Object.<anonymous> (test/services/email.test.js:64:5)
+
+PASS test/services/dashboard.test.js
+  getStats
+    ✓ returns correct counts (11 ms)
+    ✓ returns zeros when empty (1 ms)
+  getRecentActivity
+    ✓ returns recent members and payments (2 ms)
+    ✓ returns empty arrays when empty (1 ms)
+
+PASS test/db/seed.test.js
+  seed()
+    ✓ inserts 7 bios (7 ms)
+    ✓ inserts 2 announcements (2 ms)
+    ✓ inserts 4 gallery images (1 ms)
+    ✓ inserts site settings (1 ms)
+    ✓ skips when bios already exist (idempotent) (2 ms)
+    ✓ calls migrate() before seeding — tables exist (8 ms)
+
+FAIL test/db/migrate.test.js
+  migrate()
+    ✕ creates all 8 tables (4 ms)
+    ✕ is idempotent — calling twice does not throw (1 ms)
+    ✕ members table has correct status CHECK constraint (1 ms)
+    ✕ payments table has correct status CHECK constraint (1 ms)
+    ✕ members table has UNIQUE constraint on email (1 ms)
+    ✕ members table has UNIQUE constraint on member_number (1 ms)
+    ✕ site_settings uses key as PRIMARY KEY
+    ✕ payments table has foreign key to members (1 ms)
+    ✕ emails_log table has email_type CHECK constraint (1 ms)
+    ✕ emails_log table accepts otp email_type (1 ms)
+    ✕ members table has correct role CHECK constraint (1 ms)
+    ✕ members table allows NULL role for regular members (1 ms)
+    ✕ creates tables with correct default values
+
+  ● migrate() › creates all 8 tables
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:42:5)
+
+  ● migrate() › is idempotent — calling twice does not throw
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:53:5)
+
+  ● migrate() › members table has correct status CHECK constraint
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:58:5)
+
+  ● migrate() › payments table has correct status CHECK constraint
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:70:5)
+
+  ● migrate() › members table has UNIQUE constraint on email
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:86:5)
+
+  ● migrate() › members table has UNIQUE constraint on member_number
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:94:5)
+
+  ● migrate() › site_settings uses key as PRIMARY KEY
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:102:5)
+
+  ● migrate() › payments table has foreign key to members
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:110:5)
+
+  ● migrate() › emails_log table has email_type CHECK constraint
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:117:5)
+
+  ● migrate() › emails_log table accepts otp email_type
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:129:5)
+
+  ● migrate() › members table has correct role CHECK constraint
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:138:5)
+
+  ● migrate() › members table allows NULL role for regular members
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:153:5)
+
+  ● migrate() › creates tables with correct default values
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:162:5)
+
+FAIL test/services/content.test.js
+  Announcements
+    ✕ listAnnouncements returns all (4 ms)
+    ✕ listPublishedAnnouncements filters unpublished (1 ms)
+    ✕ getAnnouncement returns by id (1 ms)
+    ✕ createAnnouncement inserts (1 ms)
+    ✕ updateAnnouncement modifies (15 ms)
+    ✕ deleteAnnouncement removes and cleans up image (8 ms)
+  Gallery
+    ✕ listGalleryImages / listVisibleGalleryImages (1 ms)
+    ✕ CRUD cycle (1 ms)
+  Bios
+    ✕ listBios / listVisibleBios (1 ms)
+    ✕ CRUD cycle (1 ms)
+    ✓ deleteBio cleans up photo (1 ms)
+
+  ● Announcements › listAnnouncements returns all
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      39 |     insertAnnouncement({ title: 'A' });
+      40 |     insertAnnouncement({ title: 'B', is_published: 0 });
+    > 41 |     expect(contentService.listAnnouncements()).toHaveLength(2);
+         |                                                ^
+      42 |   });
+      43 |
+      44 |   test('listPublishedAnnouncements filters unpublished', () => {
+
+      at Object.toHaveLength (test/services/content.test.js:41:48)
+
+  ● Announcements › listPublishedAnnouncements filters unpublished
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      45 |     insertAnnouncement({ title: 'A' });
+      46 |     insertAnnouncement({ title: 'B', is_published: 0 });
+    > 47 |     expect(contentService.listPublishedAnnouncements()).toHaveLength(1);
+         |                                                         ^
+      48 |   });
+      49 |
+      50 |   test('getAnnouncement returns by id', () => {
+
+      at Object.toHaveLength (test/services/content.test.js:47:57)
+
+  ● Announcements › getAnnouncement returns by id
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Find me"
+    Received: undefined
+
+      50 |   test('getAnnouncement returns by id', () => {
+      51 |     const a = insertAnnouncement({ title: 'Find me' });
+    > 52 |     expect(contentService.getAnnouncement(a.id).title).toBe('Find me');
+         |                                                        ^
+      53 |   });
+      54 |
+      55 |   test('createAnnouncement inserts', () => {
+
+      at Object.toBe (test/services/content.test.js:52:56)
+
+  ● Announcements › createAnnouncement inserts
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      55 |   test('createAnnouncement inserts', () => {
+      56 |     contentService.createAnnouncement({ title: 'New', is_published: true, sort_order: 0 });
+    > 57 |     expect(contentService.listAnnouncements()).toHaveLength(1);
+         |                                                ^
+      58 |   });
+      59 |
+      60 |   test('updateAnnouncement modifies', () => {
+
+      at Object.toHaveLength (test/services/content.test.js:57:48)
+
+  ● Announcements › updateAnnouncement modifies
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "New"
+    Received: undefined
+
+      61 |     const a = insertAnnouncement({ title: 'Old' });
+      62 |     contentService.updateAnnouncement(a.id, { title: 'New', is_published: true, sort_order: 0 });
+    > 63 |     expect(contentService.getAnnouncement(a.id).title).toBe('New');
+         |                                                        ^
+      64 |   });
+      65 |
+      66 |   test('deleteAnnouncement removes and cleans up image', async () => {
+
+      at Object.toBe (test/services/content.test.js:63:56)
+
+  ● Announcements › deleteAnnouncement removes and cleans up image
+
+    expect(received).toBeUndefined()
+
+    Received: Promise {}
+
+      67 |     const a = insertAnnouncement({ title: 'Del', image_path: '/img/old.jpg' });
+      68 |     await contentService.deleteAnnouncement(a.id);
+    > 69 |     expect(contentService.getAnnouncement(a.id)).toBeUndefined();
+         |                                                  ^
+      70 |     expect(storage.deleteFile).toHaveBeenCalledWith('/img/old.jpg');
+      71 |   });
+      72 | });
+
+      at Object.toBeUndefined (test/services/content.test.js:69:50)
+
+  ● Gallery › listGalleryImages / listVisibleGalleryImages
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      76 |     insertGalleryImage();
+      77 |     insertGalleryImage({ filename: 'h.jpg', is_visible: 0 });
+    > 78 |     expect(contentService.listGalleryImages()).toHaveLength(2);
+         |                                                ^
+      79 |     expect(contentService.listVisibleGalleryImages()).toHaveLength(1);
+      80 |   });
+      81 |
+
+      at Object.toHaveLength (test/services/content.test.js:78:48)
+
+  ● Gallery › CRUD cycle
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      83 |     contentService.createGalleryImage({ filename: 'new.jpg', is_visible: true, sort_order: 0 });
+      84 |     const all = contentService.listGalleryImages();
+    > 85 |     expect(all).toHaveLength(1);
+         |                 ^
+      86 |
+      87 |     const id = all[0].id;
+      88 |     contentService.updateGalleryImage(id, { filename: 'upd.jpg', is_visible: true, sort_order: 0 });
+
+      at Object.toHaveLength (test/services/content.test.js:85:17)
+
+  ● Bios › listBios / listVisibleBios
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+       98 |     insertBio();
+       99 |     insertBio({ name: 'Hidden', is_visible: 0 });
+    > 100 |     expect(contentService.listBios()).toHaveLength(2);
+          |                                       ^
+      101 |     expect(contentService.listVisibleBios()).toHaveLength(1);
+      102 |   });
+      103 |
+
+      at Object.toHaveLength (test/services/content.test.js:100:39)
+
+  ● Bios › CRUD cycle
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      105 |     contentService.createBio({ name: 'New', is_visible: true, sort_order: 0 });
+      106 |     const all = contentService.listBios();
+    > 107 |     expect(all).toHaveLength(1);
+          |                 ^
+      108 |
+      109 |     const id = all[0].id;
+      110 |     contentService.updateBio(id, { name: 'Updated', is_visible: true, sort_order: 0 });
+
+      at Object.toHaveLength (test/services/content.test.js:107:17)
+
+  console.error
+    MailerSend error (welcome): MailerSend error
+
+      91 |   } catch (err) {
+      92 |     const errMsg = err.message;
+    > 93 |     console.error(`MailerSend error (${email_type}):`, errMsg);
+         |             ^
+      94 |     await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
+      95 |     throw err;
+      96 |   }
+
+      at error (services/email.js:93:13)
+      at Object.sendWelcomeEmail (services/email.js:112:3)
+      at Object.<anonymous> (test/services/email.test.js:73:5)
+
+FAIL test/services/admin.test.js
+  listAdmins
+    ✕ returns members with roles (8 ms)
+  addAdmin
+    ✕ promotes existing member to admin (1 ms)
+    ✕ creates new member with admin role (1 ms)
+    ✕ defaults to editor for non-super_admin roles (1 ms)
+    ✓ normalizes email to lowercase (1 ms)
+  demoteAdmin
+    ✕ clears role from admin
+
+  ● listAdmins › returns members with roles
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      16 |     insertMember(testDb, { email: 'user@test.com' });
+      17 |     const admins = adminService.listAdmins();
+    > 18 |     expect(admins).toHaveLength(1);
+         |                    ^
+      19 |     expect(admins[0].email).toBe('admin@test.com');
+      20 |   });
+      21 | });
+
+      at Object.toHaveLength (test/services/admin.test.js:18:20)
+
+  ● addAdmin › promotes existing member to admin
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "editor"
+    Received: undefined
+
+      26 |     const m = insertMember(testDb, { email: 'user@test.com' });
+      27 |     adminService.addAdmin({ email: 'user@test.com', first_name: 'U', last_name: 'S', role: 'editor' });
+    > 28 |     expect(memberRepo.findById(m.id).role).toBe('editor');
+         |                                            ^
+      29 |   });
+      30 |
+      31 |   test('creates new member with admin role', () => {
+
+      at Object.toBe (test/services/admin.test.js:28:44)
+
+  ● addAdmin › creates new member with admin role
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "super_admin"
+    Received: undefined
+
+      33 |     const admin = memberRepo.findByEmail('new@admin.com');
+      34 |     expect(admin).toBeDefined();
+    > 35 |     expect(admin.role).toBe('super_admin');
+         |                        ^
+      36 |   });
+      37 |
+      38 |   test('defaults to editor for non-super_admin roles', () => {
+
+      at Object.toBe (test/services/admin.test.js:35:24)
+
+  ● addAdmin › defaults to editor for non-super_admin roles
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "editor"
+    Received: undefined
+
+      38 |   test('defaults to editor for non-super_admin roles', () => {
+      39 |     adminService.addAdmin({ email: 'ed@test.com', first_name: 'Ed', last_name: 'T', role: 'unknown' });
+    > 40 |     expect(memberRepo.findByEmail('ed@test.com').role).toBe('editor');
+         |                                                        ^
+      41 |   });
+      42 |
+      43 |   test('normalizes email to lowercase', () => {
+
+      at Object.toBe (test/services/admin.test.js:40:56)
+
+  ● demoteAdmin › clears role from admin
+
+    expect(received).toBeNull()
+
+    Received: undefined
+
+      52 |     const admin = insertAdmin(testDb, { email: 'admin@test.com' });
+      53 |     adminService.demoteAdmin(admin.id);
+    > 54 |     expect(memberRepo.findById(admin.id).role).toBeNull();
+         |                                                ^
+      55 |   });
+      56 | });
+      57 |
+
+      at Object.toBeNull (test/services/admin.test.js:54:48)
+
+  console.error
+    MailerSend error (otp): MailerSend error
+
+      91 |   } catch (err) {
+      92 |     const errMsg = err.message;
+    > 93 |     console.error(`MailerSend error (${email_type}):`, errMsg);
+         |             ^
+      94 |     await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
+      95 |     throw err;
+      96 |   }
+
+      at error (services/email.js:93:13)
+      at Object.sendOtpEmail (services/email.js:213:3)
+      at Object.<anonymous> (test/services/email.test.js:180:5)
+
+  console.error
+    MailerSend error (contact): SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      91 |   } catch (err) {
+      92 |     const errMsg = err.message;
+    > 93 |     console.error(`MailerSend error (${email_type}):`, errMsg);
+         |             ^
+      94 |     await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
+      95 |     throw err;
+      96 |   }
+
+      at error (services/email.js:93:13)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:189:5)
+
+  console.error
+    MailerSend error (contact): SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      91 |   } catch (err) {
+      92 |     const errMsg = err.message;
+    > 93 |     console.error(`MailerSend error (${email_type}):`, errMsg);
+         |             ^
+      94 |     await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
+      95 |     throw err;
+      96 |   }
+
+      at error (services/email.js:93:13)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:195:5)
+
+  console.error
+    MailerSend error (contact): SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      91 |   } catch (err) {
+      92 |     const errMsg = err.message;
+    > 93 |     console.error(`MailerSend error (${email_type}):`, errMsg);
+         |             ^
+      94 |     await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
+      95 |     throw err;
+      96 |   }
+
+      at error (services/email.js:93:13)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:202:5)
+
+  console.error
+    MailerSend error (contact): SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      91 |   } catch (err) {
+      92 |     const errMsg = err.message;
+    > 93 |     console.error(`MailerSend error (${email_type}):`, errMsg);
+         |             ^
+      94 |     await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
+      95 |     throw err;
+      96 |   }
+
+      at error (services/email.js:93:13)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:208:5)
+
+  console.error
+    MailerSend error (contact): SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      91 |   } catch (err) {
+      92 |     const errMsg = err.message;
+    > 93 |     console.error(`MailerSend error (${email_type}):`, errMsg);
+         |             ^
+      94 |     await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
+      95 |     throw err;
+      96 |   }
+
+      at error (services/email.js:93:13)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:214:5)
+
+FAIL test/services/email.test.js
+  sendWelcomeEmail
+    ✓ sends to correct recipient with correct subject (13 ms)
+    ✓ includes member info in body (2 ms)
+    ✓ logs with type welcome (2 ms)
+    ✓ re-throws on MailerSend failure (56 ms)
+    ✓ logs failure when MailerSend errors (3 ms)
+  sendPaymentConfirmation
+    ✓ formats cents to dollars in email body (14 ms)
+    ✓ handles missing amount_total (1 ms)
+    ✓ logs with type payment_confirmation (2 ms)
+  sendCardEmail
+    ✓ throws when no card exists for member (1 ms)
+    ✓ sends email when card exists with pdf and png (2 ms)
+    ✓ logs with type card_delivery (2 ms)
+  sendBlastEmail
+    ✓ passes subject and body through (2 ms)
+    ✓ logs with type blast (1 ms)
+  sendOtpEmail
+    ✓ sends to correct recipient with OTP code in body (1 ms)
+    ✓ logs with type otp (1 ms)
+    ✓ does not include member_id (1 ms)
+    ✓ re-throws on MailerSend failure (3 ms)
+  sendContactEmail
+    ✕ sends to contact_email from settings (3 ms)
+    ✕ falls back to FROM_EMAIL when no setting (2 ms)
+    ✕ converts newlines in message to <br> (2 ms)
+    ✕ logs with type contact (2 ms)
+    ✕ includes sender name in subject (2 ms)
+
+  ● sendContactEmail › sends to contact_email from settings
+
+    TypeError: SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      117 |     },
+      118 |     async run(sql, ...params) {
+    > 119 |       const result = sqlite.prepare(sql).run(...params);
+          |                                          ^
+      120 |       return {
+      121 |         lastInsertRowid: result.lastInsertRowid,
+      122 |         changes: result.changes
+
+      at Object.run (test/helpers/db.js:119:42)
+      at Object.run [as insert] (db/repos/emailLog.js:4:19)
+      at insert (services/email.js:44:22)
+      at logEmail (services/email.js:94:11)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:189:5)
+
+  ● sendContactEmail › falls back to FROM_EMAIL when no setting
+
+    TypeError: SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      117 |     },
+      118 |     async run(sql, ...params) {
+    > 119 |       const result = sqlite.prepare(sql).run(...params);
+          |                                          ^
+      120 |       return {
+      121 |         lastInsertRowid: result.lastInsertRowid,
+      122 |         changes: result.changes
+
+      at Object.run (test/helpers/db.js:119:42)
+      at Object.run [as insert] (db/repos/emailLog.js:4:19)
+      at insert (services/email.js:44:22)
+      at logEmail (services/email.js:94:11)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:195:5)
+
+  ● sendContactEmail › converts newlines in message to <br>
+
+    TypeError: SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      117 |     },
+      118 |     async run(sql, ...params) {
+    > 119 |       const result = sqlite.prepare(sql).run(...params);
+          |                                          ^
+      120 |       return {
+      121 |         lastInsertRowid: result.lastInsertRowid,
+      122 |         changes: result.changes
+
+      at Object.run (test/helpers/db.js:119:42)
+      at Object.run [as insert] (db/repos/emailLog.js:4:19)
+      at insert (services/email.js:44:22)
+      at logEmail (services/email.js:94:11)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:202:5)
+
+  ● sendContactEmail › logs with type contact
+
+    TypeError: SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      117 |     },
+      118 |     async run(sql, ...params) {
+    > 119 |       const result = sqlite.prepare(sql).run(...params);
+          |                                          ^
+      120 |       return {
+      121 |         lastInsertRowid: result.lastInsertRowid,
+      122 |         changes: result.changes
+
+      at Object.run (test/helpers/db.js:119:42)
+      at Object.run [as insert] (db/repos/emailLog.js:4:19)
+      at insert (services/email.js:44:22)
+      at logEmail (services/email.js:94:11)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:208:5)
+
+  ● sendContactEmail › includes sender name in subject
+
+    TypeError: SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      117 |     },
+      118 |     async run(sql, ...params) {
+    > 119 |       const result = sqlite.prepare(sql).run(...params);
+          |                                          ^
+      120 |       return {
+      121 |         lastInsertRowid: result.lastInsertRowid,
+      122 |         changes: result.changes
+
+      at Object.run (test/helpers/db.js:119:42)
+      at Object.run [as insert] (db/repos/emailLog.js:4:19)
+      at insert (services/email.js:44:22)
+      at logEmail (services/email.js:94:11)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:214:5)
+
+PASS test/repos/members.test.js
+  findById
+    ✓ returns member when found (24 ms)
+    ✓ returns undefined when not found (9 ms)
+  findByEmail
+    ✓ returns member when found (1 ms)
+    ✓ returns undefined when not found (1 ms)
+  findAdminByEmail
+    ✓ returns admin member
+    ✓ ignores non-admin members (1 ms)
+  create
+    ✓ inserts and returns result with lastInsertRowid (5 ms)
+  update
+    ✓ updates member fields (1 ms)
+  deleteById
+    ✓ removes the member (1 ms)
+  activate
+    ✓ sets status to active (1 ms)
+  countAll / countActive / countByYear
+    ✓ counts correctly (1 ms)
+  search
+    ✓ finds members matching search term (1 ms)
+    ✓ returns all when search is empty
+  listRecent / listAll / listActiveMembers
+    ✓ lists members correctly (1 ms)
+  listAdmins
+    ✓ returns only members with roles (1 ms)
+  OTP functions
+    ✓ setOtp / incrementOtpAttempts / clearOtp (1 ms)
+  setRole / clearRole / createAdmin
+    ✓ sets and clears role (1 ms)
+    ✓ createAdmin inserts a new admin member (1 ms)
+
+PASS test/repos/bios.test.js
+  findAll / findAllVisible
+    ✓ filters by visibility (2 ms)
+  findById
+    ✓ returns bio by id (1 ms)
+  getPhotoPath
+    ✓ returns photo_path (1 ms)
+    ✓ returns null when no photo (1 ms)
+  create / update / deleteById
+    ✓ full CRUD cycle (1 ms)
+
+PASS test/repos/payments.test.js
+  create
+    ✓ inserts a payment and returns result (4 ms)
+  completeBySessionId
+    ✓ marks payment as completed (1 ms)
+  findByMemberId
+    ✓ returns payments for a member (1 ms)
+  listWithMembers
+    ✓ returns paginated payments with member info (1 ms)
+  listAllWithMembers
+    ✓ returns all payments with member info (1 ms)
+  listRecent
+    ✓ returns limited recent payments (1 ms)
+  sumCompletedCents
+    ✓ sums completed payments only (1 ms)
+  countAll
+    ✓ counts all payments (1 ms)
+
+PASS test/services/stripe.test.js
+  createCheckoutSession
+    ✓ calls stripe with correct line_items and amount (2 ms)
+    ✓ sets correct metadata with member_id (1 ms)
+    ✓ sets correct success and cancel URLs (1 ms)
+    ✓ inserts pending payment row in DB (1 ms)
+    ✓ returns the session object (1 ms)
+    ✓ uses payment mode (1 ms)
+    ✓ sets customer_email (1 ms)
+    ✓ sets payment_method_types to card
+  constructWebhookEvent
+    ✓ calls Stripe SDK verification and returns event (1 ms)
+    ✓ throws on bad signature (7 ms)
+
+PASS test/services/card.test.js
+  generatePNG
+    ✓ writes file with correct name pattern (38 ms)
+    ✓ returns the file path (13 ms)
+    ✓ inserts membership_cards row with png_path (2 ms)
+    ✓ updates existing card row when one exists for same member+year (1 ms)
+    ✓ writes PNG buffer to file (2 ms)
+  generatePDF
+    ✓ returns file path with correct name pattern (1 ms)
+    ✓ pipes to writeStream (2 ms)
+    ✓ inserts membership_cards row with pdf_path (1 ms)
+    ✓ updates existing card row when one exists for same member+year (1 ms)
+    ✓ calls doc.end() to finish PDF generation (2 ms)
+
+PASS test/services/payments.test.js
+  recordOfflinePayment
+    ✓ creates a completed payment record (6 ms)
+    ✓ activates member when activateMember is true
+    ✓ does not activate when activateMember is falsy (4 ms)
+  completeStripePayment
+    ✓ marks payment as completed by session id (1 ms)
+
+  console.log
+    DEV OTP for admin@example.com: 000000
+
+      at Object.log [as POST /login] (routes/admin.js:51:15)
+
+PASS test/repos/announcements.test.js
+  findAll / findAllPublished
+    ✓ findAll returns all, findAllPublished filters (2 ms)
+  findById
+    ✓ returns announcement by id (1 ms)
+    ✓ returns undefined for missing id (1 ms)
+  getImagePath
+    ✓ returns image_path
+    ✓ returns null when no image
+  create
+    ✓ inserts and returns result (1 ms)
+  update
+    ✓ updates fields (1 ms)
+  deleteById
+    ✓ removes the announcement (2 ms)
+
+PASS test/routes/admin-export.test.js
+  GET /members/export (CSV pipeline)
+    ✓ produces CSV with correct headers for members (9 ms)
+    ✓ produces empty CSV with only headers when no members (1 ms)
+  GET /payments/export (CSV pipeline)
+    ✓ produces CSV with payment data joined with member info (2 ms)
+
+PASS test/routes/admin-payments.test.js
+  offline payment recording
+    ✓ inserts payment with correct amount in cents (11 ms)
+    ✓ defaults payment_method to stripe (1 ms)
+    ✓ records multiple payments for the same member (1 ms)
+    ✓ payment with member activation changes status to active (1 ms)
+    ✓ insertPayment fixture uses defaults correctly (1 ms)
+
+PASS test/services/storage.test.js
+  isConfigured
+    ✓ returns true when all B2 env vars are set (3 ms)
+    ✓ returns false when a B2 env var is missing
+    ✓ returns false when no B2 env vars are set
+  uploadFile
+    ✓ sends PutObjectCommand with correct params (2 ms)
+    ✓ returns public URL (1 ms)
+    ✓ generates unique filenames
+    ✓ creates S3Client with correct config (1 ms)
+    ✓ sets correct content type for webp (1 ms)
+    ✓ propagates S3 errors (6 ms)
+  deleteFile
+    ✓ sends DeleteObjectCommand for B2 URLs (6 ms)
+    ✓ skips local paths
+    ✓ skips seed image paths
+    ✓ skips null values (1 ms)
+    ✓ skips undefined values
+    ✓ skips when B2 is not configured (1 ms)
+    ✓ propagates S3 errors
+
+PASS test/repos/gallery.test.js
+  findAll / findAllVisible
+    ✓ filters by visibility (2 ms)
+  findById
+    ✓ returns image by id (1 ms)
+  getFilename
+    ✓ returns filename (4 ms)
+    ✓ returns null for missing id (11 ms)
+  create / update / deleteById
+    ✓ full CRUD cycle (1 ms)
+
+PASS test/services/members.test.js
+  generateMemberNumber
+    ✓ returns YSH-YYYY-0001 for first member of that year (1 ms)
+    ✓ increments the sequence number
+    ✓ defaults to current year when no year given (1 ms)
+    ✓ pads sequence to 4 digits (5 ms)
+    ✓ counts per year independently (1 ms)
+  findMemberById
+    ✓ returns the member when found (1 ms)
+    ✓ returns undefined when not found
+  findMemberByEmail
+    ✓ returns the member when found (1 ms)
+    ✓ returns undefined when not found (1 ms)
+  activateMember
+    ✓ sets status to active and updates timestamp (1 ms)
+    ✓ is a no-op for missing id (1 ms)
+
+PASS test/repos/settings.test.js
+  getAll
+    ✓ returns key-value object (2 ms)
+    ✓ returns empty object when no settings (1 ms)
+  get
+    ✓ returns value for key
+    ✓ returns null for missing key (1 ms)
+  upsertMany
+    ✓ inserts new settings (1 ms)
+    ✓ updates existing settings
+    ✓ skips undefined values (1 ms)
+
+PASS test/repos/cards.test.js
+  findLatestByMemberId
+    ✓ returns most recent card by id (2 ms)
+    ✓ returns undefined when no card (1 ms)
+  findByMemberId
+    ✓ returns all cards for member
+  upsertPng
+    ✓ inserts when no existing card (1 ms)
+    ✓ updates when card exists for year (2 ms)
+  upsertPdf
+    ✓ inserts when no existing card (1 ms)
+    ✓ updates when card exists for year (1 ms)
+
+PASS test/repos/emailLog.test.js
+  insert
+    ✓ creates an email log entry (1 ms)
+  list
+    ✓ returns paginated results
+  listByMemberId
+    ✓ returns emails for a specific member (1 ms)
+  countAll
+    ✓ returns total count (1 ms)
+
+PASS test/services/csv.test.js
+  escapeCsvValue
+    ✓ returns empty string for null (1 ms)
+    ✓ returns empty string for undefined (1 ms)
+    ✓ returns number as string
+    ✓ returns plain string unchanged
+    ✓ wraps value containing commas in quotes
+    ✓ wraps and escapes value containing double quotes (1 ms)
+    ✓ wraps value containing newlines
+    ✓ wraps value containing carriage return
+    ✓ handles empty string
+  toCsv
+    ✓ produces header row and data rows (1 ms)
+    ✓ uses custom headers when provided
+    ✓ returns only header row for empty rows
+    ✓ handles missing columns with empty string
+    ✓ escapes values in data rows (1 ms)
+    ✓ escapes values in header row
+
+PASS test/db/pg-translate.test.js
+  pg-translate
+    ✓ translateParams replaces ? with $n (2 ms)
+    ✓ translateSql handles datetime("now") (1 ms)
+    ✓ translateSql handles INSERT OR IGNORE
+    ✓ addReturningId appends RETURNING id to INSERT
+    ✓ addReturningId does not append if already present or not an INSERT (1 ms)
+
+PASS test/middleware/auth.test.js
+  requireAdmin middleware
+    ✓ calls next() when req.session.adminId is set (1 ms)
+    ✓ does not redirect when session has adminId
+    ✓ redirects to /admin/login when adminId is missing (1 ms)
+    ✓ stores req.originalUrl in req.session.returnTo before redirect
+    ✓ does not call next() when not admin
+  requireSuperAdmin middleware
+    ✓ calls next() when session has adminId and role is super_admin
+    ✓ redirects editor to dashboard with flash error
+    ✓ redirects unauthenticated user to login
+    ✓ does not call next() for editor
+
+  console.log
+    DEV OTP for admin@example.com: 000000
+
+      at Object.log [as POST /login] (routes/admin.js:51:15)
+
+  console.log
+    DEV OTP for admin@example.com: 000000
+
+      at Object.log [as POST /login] (routes/admin.js:51:15)
+
+FAIL test/services/auth.test.js
+  findAdminByEmail
+    ✕ returns admin member by email (9 ms)
+    ✕ returns undefined for non-admin (1 ms)
+  generateAndStoreOtp
+    ✓ generates OTP and stores hash in DB (84 ms)
+  verifyOtp
+    ✓ returns success when code matches (177 ms)
+    ✓ returns error when code does not match (161 ms)
+    ✓ returns error when admin has no OTP (1 ms)
+    ✓ returns error when too many attempts (81 ms)
+    ✓ returns error when OTP expired (81 ms)
+    ✓ clears OTP after successful verification (162 ms)
+
+  ● findAdminByEmail › returns admin member by email
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "super_admin"
+    Received: undefined
+
+      16 |     const admin = authService.findAdminByEmail('admin@test.com');
+      17 |     expect(admin).toBeDefined();
+    > 18 |     expect(admin.role).toBe('super_admin');
+         |                        ^
+      19 |   });
+      20 |
+      21 |   test('returns undefined for non-admin', () => {
+
+      at Object.toBe (test/services/auth.test.js:18:24)
+
+  ● findAdminByEmail › returns undefined for non-admin
+
+    expect(received).toBeUndefined()
+
+    Received: Promise {}
+
+      20 |
+      21 |   test('returns undefined for non-admin', () => {
+    > 22 |     expect(authService.findAdminByEmail('nobody@test.com')).toBeUndefined();
+         |                                                             ^
+      23 |   });
+      24 | });
+      25 |
+
+      at Object.toBeUndefined (test/services/auth.test.js:22:61)
+
+PASS test/routes/admin-login.test.js
+  POST /login (OTP generation)
+    ✓ stores bcrypt-hashed OTP that matches 000000 in dev (302 ms)
+    ✓ sets session.otpEmail to lowercased trimmed email (106 ms)
+    ✓ redirects to /admin/login/verify (104 ms)
+  POST /login/verify (OTP verification)
+    ✓ correct OTP sets session.adminId and redirects to dashboard (184 ms)
+    ✓ correct OTP clears otp_hash from database (187 ms)
+    ✓ wrong OTP increments attempts and shows error (185 ms)
+    ✓ expired OTP shows expiry error (102 ms)
+    ✓ missing session email redirects to login (104 ms)
+    ✓ too many attempts shows lockout error (103 ms)
+    ✓ respects returnTo session value (183 ms)
+
+Summary of all failing tests
+FAIL test/db/migrate.test.js
+  ● migrate() › creates all 8 tables
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:42:5)
+
+  ● migrate() › is idempotent — calling twice does not throw
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:53:5)
+
+  ● migrate() › members table has correct status CHECK constraint
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:58:5)
+
+  ● migrate() › payments table has correct status CHECK constraint
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:70:5)
+
+  ● migrate() › members table has UNIQUE constraint on email
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:86:5)
+
+  ● migrate() › members table has UNIQUE constraint on member_number
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:94:5)
+
+  ● migrate() › site_settings uses key as PRIMARY KEY
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:102:5)
+
+  ● migrate() › payments table has foreign key to members
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:110:5)
+
+  ● migrate() › emails_log table has email_type CHECK constraint
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:117:5)
+
+  ● migrate() › emails_log table accepts otp email_type
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:129:5)
+
+  ● migrate() › members table has correct role CHECK constraint
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:138:5)
+
+  ● migrate() › members table allows NULL role for regular members
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:153:5)
+
+  ● migrate() › creates tables with correct default values
+
+    TypeError: db.get is not a function
+
+      207 |   // Migrate emails_log CHECK constraint to include 'otp' type.
+      208 |   // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
+    > 209 |   const hasOtp = await db.get(
+          |                           ^
+      210 |     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+      211 |   );
+      212 |   if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+
+      at get (db/migrate.js:209:27)
+      at Object.<anonymous> (test/db/migrate.test.js:162:5)
+
+FAIL test/services/content.test.js
+  ● Announcements › listAnnouncements returns all
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      39 |     insertAnnouncement({ title: 'A' });
+      40 |     insertAnnouncement({ title: 'B', is_published: 0 });
+    > 41 |     expect(contentService.listAnnouncements()).toHaveLength(2);
+         |                                                ^
+      42 |   });
+      43 |
+      44 |   test('listPublishedAnnouncements filters unpublished', () => {
+
+      at Object.toHaveLength (test/services/content.test.js:41:48)
+
+  ● Announcements › listPublishedAnnouncements filters unpublished
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      45 |     insertAnnouncement({ title: 'A' });
+      46 |     insertAnnouncement({ title: 'B', is_published: 0 });
+    > 47 |     expect(contentService.listPublishedAnnouncements()).toHaveLength(1);
+         |                                                         ^
+      48 |   });
+      49 |
+      50 |   test('getAnnouncement returns by id', () => {
+
+      at Object.toHaveLength (test/services/content.test.js:47:57)
+
+  ● Announcements › getAnnouncement returns by id
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Find me"
+    Received: undefined
+
+      50 |   test('getAnnouncement returns by id', () => {
+      51 |     const a = insertAnnouncement({ title: 'Find me' });
+    > 52 |     expect(contentService.getAnnouncement(a.id).title).toBe('Find me');
+         |                                                        ^
+      53 |   });
+      54 |
+      55 |   test('createAnnouncement inserts', () => {
+
+      at Object.toBe (test/services/content.test.js:52:56)
+
+  ● Announcements › createAnnouncement inserts
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      55 |   test('createAnnouncement inserts', () => {
+      56 |     contentService.createAnnouncement({ title: 'New', is_published: true, sort_order: 0 });
+    > 57 |     expect(contentService.listAnnouncements()).toHaveLength(1);
+         |                                                ^
+      58 |   });
+      59 |
+      60 |   test('updateAnnouncement modifies', () => {
+
+      at Object.toHaveLength (test/services/content.test.js:57:48)
+
+  ● Announcements › updateAnnouncement modifies
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "New"
+    Received: undefined
+
+      61 |     const a = insertAnnouncement({ title: 'Old' });
+      62 |     contentService.updateAnnouncement(a.id, { title: 'New', is_published: true, sort_order: 0 });
+    > 63 |     expect(contentService.getAnnouncement(a.id).title).toBe('New');
+         |                                                        ^
+      64 |   });
+      65 |
+      66 |   test('deleteAnnouncement removes and cleans up image', async () => {
+
+      at Object.toBe (test/services/content.test.js:63:56)
+
+  ● Announcements › deleteAnnouncement removes and cleans up image
+
+    expect(received).toBeUndefined()
+
+    Received: Promise {}
+
+      67 |     const a = insertAnnouncement({ title: 'Del', image_path: '/img/old.jpg' });
+      68 |     await contentService.deleteAnnouncement(a.id);
+    > 69 |     expect(contentService.getAnnouncement(a.id)).toBeUndefined();
+         |                                                  ^
+      70 |     expect(storage.deleteFile).toHaveBeenCalledWith('/img/old.jpg');
+      71 |   });
+      72 | });
+
+      at Object.toBeUndefined (test/services/content.test.js:69:50)
+
+  ● Gallery › listGalleryImages / listVisibleGalleryImages
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      76 |     insertGalleryImage();
+      77 |     insertGalleryImage({ filename: 'h.jpg', is_visible: 0 });
+    > 78 |     expect(contentService.listGalleryImages()).toHaveLength(2);
+         |                                                ^
+      79 |     expect(contentService.listVisibleGalleryImages()).toHaveLength(1);
+      80 |   });
+      81 |
+
+      at Object.toHaveLength (test/services/content.test.js:78:48)
+
+  ● Gallery › CRUD cycle
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      83 |     contentService.createGalleryImage({ filename: 'new.jpg', is_visible: true, sort_order: 0 });
+      84 |     const all = contentService.listGalleryImages();
+    > 85 |     expect(all).toHaveLength(1);
+         |                 ^
+      86 |
+      87 |     const id = all[0].id;
+      88 |     contentService.updateGalleryImage(id, { filename: 'upd.jpg', is_visible: true, sort_order: 0 });
+
+      at Object.toHaveLength (test/services/content.test.js:85:17)
+
+  ● Bios › listBios / listVisibleBios
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+       98 |     insertBio();
+       99 |     insertBio({ name: 'Hidden', is_visible: 0 });
+    > 100 |     expect(contentService.listBios()).toHaveLength(2);
+          |                                       ^
+      101 |     expect(contentService.listVisibleBios()).toHaveLength(1);
+      102 |   });
+      103 |
+
+      at Object.toHaveLength (test/services/content.test.js:100:39)
+
+  ● Bios › CRUD cycle
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      105 |     contentService.createBio({ name: 'New', is_visible: true, sort_order: 0 });
+      106 |     const all = contentService.listBios();
+    > 107 |     expect(all).toHaveLength(1);
+          |                 ^
+      108 |
+      109 |     const id = all[0].id;
+      110 |     contentService.updateBio(id, { name: 'Updated', is_visible: true, sort_order: 0 });
+
+      at Object.toHaveLength (test/services/content.test.js:107:17)
+
+FAIL test/services/admin.test.js
+  ● listAdmins › returns members with roles
+
+    TypeError: expect(received).toHaveLength(expected)
+
+    Matcher error: received value must have a length property whose value must be a number
+
+    Received has type:  object
+    Received has value: Promise {}
+
+      16 |     insertMember(testDb, { email: 'user@test.com' });
+      17 |     const admins = adminService.listAdmins();
+    > 18 |     expect(admins).toHaveLength(1);
+         |                    ^
+      19 |     expect(admins[0].email).toBe('admin@test.com');
+      20 |   });
+      21 | });
+
+      at Object.toHaveLength (test/services/admin.test.js:18:20)
+
+  ● addAdmin › promotes existing member to admin
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "editor"
+    Received: undefined
+
+      26 |     const m = insertMember(testDb, { email: 'user@test.com' });
+      27 |     adminService.addAdmin({ email: 'user@test.com', first_name: 'U', last_name: 'S', role: 'editor' });
+    > 28 |     expect(memberRepo.findById(m.id).role).toBe('editor');
+         |                                            ^
+      29 |   });
+      30 |
+      31 |   test('creates new member with admin role', () => {
+
+      at Object.toBe (test/services/admin.test.js:28:44)
+
+  ● addAdmin › creates new member with admin role
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "super_admin"
+    Received: undefined
+
+      33 |     const admin = memberRepo.findByEmail('new@admin.com');
+      34 |     expect(admin).toBeDefined();
+    > 35 |     expect(admin.role).toBe('super_admin');
+         |                        ^
+      36 |   });
+      37 |
+      38 |   test('defaults to editor for non-super_admin roles', () => {
+
+      at Object.toBe (test/services/admin.test.js:35:24)
+
+  ● addAdmin › defaults to editor for non-super_admin roles
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "editor"
+    Received: undefined
+
+      38 |   test('defaults to editor for non-super_admin roles', () => {
+      39 |     adminService.addAdmin({ email: 'ed@test.com', first_name: 'Ed', last_name: 'T', role: 'unknown' });
+    > 40 |     expect(memberRepo.findByEmail('ed@test.com').role).toBe('editor');
+         |                                                        ^
+      41 |   });
+      42 |
+      43 |   test('normalizes email to lowercase', () => {
+
+      at Object.toBe (test/services/admin.test.js:40:56)
+
+  ● demoteAdmin › clears role from admin
+
+    expect(received).toBeNull()
+
+    Received: undefined
+
+      52 |     const admin = insertAdmin(testDb, { email: 'admin@test.com' });
+      53 |     adminService.demoteAdmin(admin.id);
+    > 54 |     expect(memberRepo.findById(admin.id).role).toBeNull();
+         |                                                ^
+      55 |   });
+      56 | });
+      57 |
+
+      at Object.toBeNull (test/services/admin.test.js:54:48)
+
+FAIL test/services/email.test.js
+  ● sendContactEmail › sends to contact_email from settings
+
+    TypeError: SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      117 |     },
+      118 |     async run(sql, ...params) {
+    > 119 |       const result = sqlite.prepare(sql).run(...params);
+          |                                          ^
+      120 |       return {
+      121 |         lastInsertRowid: result.lastInsertRowid,
+      122 |         changes: result.changes
+
+      at Object.run (test/helpers/db.js:119:42)
+      at Object.run [as insert] (db/repos/emailLog.js:4:19)
+      at insert (services/email.js:44:22)
+      at logEmail (services/email.js:94:11)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:189:5)
+
+  ● sendContactEmail › falls back to FROM_EMAIL when no setting
+
+    TypeError: SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      117 |     },
+      118 |     async run(sql, ...params) {
+    > 119 |       const result = sqlite.prepare(sql).run(...params);
+          |                                          ^
+      120 |       return {
+      121 |         lastInsertRowid: result.lastInsertRowid,
+      122 |         changes: result.changes
+
+      at Object.run (test/helpers/db.js:119:42)
+      at Object.run [as insert] (db/repos/emailLog.js:4:19)
+      at insert (services/email.js:44:22)
+      at logEmail (services/email.js:94:11)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:195:5)
+
+  ● sendContactEmail › converts newlines in message to <br>
+
+    TypeError: SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      117 |     },
+      118 |     async run(sql, ...params) {
+    > 119 |       const result = sqlite.prepare(sql).run(...params);
+          |                                          ^
+      120 |       return {
+      121 |         lastInsertRowid: result.lastInsertRowid,
+      122 |         changes: result.changes
+
+      at Object.run (test/helpers/db.js:119:42)
+      at Object.run [as insert] (db/repos/emailLog.js:4:19)
+      at insert (services/email.js:44:22)
+      at logEmail (services/email.js:94:11)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:202:5)
+
+  ● sendContactEmail › logs with type contact
+
+    TypeError: SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      117 |     },
+      118 |     async run(sql, ...params) {
+    > 119 |       const result = sqlite.prepare(sql).run(...params);
+          |                                          ^
+      120 |       return {
+      121 |         lastInsertRowid: result.lastInsertRowid,
+      122 |         changes: result.changes
+
+      at Object.run (test/helpers/db.js:119:42)
+      at Object.run [as insert] (db/repos/emailLog.js:4:19)
+      at insert (services/email.js:44:22)
+      at logEmail (services/email.js:94:11)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:208:5)
+
+  ● sendContactEmail › includes sender name in subject
+
+    TypeError: SQLite3 can only bind numbers, strings, bigints, buffers, and null
+
+      117 |     },
+      118 |     async run(sql, ...params) {
+    > 119 |       const result = sqlite.prepare(sql).run(...params);
+          |                                          ^
+      120 |       return {
+      121 |         lastInsertRowid: result.lastInsertRowid,
+      122 |         changes: result.changes
+
+      at Object.run (test/helpers/db.js:119:42)
+      at Object.run [as insert] (db/repos/emailLog.js:4:19)
+      at insert (services/email.js:44:22)
+      at logEmail (services/email.js:94:11)
+      at Object.sendContactEmail (services/email.js:232:3)
+      at Object.<anonymous> (test/services/email.test.js:214:5)
+
+FAIL test/services/auth.test.js
+  ● findAdminByEmail › returns admin member by email
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "super_admin"
+    Received: undefined
+
+      16 |     const admin = authService.findAdminByEmail('admin@test.com');
+      17 |     expect(admin).toBeDefined();
+    > 18 |     expect(admin.role).toBe('super_admin');
+         |                        ^
+      19 |   });
+      20 |
+      21 |   test('returns undefined for non-admin', () => {
+
+      at Object.toBe (test/services/auth.test.js:18:24)
+
+  ● findAdminByEmail › returns undefined for non-admin
+
+    expect(received).toBeUndefined()
+
+    Received: Promise {}
+
+      20 |
+      21 |   test('returns undefined for non-admin', () => {
+    > 22 |     expect(authService.findAdminByEmail('nobody@test.com')).toBeUndefined();
+         |                                                             ^
+      23 |   });
+      24 | });
+      25 |
+
+      at Object.toBeUndefined (test/services/auth.test.js:22:61)
+
+
+Test Suites: 5 failed, 22 passed, 27 total
+Tests:       35 failed, 209 passed, 244 total
+Snapshots:   0 total
+Time:        2.235 s
+Ran all test suites.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?

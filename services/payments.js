@@ -1,8 +1,8 @@
 const paymentRepo = require('../db/repos/payments');
 const memberRepo = require('../db/repos/members');
 
-function recordOfflinePayment({ memberId, amountCents, paymentMethod, description, activateMember }) {
-  paymentRepo.create({
+async function recordOfflinePayment({ memberId, amountCents, paymentMethod, description, activateMember }) {
+  await paymentRepo.create({
     member_id: memberId,
     amount_cents: amountCents,
     currency: 'usd',
@@ -12,12 +12,12 @@ function recordOfflinePayment({ memberId, amountCents, paymentMethod, descriptio
   });
 
   if (activateMember) {
-    memberRepo.activate(memberId);
+    await memberRepo.activate(memberId);
   }
 }
 
-function completeStripePayment(sessionId, paymentIntent) {
-  paymentRepo.completeBySessionId(sessionId, paymentIntent);
+async function completeStripePayment(sessionId, paymentIntent) {
+  await paymentRepo.completeBySessionId(sessionId, paymentIntent);
 }
 
 module.exports = {

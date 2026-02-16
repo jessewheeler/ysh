@@ -5,11 +5,51 @@ jest.mock('../../db/database', () => {
 
   const proxy = new Proxy({}, {
     get(_, prop) {
+      if (prop === 'dialect') return 'sqlite';
       if (prop === '__resetBare') {
         return () => {
           try { _db.close(); } catch (_e) { /* ignore */ }
           _db = new Database(':memory:');
           _db.pragma('foreign_keys = ON');
+        };
+      }
+      if (prop === 'get') {
+        return async (sql, ...params) => {
+          const sanitized = params.map(p => p === undefined ? null : p);
+          return _db.prepare(sql).get(...sanitized);
+        };
+      }
+      if (prop === 'all') {
+        return async (sql, ...params) => {
+          const sanitized = params.map(p => p === undefined ? null : p);
+          return _db.prepare(sql).all(...sanitized);
+        };
+      }
+      if (prop === 'run') {
+        return async (sql, ...params) => {
+          const sanitized = params.map(p => p === undefined ? null : p);
+          return _db.prepare(sql).run(...sanitized);
+        };
+      }
+      if (prop === 'exec') {
+        return async (sql) => _db.exec(sql);
+      }
+      if (prop === 'transaction') {
+        return async (fn) => {
+          const isAsync = fn.constructor.name === 'AsyncFunction';
+          if (!isAsync) {
+            return _db.transaction(fn)();
+          } else {
+            _db.prepare('BEGIN').run();
+            try {
+              const result = await fn();
+              _db.prepare('COMMIT').run();
+              return result;
+            } catch (e) {
+              _db.prepare('ROLLBACK').run();
+              throw e;
+            }
+          }
         };
       }
       const val = _db[prop];
@@ -38,8 +78,8 @@ afterEach(() => {
 });
 
 describe('migrate()', () => {
-  test('creates all 8 tables', () => {
-    migrate();
+  test('creates all 8 tables', async () => {
+    await migrate();
     const tables = db.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
     ).all().map(r => r.name);
@@ -49,13 +89,13 @@ describe('migrate()', () => {
     }
   });
 
-  test('is idempotent — calling twice does not throw', () => {
-    migrate();
-    expect(() => migrate()).not.toThrow();
+  test('is idempotent — calling twice does not throw', async () => {
+    await migrate();
+    await expect(migrate()).resolves.not.toThrow();
   });
 
-  test('members table has correct status CHECK constraint', () => {
-    migrate();
+  test('members table has correct status CHECK constraint', async () => {
+    await migrate();
     db.prepare(
       "INSERT INTO members (first_name, last_name, email, status) VALUES ('A','B','a@b.com','pending')"
     ).run();
@@ -66,8 +106,8 @@ describe('migrate()', () => {
     ).toThrow();
   });
 
-  test('payments table has correct status CHECK constraint', () => {
-    migrate();
+  test('payments table has correct status CHECK constraint', async () => {
+    await migrate();
     db.prepare(
       "INSERT INTO members (first_name, last_name, email) VALUES ('A','B','x@y.com')"
     ).run();
@@ -82,39 +122,39 @@ describe('migrate()', () => {
     ).toThrow();
   });
 
-  test('members table has UNIQUE constraint on email', () => {
-    migrate();
+  test('members table has UNIQUE constraint on email', async () => {
+    await migrate();
     db.prepare("INSERT INTO members (first_name, last_name, email) VALUES ('A','B','dup@a.com')").run();
     expect(() =>
       db.prepare("INSERT INTO members (first_name, last_name, email) VALUES ('C','D','dup@a.com')").run()
     ).toThrow();
   });
 
-  test('members table has UNIQUE constraint on member_number', () => {
-    migrate();
+  test('members table has UNIQUE constraint on member_number', async () => {
+    await migrate();
     db.prepare("INSERT INTO members (first_name, last_name, email, member_number) VALUES ('A','B','a@a.com','YSH-2025-0001')").run();
     expect(() =>
       db.prepare("INSERT INTO members (first_name, last_name, email, member_number) VALUES ('C','D','b@a.com','YSH-2025-0001')").run()
     ).toThrow();
   });
 
-  test('site_settings uses key as PRIMARY KEY', () => {
-    migrate();
+  test('site_settings uses key as PRIMARY KEY', async () => {
+    await migrate();
     db.prepare("INSERT INTO site_settings (key, value) VALUES ('foo','bar')").run();
     expect(() =>
       db.prepare("INSERT INTO site_settings (key, value) VALUES ('foo','baz')").run()
     ).toThrow();
   });
 
-  test('payments table has foreign key to members', () => {
-    migrate();
+  test('payments table has foreign key to members', async () => {
+    await migrate();
     expect(() =>
       db.prepare("INSERT INTO payments (member_id, amount_cents) VALUES (999, 100)").run()
     ).toThrow();
   });
 
-  test('emails_log table has email_type CHECK constraint', () => {
-    migrate();
+  test('emails_log table has email_type CHECK constraint', async () => {
+    await migrate();
     db.prepare(
       "INSERT INTO emails_log (to_email, email_type) VALUES ('a@b.com','welcome')"
     ).run();
@@ -125,8 +165,8 @@ describe('migrate()', () => {
     ).toThrow();
   });
 
-  test('emails_log table accepts otp email_type', () => {
-    migrate();
+  test('emails_log table accepts otp email_type', async () => {
+    await migrate();
     expect(() =>
       db.prepare(
         "INSERT INTO emails_log (to_email, email_type) VALUES ('a@b.com','otp')"
@@ -134,8 +174,8 @@ describe('migrate()', () => {
     ).not.toThrow();
   });
 
-  test('members table has correct role CHECK constraint', () => {
-    migrate();
+  test('members table has correct role CHECK constraint', async () => {
+    await migrate();
     db.prepare(
       "INSERT INTO members (first_name, last_name, email, role) VALUES ('A', 'B', 'a@b.com', 'super_admin')"
     ).run();
@@ -149,8 +189,8 @@ describe('migrate()', () => {
     ).toThrow();
   });
 
-  test('members table allows NULL role for regular members', () => {
-    migrate();
+  test('members table allows NULL role for regular members', async () => {
+    await migrate();
     db.prepare(
       "INSERT INTO members (first_name, last_name, email) VALUES ('A', 'B', 'reg@a.com')"
     ).run();
@@ -158,8 +198,8 @@ describe('migrate()', () => {
     expect(member.role).toBeNull();
   });
 
-  test('creates tables with correct default values', () => {
-    migrate();
+  test('creates tables with correct default values', async () => {
+    await migrate();
     db.prepare("INSERT INTO members (first_name, last_name, email) VALUES ('A','B','def@a.com')").run();
     const member = db.prepare("SELECT status, created_at FROM members WHERE email = 'def@a.com'").get();
     expect(member.status).toBe('pending');

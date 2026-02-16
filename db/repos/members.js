@@ -1,54 +1,60 @@
 const db = require('../database');
 
-function findById(id) {
-  return db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+async function findById(id) {
+  return await db.get('SELECT * FROM members WHERE id = ?', id);
 }
 
-function findByEmail(email) {
-  return db.prepare('SELECT * FROM members WHERE email = ?').get(email);
+async function findByEmail(email) {
+  return await db.get('SELECT * FROM members WHERE email = ?', email);
 }
 
-function findAdminByEmail(email) {
-  return db.prepare('SELECT * FROM members WHERE email = ? AND role IS NOT NULL').get(email);
+async function findAdminByEmail(email) {
+  return await db.get('SELECT * FROM members WHERE email = ? AND role IS NOT NULL', email);
 }
 
-function create({ member_number, first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, notes }) {
-  return db.prepare(
+async function create({ member_number, first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, notes }) {
+  return await db.run(
     `INSERT INTO members (member_number, first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(member_number, first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, status || 'pending', notes || null);
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    member_number, first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, status || 'pending', notes || null
+  );
 }
 
-function update(id, { first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, notes }) {
-  return db.prepare(
+async function update(id, { first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, notes }) {
+  return await db.run(
     `UPDATE members SET first_name=?, last_name=?, email=?, phone=?, address_street=?, address_city=?, address_state=?, address_zip=?, membership_year=?, status=?, notes=?, updated_at=datetime('now')
-     WHERE id=?`
-  ).run(first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, status, notes || null, id);
+     WHERE id=?`,
+    first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, status, notes || null, id
+  );
 }
 
-function deleteById(id) {
-  return db.prepare('DELETE FROM members WHERE id = ?').run(id);
+async function deleteById(id) {
+  return await db.run('DELETE FROM members WHERE id = ?', id);
 }
 
-function activate(id) {
-  return db.prepare(
-    "UPDATE members SET status = 'active', updated_at = datetime('now') WHERE id = ?"
-  ).run(id);
+async function activate(id) {
+  return await db.run(
+    "UPDATE members SET status = 'active', updated_at = datetime('now') WHERE id = ?",
+    id
+  );
 }
 
-function countAll() {
-  return db.prepare('SELECT COUNT(*) as c FROM members').get().c;
+async function countAll() {
+  const row = await db.get('SELECT COUNT(*) as c FROM members');
+  return row ? row.c : 0;
 }
 
-function countActive() {
-  return db.prepare("SELECT COUNT(*) as c FROM members WHERE status = 'active'").get().c;
+async function countActive() {
+  const row = await db.get("SELECT COUNT(*) as c FROM members WHERE status = 'active'");
+  return row ? row.c : 0;
 }
 
-function countByYear(year) {
-  return db.prepare('SELECT COUNT(*) as c FROM members WHERE membership_year = ?').get(year).c;
+async function countByYear(year) {
+  const row = await db.get('SELECT COUNT(*) as c FROM members WHERE membership_year = ?', year);
+  return row ? row.c : 0;
 }
 
-function search({ search, limit, offset }) {
+async function search({ search, limit, offset }) {
   let where = '';
   let params = [];
   if (search) {
@@ -56,61 +62,68 @@ function search({ search, limit, offset }) {
     const s = `%${search}%`;
     params = [s, s, s, s];
   }
-  const total = db.prepare(`SELECT COUNT(*) as c FROM members ${where}`).get(...params).c;
-  const members = db.prepare(`SELECT * FROM members ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
+  const totalRow = await db.get(`SELECT COUNT(*) as c FROM members ${where}`, ...params);
+  const total = totalRow ? totalRow.c : 0;
+  const members = await db.all(`SELECT * FROM members ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`, ...params, limit, offset);
   return { members, total };
 }
 
-function listRecent(limit) {
-  return db.prepare('SELECT * FROM members ORDER BY created_at DESC LIMIT ?').all(limit);
+async function listRecent(limit) {
+  return await db.all('SELECT * FROM members ORDER BY created_at DESC LIMIT ?', limit);
 }
 
-function listAll() {
-  return db.prepare('SELECT * FROM members ORDER BY created_at DESC').all();
+async function listAll() {
+  return await db.all('SELECT * FROM members ORDER BY created_at DESC');
 }
 
-function listActiveMembers() {
-  return db.prepare("SELECT * FROM members WHERE status = 'active'").all();
+async function listActiveMembers() {
+  return await db.all("SELECT * FROM members WHERE status = 'active'");
 }
 
-function listAdmins() {
-  return db.prepare('SELECT id, email, first_name, last_name, role, created_at FROM members WHERE role IS NOT NULL ORDER BY created_at ASC').all();
+async function listAdmins() {
+  return await db.all('SELECT id, email, first_name, last_name, role, created_at FROM members WHERE role IS NOT NULL ORDER BY created_at ASC');
 }
 
-function setOtp(id, { otpHash, expiresAt }) {
-  return db.prepare(
-    "UPDATE members SET otp_hash = ?, otp_expires_at = ?, otp_attempts = 0, updated_at = datetime('now') WHERE id = ?"
-  ).run(otpHash, expiresAt, id);
+async function setOtp(id, { otpHash, expiresAt }) {
+  return await db.run(
+    "UPDATE members SET otp_hash = ?, otp_expires_at = ?, otp_attempts = 0, updated_at = datetime('now') WHERE id = ?",
+    otpHash, expiresAt, id
+  );
 }
 
-function incrementOtpAttempts(id) {
-  return db.prepare(
-    "UPDATE members SET otp_attempts = otp_attempts + 1, updated_at = datetime('now') WHERE id = ?"
-  ).run(id);
+async function incrementOtpAttempts(id) {
+  return await db.run(
+    "UPDATE members SET otp_attempts = otp_attempts + 1, updated_at = datetime('now') WHERE id = ?",
+    id
+  );
 }
 
-function clearOtp(id) {
-  return db.prepare(
-    "UPDATE members SET otp_hash = NULL, otp_expires_at = NULL, otp_attempts = 0, updated_at = datetime('now') WHERE id = ?"
-  ).run(id);
+async function clearOtp(id) {
+  return await db.run(
+    "UPDATE members SET otp_hash = NULL, otp_expires_at = NULL, otp_attempts = 0, updated_at = datetime('now') WHERE id = ?",
+    id
+  );
 }
 
-function setRole(id, role) {
-  return db.prepare(
-    "UPDATE members SET role = ?, updated_at = datetime('now') WHERE id = ?"
-  ).run(role, id);
+async function setRole(id, role) {
+  return await db.run(
+    "UPDATE members SET role = ?, updated_at = datetime('now') WHERE id = ?",
+    role, id
+  );
 }
 
-function clearRole(id) {
-  return db.prepare(
-    "UPDATE members SET role = NULL, updated_at = datetime('now') WHERE id = ?"
-  ).run(id);
+async function clearRole(id) {
+  return await db.run(
+    "UPDATE members SET role = NULL, updated_at = datetime('now') WHERE id = ?",
+    id
+  );
 }
 
-function createAdmin({ first_name, last_name, email, role }) {
-  return db.prepare(
-    'INSERT INTO members (first_name, last_name, email, role) VALUES (?, ?, ?, ?)'
-  ).run(first_name, last_name, email, role);
+async function createAdmin({ first_name, last_name, email, role }) {
+  return await db.run(
+    'INSERT INTO members (first_name, last_name, email, role) VALUES (?, ?, ?, ?)',
+    first_name, last_name, email, role
+  );
 }
 
 module.exports = {
