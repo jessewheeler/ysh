@@ -4,6 +4,7 @@ const contentService = require('../services/content');
 const memberRepo = require('../db/repos/members');
 const settingsRepo = require('../db/repos/settings');
 const { generateMemberNumber } = require('../services/members');
+const logger = require('../services/logger');
 
 // Homepage
 router.get('/', async (req, res, next) => {
@@ -111,7 +112,12 @@ router.post('/membership', async (req, res) => {
 
     res.redirect(303, session.url);
   } catch (err) {
-    console.error('Membership signup error:', err);
+    const log = req.logger || logger;
+    log.error('Membership signup error', {
+      error: err.message,
+      stack: err.stack,
+      membershipType: req.body.membership_type
+    });
     req.session.flash_error = 'Something went wrong. Please try again.';
     res.redirect('/membership');
   }
@@ -140,12 +146,17 @@ router.post('/contact', async (req, res) => {
       const emailService = require('../services/email');
       await emailService.sendContactEmail({ name, email, message });
     } catch (e) {
-      console.error('Email service not available or error:', e.message);
+      const log = req.logger || logger;
+      log.warn('Email service not available or error', { error: e.message });
     }
 
     res.redirect('/contact/success');
   } catch (err) {
-    console.error('Contact form error:', err);
+    const log = req.logger || logger;
+    log.error('Contact form error', {
+      error: err.message,
+      stack: err.stack
+    });
     req.session.flash_error = 'Something went wrong. Please try again.';
     res.redirect('/#contact');
   }

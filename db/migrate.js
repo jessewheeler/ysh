@@ -1,10 +1,11 @@
 const db = require('./database');
 const { SCHEMA, toPgSchema } = require('./schema');
+const logger = require('../services/logger');
 
 async function migrate() {
   if (db.dialect === 'pg') {
     await db.exec(toPgSchema(SCHEMA));
-    console.log('PostgreSQL schema creation complete.');
+    logger.info('PostgreSQL schema creation complete');
     return;
   }
 
@@ -127,7 +128,7 @@ async function migrate() {
       await db.exec('CREATE INDEX IF NOT EXISTS idx_members_primary_member_id ON members(primary_member_id)');
     });
 
-    console.log('Members table migrated to support family memberships.');
+    logger.info('Members table migrated to support family memberships');
   }
 
   // Migrate existing admins rows into members, then drop admins table
@@ -159,14 +160,14 @@ async function migrate() {
     await db.exec('DROP TABLE admins');
   }
 
-  console.log('Database migration complete.');
+  logger.info('Database migration complete');
 }
 
 module.exports = migrate;
 
 if (require.main === module) {
   migrate().catch(err => {
-    console.error('Migration failed:', err);
+    logger.error('Migration failed', { error: err.message, stack: err.stack });
     process.exit(1);
   });
 }

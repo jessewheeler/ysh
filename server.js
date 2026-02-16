@@ -9,6 +9,8 @@ const multer = require('multer');
 const fs = require('fs');
 const seed = require('./db/seed');
 const { injectLocals } = require('./middleware/locals');
+const logger = require('./services/logger');
+const { attachRequestId, attachLogger, morganMiddleware, logError } = require('./middleware/requestLogger');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -58,6 +60,11 @@ app.use(express.urlencoded({ extended: true }));
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'data', 'uploads')));
+
+// Request logging and tracking
+app.use(attachRequestId);
+app.use(attachLogger);
+app.use(morganMiddleware);
 
 // Multer setup for file uploads (memoryStorage — files go to B2 or local disk in route handler)
 const upload = multer({
@@ -166,9 +173,11 @@ app.use((req, res) => {
   res.status(404).render('error', { status: 404, message: 'Page not found' });
 });
 
+// Error logging middleware
+app.use(logError);
+
 // Error handler
 app.use((err, req, res, _next) => {
-  console.error(err.stack);
   res.status(500).render('error', { status: 500, message: 'Something went wrong' });
 });
 
@@ -177,10 +186,12 @@ async function start() {
   try {
     await seed();
     app.listen(PORT, () => {
-      console.log(`Server running at http://localhost:${PORT}`);
+      logger.info(`Server running at http://localhost:${PORT}`);
+      logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`Log level: ${logger.level}`);
     });
   } catch (err) {
-    console.error('Failed to start server:', err);
+    logger.error('Failed to start server', { error: err.message, stack: err.stack });
     process.exit(1);
   }
 }

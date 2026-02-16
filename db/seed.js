@@ -1,5 +1,6 @@
 const db = require('./database');
 const migrate = require('./migrate');
+const logger = require('../services/logger');
 
 async function seed() {
   await migrate();
@@ -8,11 +9,11 @@ async function seed() {
   const bioCountRes = await db.get('SELECT COUNT(*) as c FROM bios');
   const bioCount = bioCountRes ? bioCountRes.c : 0;
   if (bioCount > 0) {
-    console.log('Database already seeded, skipping.');
+    logger.info('Database already seeded, skipping');
     return;
   }
 
-  console.log('Seeding database...');
+  logger.info('Seeding database...');
 
   // --- Bios ---
   const bios = [
@@ -118,14 +119,14 @@ async function seed() {
     await db.run('INSERT OR IGNORE INTO site_settings (key, value) VALUES (?, ?)', k, v);
   }
 
-  console.log('Seed complete.');
+  logger.info('Seed complete');
 }
 
 module.exports = seed;
 
 if (require.main === module) {
   seed().catch(err => {
-    console.error('Seed failed:', err);
+    logger.error('Seed failed', { error: err.message, stack: err.stack });
     process.exit(1);
   });
 }
