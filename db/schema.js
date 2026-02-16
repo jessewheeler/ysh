@@ -24,6 +24,7 @@ const SCHEMA = `
     otp_hash TEXT,
     otp_expires_at TEXT,
     otp_attempts INTEGER NOT NULL DEFAULT 0,
+    join_date TEXT DEFAULT (datetime('now')),
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );

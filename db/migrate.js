@@ -160,6 +160,18 @@ async function migrate() {
     await db.exec('DROP TABLE admins');
   }
 
+  // Add join_date column to track when members joined the organization
+  // Note: SQLite ALTER TABLE doesn't support DEFAULT with functions, so we add without default
+  // and set values manually. New inserts will use the schema default from SCHEMA constant.
+  try {
+    await db.exec("ALTER TABLE members ADD COLUMN join_date TEXT");
+    // For existing members, set join_date to created_at for backward compatibility
+    await db.exec("UPDATE members SET join_date = created_at WHERE join_date IS NULL");
+    logger.info('Added join_date column to members table');
+  } catch (_e) {
+    // Column already exists
+  }
+
   logger.info('Database migration complete');
 }
 
