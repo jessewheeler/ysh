@@ -94,12 +94,12 @@ router.post('/contact', async (req, res) => {
       return res.redirect('/#contact');
     }
 
-    // Try to send via email service (will be fully implemented in Phase 5)
+    // Try to send via email service
     try {
       const emailService = require('../services/email');
       await emailService.sendContactEmail({ name, email, message });
     } catch (e) {
-      console.log('Email service not available or error:', e.message);
+      console.error('Email service not available or error:', e.message);
     }
 
     res.redirect('/contact/success');

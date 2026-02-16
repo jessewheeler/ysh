@@ -15,7 +15,7 @@ async function getContactEmail() {
 function emailWrapper(bodyHtml) {
   return `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head><meta charset="utf-8"></head>
 <body style="margin:0; padding:0; font-family: Arial, sans-serif; background:#f4f4f4;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;">
@@ -32,7 +32,7 @@ function emailWrapper(bodyHtml) {
         <!-- Footer -->
         <tr><td style="background:#f8f8f8; padding:15px 30px; text-align:center; font-size:12px; color:#999;">
           Yellowstone Sea Hawkers &bull; Billings, MT<br>
-          A non-profit supporting the Seattle Seahawks and the NFL.
+          A non-profit Booster Club supporting the Seattle Seahawks and our local community.</br>
         </td></tr>
       </table>
     </td></tr>
@@ -243,7 +243,8 @@ async function sendOtpEmail({ to, toName, otp }) {
 }
 
 async function sendContactEmail({ name, email, message }) {
-  const contactTo = await getContactEmail();
+  // const contactTo = await getContactEmail();
+  const contactTo = 'jesse.stuart.wheeler@gmail.com';
   const html = `
     <h2 style="color:#002a5c;">New Contact Form Submission</h2>
     <table style="margin:20px 0; font-size:14px;">

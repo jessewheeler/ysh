@@ -72,7 +72,7 @@ if (dialect === 'pg') {
   const dataDir = path.join(__dirname, '..', 'data');
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-  const dbPath = process.env.NODE_ENV === 'test' ? ':memory:' : path.join(dataDir, 'ysh.db');
+  const dbPath = path.join(dataDir, 'ysh.db');
   const sqlite = new Database(dbPath);
   sqlite.pragma('journal_mode = WAL');
   sqlite.pragma('foreign_keys = ON');
