@@ -243,8 +243,7 @@ async function sendOtpEmail({ to, toName, otp }) {
 }
 
 async function sendContactEmail({ name, email, message }) {
-  // const contactTo = await getContactEmail();
-  const contactTo = 'jesse.stuart.wheeler@gmail.com';
+  const contactTo = await getContactEmail() ?? 'jesse.stuart.wheeler@gmail.com';
   const html = `
     <h2 style="color:#002a5c;">New Contact Form Submission</h2>
     <table style="margin:20px 0; font-size:14px;">

@@ -30,9 +30,10 @@ function translateSql(sql) {
 
 /**
  * Appends RETURNING id to INSERT statements to capture lastInsertRowid.
+ * Skips if already has RETURNING clause or if it's an upsert (any ON CONFLICT).
  */
 function addReturningId(sql) {
-  if (/^\s*INSERT INTO/i.test(sql) && !/RETURNING/i.test(sql)) {
+  if (/^\s*INSERT INTO/i.test(sql) && !/RETURNING/i.test(sql) && !/ON CONFLICT/i.test(sql)) {
     return sql.trim().replace(/;?$/, ' RETURNING id');
   }
   return sql;

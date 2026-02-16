@@ -17,6 +17,18 @@ async function injectLocals(req, res, next) {
       delete req.session.flash_error;
     }
 
+    // Date formatting helper (handles both SQLite strings and PostgreSQL Date objects)
+    res.locals.formatDate = function(date) {
+      if (!date) return '';
+      if (date instanceof Date) {
+        return date.toISOString().split('T')[0];
+      }
+      if (typeof date === 'string') {
+        return date.split('T')[0];
+      }
+      return '';
+    };
+
     next();
   } catch (err) {
     console.error('Error in injectLocals:', err);

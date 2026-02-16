@@ -74,8 +74,13 @@ const upload = multer({
 let store;
 if (process.env.DATABASE_URL) {
   const PgSimpleStore = require('connect-pg-simple')(session);
+  const { Pool } = require('pg');
+  const sessionPool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false }
+  });
   store = new PgSimpleStore({
-    conString: process.env.DATABASE_URL,
+    pool: sessionPool,
     createTableIfMissing: true,
   });
 } else {

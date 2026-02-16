@@ -23,7 +23,7 @@ block content
             td= e.subject
             td= e.email_type
             td= e.status
-            td= e.created_at
+            td= formatDate(e.created_at)
 
     if totalPages > 1
       .pagination

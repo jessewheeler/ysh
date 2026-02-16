@@ -26,7 +26,7 @@ block content
             td
               span(class=`badge badge-${p.status}`)= p.status
             td= p.payment_method || 'stripe'
-            td= p.created_at
+            td= formatDate(p.created_at)
 
     if totalPages > 1
       .pagination

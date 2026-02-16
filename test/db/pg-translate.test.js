@@ -44,4 +44,14 @@ describe('pg-translate', () => {
     expect(addReturningId('SELECT * FROM members')).toBe('SELECT * FROM members');
     expect(addReturningId('INSERT INTO members (name) VALUES (?) RETURNING id')).toBe('INSERT INTO members (name) VALUES (?) RETURNING id');
   });
+
+  test('addReturningId does not append to INSERT ... ON CONFLICT DO NOTHING', () => {
+    expect(addReturningId('INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT DO NOTHING'))
+      .toBe('INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT DO NOTHING');
+  });
+
+  test('addReturningId does not append to INSERT ... ON CONFLICT(...) DO UPDATE', () => {
+    expect(addReturningId('INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value'))
+      .toBe('INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
+  });
 });
