@@ -1,11 +1,26 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const paymentRepo = require('../db/repos/payments');
 
-async function createCheckoutSession({ memberId, email, amountCents, baseUrl }) {
+async function createCheckoutSession({ memberId, email, amountCents, baseUrl, membershipType = 'individual', familyMemberIds = [] }) {
+  const year = new Date().getFullYear();
+  const description = membershipType === 'family'
+    ? `${year} Family Membership`
+    : `${year} Annual Membership`;
+
+  const metadata = {
+    member_id: String(memberId),
+    membership_type: membershipType
+  };
+
+  // Store family member IDs in metadata
+  if (membershipType === 'family' && familyMemberIds.length) {
+    metadata.family_member_ids = JSON.stringify(familyMemberIds);
+  }
+
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ['card'],
     customer_email: email,
-    metadata: { member_id: String(memberId) },
+    metadata,
     line_items: [
       {
         price_data: {
@@ -13,7 +28,7 @@ async function createCheckoutSession({ memberId, email, amountCents, baseUrl }) 
           unit_amount: amountCents,
           product_data: {
             name: 'Yellowstone Sea Hawkers Membership Dues',
-            description: `${new Date().getFullYear()} Annual Membership`,
+            description
           },
         },
         quantity: 1,

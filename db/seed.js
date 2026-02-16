@@ -108,7 +108,9 @@ async function seed() {
     about_quote: "Yellowstone Sea Hawkers are the most passionate, hardcore, devoted, cheer-crazy, raisin' the roof, no-life-during-football-season-havin' fans on earth.",
     about_text: 'Our primary purpose is to have fun while supporting the Seahawks football team, their coaches, staff, our local charities, and organizations in the city of Billings and its surrounding communities.',
     gallery_album_url: 'https://1drv.ms/a/c/10fffe404656475d/EqrBFR6ebKtMhwnrQj-bm6wBRoAUuX5GI4Rp3EdNVW5kIw?e=l1rltU',
-    dues_amount_cents: '2500',
+    individual_dues_amount_cents: '1600',
+    family_dues_amount_cents: '2600',
+    max_family_members: '6',
     contact_email: 'info@yellowstoneseahawkers.com',
     stripe_publishable_key: '',
   };

@@ -30,6 +30,23 @@ block content
           th Status
           td
             span(class=`badge badge-${member.status}`)= member.status
+        if member.membership_type
+          tr
+            th Membership Type
+            td= member.membership_type === 'family' ? 'Family' : 'Individual'
+        if member.primary_member_id && primaryMember
+          tr
+            th Primary Member
+            td
+              a(href=`/admin/members/${primaryMember.id}`) #{primaryMember.first_name} #{primaryMember.last_name} (#{primaryMember.member_number})
+        else if member.membership_type === 'family' && familyMembers.length
+          tr
+            th Family Members
+            td
+              ul(style="margin: 0; padding-left: 1.5rem;")
+                each fm in familyMembers
+                  li
+                    a(href=`/admin/members/${fm.id}`) #{fm.first_name} #{fm.last_name} (#{fm.member_number})
         tr
           th Notes
           td= member.notes || '—'

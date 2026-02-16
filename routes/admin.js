@@ -184,21 +184,67 @@ router.get('/members/new', (req, res) => {
 });
 
 router.post('/members', async (req, res) => {
-  const { first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, notes } = req.body;
+  const {
+    membership_type = 'individual',
+    first_name, last_name, email, phone,
+    address_street, address_city, address_state, address_zip,
+    membership_year, status, notes
+  } = req.body;
 
-  // Generate member number
   const year = membership_year || new Date().getFullYear();
-  const { generateMemberNumber } = require('../services/members');
-  const member_number = await generateMemberNumber(year);
 
   try {
-    await memberRepo.create({
-      member_number, first_name, last_name, email, phone,
-      address_street, address_city, address_state, address_zip,
-      membership_year: year, status: status || 'pending', notes,
-    });
+    if (membership_type === 'family') {
+      // Parse family members
+      const familyData = Array.isArray(req.body.family_members)
+        ? req.body.family_members
+        : (req.body.family_members ? [req.body.family_members] : []);
 
-    req.session.flash_success = `Member ${first_name} ${last_name} created.`;
+      const familyMembers = familyData
+        .map(fm => ({
+          first_name: fm.first_name?.trim(),
+          last_name: fm.last_name?.trim(),
+          email: fm.email?.trim() || ''
+        }))
+        .filter(fm => fm.first_name && fm.last_name);
+
+      // Create family membership
+      await memberRepo.createWithFamily({
+        primaryMember: {
+          first_name, last_name, email, phone,
+          address_street, address_city, address_state, address_zip
+        },
+        familyMembers,
+        membershipType: 'family'
+      });
+
+      // Activate all members if status is active
+      if (status === 'active') {
+        const primary = await memberRepo.findByEmail(email);
+        if (primary) {
+          await memberRepo.activate(primary.id);
+          const family = await memberRepo.findFamilyMembers(primary.id);
+          for (const fm of family) {
+            await memberRepo.activate(fm.id);
+          }
+        }
+      }
+
+      const count = familyMembers.length + 1;
+      req.session.flash_success = `Family membership created: ${first_name} ${last_name} + ${familyMembers.length} family member(s) (${count} total).`;
+    } else {
+      // Create individual member
+      const { generateMemberNumber } = require('../services/members');
+      const member_number = await generateMemberNumber(year);
+
+      await memberRepo.create({
+        member_number, first_name, last_name, email, phone,
+        address_street, address_city, address_state, address_zip,
+        membership_year: year, status: status || 'pending', notes,
+      });
+
+      req.session.flash_success = `Member ${first_name} ${last_name} created.`;
+    }
   } catch (e) {
     req.session.flash_error = (e.message.includes('UNIQUE') || e.code === '23505') ? 'A member with that email already exists.' : e.message;
     return res.redirect('/admin/members/new');
@@ -214,14 +260,30 @@ router.get('/members/:id', async (req, res, next) => {
     if (req.query.edit) {
       return res.render('admin/members/form', { member });
     }
-    
+
     const [payments, cards, emails] = await Promise.all([
       paymentRepo.findByMemberId(member.id),
       cardsRepo.findByMemberId(member.id),
       emailLogRepo.listByMemberId(member.id, 10)
     ]);
 
-    res.render('admin/members/view', { member, payments, cards, emails });
+    // Get family relationships
+    let familyMembers = [];
+    let primaryMember = null;
+
+    if (member.membership_type === 'family') {
+      if (member.primary_member_id) {
+        // This is a family member
+        primaryMember = await memberRepo.findById(member.primary_member_id);
+        const allFamily = await memberRepo.findFamilyMembers(member.primary_member_id);
+        familyMembers = allFamily.filter(fm => fm.id !== member.id);
+      } else {
+        // This is a primary member
+        familyMembers = await memberRepo.findFamilyMembers(member.id);
+      }
+    }
+
+    res.render('admin/members/view', { member, payments, cards, emails, familyMembers, primaryMember });
   } catch (err) {
     next(err);
   }

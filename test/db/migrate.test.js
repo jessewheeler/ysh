@@ -122,12 +122,13 @@ describe('migrate()', () => {
     ).toThrow();
   });
 
-  test('members table has UNIQUE constraint on email', async () => {
+  test('members table allows duplicate emails (for family members)', async () => {
     await migrate();
-    db.prepare("INSERT INTO members (first_name, last_name, email) VALUES ('A','B','dup@a.com')").run();
+    db.prepare("INSERT INTO members (first_name, last_name, email, membership_type) VALUES ('A','B','shared@family.com','family')").run();
+    // Family members can share the same email
     expect(() =>
-      db.prepare("INSERT INTO members (first_name, last_name, email) VALUES ('C','D','dup@a.com')").run()
-    ).toThrow();
+      db.prepare("INSERT INTO members (first_name, last_name, email, membership_type) VALUES ('C','D','shared@family.com','family')").run()
+    ).not.toThrow();
   });
 
   test('members table has UNIQUE constraint on member_number', async () => {
