@@ -3,7 +3,6 @@ const router = express.Router();
 const contentService = require('../services/content');
 const memberRepo = require('../db/repos/members');
 const settingsRepo = require('../db/repos/settings');
-const { generateMemberNumber } = require('../services/members');
 const logger = require('../services/logger');
 
 // Homepage
