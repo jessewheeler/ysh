@@ -8,6 +8,17 @@ block page_title
 
 block content
   form(method="POST" action=member ? `/admin/members/${member.id}` : '/admin/members')
+    if !member
+      .form-group
+        label Membership Type
+        .radio-group(style="margin-bottom: 1rem;")
+          label(style="display: inline-block; margin-right: 2rem;")
+            input(type="radio" name="membership_type" value="individual" checked)
+            |  Individual
+          label(style="display: inline-block;")
+            input(type="radio" name="membership_type" value="family")
+            |  Family
+
     .form-grid
       .form-group
         label(for="first_name") First Name *
@@ -47,6 +58,69 @@ block content
       label(for="notes") Notes
       textarea#notes(name="notes" rows="3")= member ? member.notes : ''
 
+    if !member
+      #family-members-section(style="display: none; margin-top: 2rem;")
+        h3 Additional Family Members
+        p.text-muted Add family members (optional). Each will receive their own member number and card.
+
+        #family-members-container
+          //- Dynamic family member rows added by JS
+
+        button.btn-outline(type="button" id="add-family-member") + Add Family Member
+
     .form-actions
       button.btn(type="submit")= member ? 'Update Member' : 'Create Member'
       a.btn-outline(href="/admin/members") Cancel
+
+  if !member
+    script.
+      (function() {
+        const familySection = document.getElementById('family-members-section');
+        const familyContainer = document.getElementById('family-members-container');
+        const addBtn = document.getElementById('add-family-member');
+        const radios = document.querySelectorAll('input[name="membership_type"]');
+        const primaryLastName = document.getElementById('last_name');
+
+        let familyMemberCount = 0;
+
+        // Toggle family section visibility
+        radios.forEach(radio => {
+          radio.addEventListener('change', () => {
+            familySection.style.display = radio.value === 'family' ? 'block' : 'none';
+          });
+        });
+
+        // Add family member row
+        addBtn.addEventListener('click', () => {
+          const index = familyMemberCount;
+          const currentLastName = primaryLastName.value || '';
+          const row = document.createElement('div');
+          row.className = 'family-member-row';
+          row.style.cssText = 'border: 1px solid #ddd; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; position: relative;';
+          row.innerHTML = `
+            <button type="button" class="remove-family-member" style="position: absolute; top: 0.5rem; right: 0.5rem; background: #dc3545; color: white; border: none; border-radius: 3px; padding: 0.25rem 0.5rem; cursor: pointer;">Remove</button>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>First Name</label>
+                <input type="text" name="family_members[${index}][first_name]" required>
+              </div>
+              <div class="form-group">
+                <label>Last Name</label>
+                <input type="text" name="family_members[${index}][last_name]" value="${currentLastName}" required>
+              </div>
+              <div class="form-group">
+                <label>Email (optional)</label>
+                <input type="email" name="family_members[${index}][email]">
+              </div>
+            </div>
+          `;
+
+          row.querySelector('.remove-family-member').addEventListener('click', () => {
+            row.remove();
+            familyMemberCount--;
+          });
+
+          familyContainer.appendChild(row);
+          familyMemberCount++;
+        });
+      })();

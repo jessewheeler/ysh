@@ -17,12 +17,13 @@ function buildMember(overrides = {}) {
 function insertMember(db, overrides = {}) {
   const m = buildMember(overrides);
   const info = db.prepare(
-    `INSERT INTO members (first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, member_number)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO members (first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, member_number, membership_type, primary_member_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     m.first_name, m.last_name, m.email, m.phone,
     m.address_street, m.address_city, m.address_state, m.address_zip,
-    m.membership_year, m.status, m.member_number || null
+    m.membership_year, m.status, m.member_number || null,
+    m.membership_type || 'individual', m.primary_member_id || null
   );
   return { ...m, id: info.lastInsertRowid };
 }
@@ -85,4 +86,43 @@ function insertPayment(db, overrides = {}) {
   return { ...p, id: info.lastInsertRowid };
 }
 
-module.exports = { buildMember, insertMember, insertSetting, insertCard, buildStripeSession, buildAdmin, insertAdmin, insertPayment };
+function buildFamilyMembership(overrides = {}) {
+  return {
+    primaryMember: buildMember({
+      email: 'primary@example.com',
+      membership_type: 'family',
+      ...overrides.primaryMember
+    }),
+    familyMembers: overrides.familyMembers || [
+      { first_name: 'Jane', last_name: 'Doe', email: 'jane@example.com' },
+      { first_name: 'Jimmy', last_name: 'Doe', email: '' }
+    ]
+  };
+}
+
+function insertFamilyMembership(db, overrides = {}) {
+  const year = new Date().getFullYear();
+  const primary = insertMember(db, {
+    membership_type: 'family',
+    email: 'primary@family.test',
+    ...overrides.primaryMember
+  });
+
+  const familyMembers = (overrides.familyMembers || [
+    { first_name: 'Jane', last_name: 'Doe', email: 'jane@family.test' },
+    { first_name: 'Jimmy', last_name: 'Doe', email: 'jimmy@family.test' }
+  ]).map((fm, index) => {
+    return insertMember(db, {
+      ...fm,
+      email: fm.email || `family${index}@family.test`,
+      membership_type: 'family',
+      primary_member_id: primary.id,
+      membership_year: year,
+      status: primary.status
+    });
+  });
+
+  return { primary, familyMembers };
+}
+
+module.exports = { buildMember, insertMember, insertSetting, insertCard, buildStripeSession, buildAdmin, insertAdmin, insertPayment, buildFamilyMembership, insertFamilyMembership };

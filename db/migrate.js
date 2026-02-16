@@ -59,6 +59,77 @@ async function migrate() {
     await db.exec("ALTER TABLE members ADD COLUMN otp_attempts INTEGER NOT NULL DEFAULT 0");
   } catch (_e) { /* Column already exists */ }
 
+  // Add family membership columns and remove UNIQUE constraint on email
+  // Check if migration is needed by looking at the table schema
+  const memberSchema = await db.get(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='members'"
+  );
+
+  const needsMigration = memberSchema && (
+    memberSchema.sql.includes('email TEXT UNIQUE') ||
+    !memberSchema.sql.includes('membership_type')
+  );
+
+  if (needsMigration) {
+    // Need to rebuild the table to remove UNIQUE constraint and add new columns
+    const allMembers = await db.all('SELECT * FROM members');
+
+    await db.transaction(async () => {
+      // Create new members table with updated schema
+      await db.exec(`
+        CREATE TABLE members_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          member_number TEXT UNIQUE,
+          first_name TEXT NOT NULL,
+          last_name TEXT NOT NULL,
+          email TEXT NOT NULL,
+          phone TEXT,
+          address_street TEXT,
+          address_city TEXT,
+          address_state TEXT,
+          address_zip TEXT,
+          membership_year INTEGER,
+          membership_type TEXT NOT NULL DEFAULT 'individual' CHECK(membership_type IN ('individual','family')),
+          primary_member_id INTEGER REFERENCES members_new(id) ON DELETE CASCADE,
+          status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','active','expired','cancelled')),
+          notes TEXT,
+          role TEXT CHECK(role IN ('super_admin','editor')),
+          otp_hash TEXT,
+          otp_expires_at TEXT,
+          otp_attempts INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+
+      // Copy data from old to new table
+      if (allMembers.length > 0) {
+        for (const m of allMembers) {
+          await db.run(
+            `INSERT INTO members_new (id, member_number, first_name, last_name, email, phone,
+              address_street, address_city, address_state, address_zip, membership_year,
+              membership_type, primary_member_id, status, notes, role, otp_hash,
+              otp_expires_at, otp_attempts, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            m.id, m.member_number, m.first_name, m.last_name, m.email, m.phone,
+            m.address_street, m.address_city, m.address_state, m.address_zip, m.membership_year,
+            'individual', null, m.status, m.notes,
+            m.role, m.otp_hash, m.otp_expires_at, m.otp_attempts || 0, m.created_at, m.updated_at
+          );
+        }
+      }
+
+      // Drop old table and rename new one
+      await db.exec('DROP TABLE members');
+      await db.exec('ALTER TABLE members_new RENAME TO members');
+
+      // Create index for family member lookups
+      await db.exec('CREATE INDEX IF NOT EXISTS idx_members_primary_member_id ON members(primary_member_id)');
+    });
+
+    console.log('Members table migrated to support family memberships.');
+  }
+
   // Migrate existing admins rows into members, then drop admins table
   const adminsExists = await db.get(
     "SELECT name FROM sqlite_master WHERE type='table' AND name='admins'"

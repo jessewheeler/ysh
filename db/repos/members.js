@@ -126,6 +126,54 @@ async function createAdmin({ first_name, last_name, email, role }) {
   );
 }
 
+async function findFamilyMembers(primaryMemberId) {
+  return await db.all(
+    'SELECT * FROM members WHERE primary_member_id = ? ORDER BY created_at ASC',
+    primaryMemberId
+  );
+}
+
+async function createWithFamily({ primaryMember, familyMembers = [], membershipType }) {
+  const { generateMemberNumber } = require('../../services/members');
+
+  return await db.transaction(async () => {
+    const year = new Date().getFullYear();
+
+    // Create primary member
+    const primaryMemberNumber = await generateMemberNumber(year);
+    const primaryResult = await db.run(
+      `INSERT INTO members (member_number, first_name, last_name, email, phone,
+        address_street, address_city, address_state, address_zip,
+        membership_year, status, membership_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [primaryMemberNumber, primaryMember.first_name, primaryMember.last_name,
+       primaryMember.email, primaryMember.phone || null, primaryMember.address_street || null,
+       primaryMember.address_city || null, primaryMember.address_state || null, primaryMember.address_zip || null,
+       year, 'pending', membershipType]
+    );
+
+    const primaryId = primaryResult.lastInsertRowid;
+    const familyMemberIds = [];
+
+    // Create family members
+    for (const fm of familyMembers) {
+      const fmNumber = await generateMemberNumber(year);
+      const fmEmail = fm.email || primaryMember.email; // Reuse primary email if not provided
+
+      const fmResult = await db.run(
+        `INSERT INTO members (member_number, first_name, last_name, email,
+          membership_year, status, membership_type, primary_member_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [fmNumber, fm.first_name, fm.last_name, fmEmail,
+         year, 'pending', 'family', primaryId]
+      );
+      familyMemberIds.push(fmResult.lastInsertRowid);
+    }
+
+    return { primaryId, familyMemberIds };
+  });
+}
+
 module.exports = {
   findById,
   findByEmail,
@@ -148,4 +196,6 @@ module.exports = {
   setRole,
   clearRole,
   createAdmin,
+  findFamilyMembers,
+  createWithFamily,
 };

@@ -18,6 +18,7 @@ block content
           th Number
           th Name
           th Email
+          th Type
           th Status
           th Year
           th Actions
@@ -27,6 +28,7 @@ block content
             td= m.member_number
             td: a(href=`/admin/members/${m.id}`)= `${m.first_name} ${m.last_name}`
             td= m.email
+            td= m.membership_type === 'family' ? 'Family' : 'Individual'
             td
               span(class=`badge badge-${m.status}`)= m.status
             td= m.membership_year

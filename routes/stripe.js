@@ -18,31 +18,50 @@ router.post('/webhook', async (req, res) => {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     const memberId = session.metadata?.member_id;
+    const membershipType = session.metadata?.membership_type || 'individual';
 
     if (memberId) {
-      // Update payment record
+      // 1. Complete payment
       await paymentsService.completeStripePayment(session.id, session.payment_intent);
 
-      // Activate member
+      // 2. Activate primary member
       await activateMember(memberId);
+      const primaryMember = await findMemberById(memberId);
 
-      const member = await findMemberById(memberId);
-
-      // Generate membership card
-      try {
-        const { generatePDF, generatePNG } = require('../services/card');
-        await generatePDF(member);
-        await generatePNG(member);
-      } catch (e) {
-        console.error('Card generation error:', e.message);
+      // 3. Get and activate family members
+      const memberRepo = require('../db/repos/members');
+      let familyMembers = [];
+      if (membershipType === 'family') {
+        familyMembers = await memberRepo.findFamilyMembers(memberId);
+        for (const fm of familyMembers) {
+          await activateMember(fm.id);
+        }
       }
 
-      // Send welcome + card emails
+      // 4. Generate cards for all members
+      const allMembers = [primaryMember, ...familyMembers];
+      for (const member of allMembers) {
+        try {
+          const { generatePDF, generatePNG } = require('../services/card');
+          await generatePDF(member);
+          await generatePNG(member);
+        } catch (e) {
+          console.error(`Card generation error for ${member.member_number}:`, e.message);
+        }
+      }
+
+      // 5. Send emails
       try {
         const emailService = require('../services/email');
-        await emailService.sendWelcomeEmail(member);
-        await emailService.sendPaymentConfirmation(member, session);
-        await emailService.sendCardEmail(member);
+
+        // Primary member: welcome + payment confirmation
+        await emailService.sendWelcomeEmail(primaryMember);
+        await emailService.sendPaymentConfirmation(primaryMember, session);
+
+        // All members: card email
+        for (const member of allMembers) {
+          await emailService.sendCardEmail(member);
+        }
       } catch (e) {
         console.error('Email send error:', e.message);
       }
