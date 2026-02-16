@@ -34,7 +34,8 @@ Membership Form Renders
     Wait For Elements State    input[name="address_city"]    visible
     Wait For Elements State    input[name="address_state"]    visible
     Wait For Elements State    input[name="address_zip"]    visible
-    Page Should Contain Text    $25.00
+    Page Should Contain Text    $16.00
+    Page Should Contain Text    $26.00
 
 Membership Validates Required Fields
     Navigate To    /membership
