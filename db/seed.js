@@ -106,6 +106,8 @@ async function seed() {
     hero_subtitle: 'Join your fellow Seahawks fans at the Red Door Lounge in Billings for our watch party! Enjoy the game day specials on food and drink, and lots of fun!',
     hero_button_text: 'Red Door Lounge — 3875 Grand Ave, Billings, MT',
     hero_button_url: 'https://maps.app.goo.gl/rSenva2n2pinhLRL7',
+    hero_media_type: 'none', // 'none', 'photo', or 'video'
+    hero_media_url: '', // Path to photo or video file
     about_quote: "Yellowstone Sea Hawkers are the most passionate, hardcore, devoted, cheer-crazy, raisin' the roof, no-life-during-football-season-havin' fans on earth.",
     about_text: 'Our primary purpose is to have fun while supporting the Seahawks football team, their coaches, staff, our local charities, and organizations in the city of Billings and its surrounding communities.',
     gallery_album_url: 'https://1drv.ms/a/c/10fffe404656475d/EqrBFR6ebKtMhwnrQj-bm6wBRoAUuX5GI4Rp3EdNVW5kIw?e=l1rltU',

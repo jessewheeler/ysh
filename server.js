@@ -69,11 +69,17 @@ app.use(morganMiddleware);
 // Multer setup for file uploads (memoryStorage — files go to B2 or local disk in route handler)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB for videos
   fileFilter: (req, file, cb) => {
-    const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
-    if (allowed.test(path.extname(file.originalname))) return cb(null, true);
-    cb(new Error('Only image files (jpg, png, gif, webp) are allowed.'));
+    // Allow images and videos
+    const allowedImages = /\.(jpg|jpeg|png|gif|webp)$/i;
+    const allowedVideos = /\.(mp4|webm|mov)$/i;
+
+    if (allowedImages.test(path.extname(file.originalname)) ||
+        allowedVideos.test(path.extname(file.originalname))) {
+      return cb(null, true);
+    }
+    cb(new Error('Only image files (jpg, png, gif, webp) and video files (mp4, webm, mov) are allowed.'));
   },
 });
 

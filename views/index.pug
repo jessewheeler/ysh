@@ -2,6 +2,17 @@ extends layout
 
 block content
   section#home-slider.hero
+    //- Hero media (photo or video)
+    if site.hero_media_type === 'photo' && site.hero_media_url
+      .hero-media
+        img.hero-image(src=site.hero_media_url alt="Hero image")
+    else if site.hero_media_type === 'video' && site.hero_media_url
+      .hero-media
+        video.hero-video(autoplay muted loop playsinline)
+          source(src=site.hero_media_url type="video/mp4")
+          | Your browser does not support the video tag.
+
+    //- Hero content overlay
     .hero-content
       h1= site.hero_title || 'Yellowstone Sea Hawkers'
       p= site.hero_subtitle || ''

@@ -4,7 +4,7 @@ block page_title
   | Site Settings
 
 block content
-  form(method="POST" action="/admin/settings")
+  form(method="POST" action="/admin/settings" enctype="multipart/form-data")
     h3 Hero Section
     .form-group
       label(for="hero_title") Hero Title
@@ -18,6 +18,26 @@ block content
     .form-group
       label(for="hero_button_url") Hero Button URL
       input#hero_button_url(type="text" name="hero_button_url" value=(site.hero_button_url || ''))
+
+    .form-group
+      label(for="hero_media_type") Hero Media Type
+      select#hero_media_type(name="hero_media_type")
+        option(value="none" selected=(site.hero_media_type === 'none' || !site.hero_media_type)) None (text only)
+        option(value="photo" selected=(site.hero_media_type === 'photo')) Photo
+        option(value="video" selected=(site.hero_media_type === 'video')) Video
+
+    .form-group
+      label(for="hero_media") Upload Hero Photo/Video
+      input#hero_media(type="file" name="image" accept="image/*,video/*")
+      if site.hero_media_url
+        p.text-muted
+          | Current:
+          a(href=site.hero_media_url target="_blank") View current media
+        input(type="hidden" name="hero_media_url" value=site.hero_media_url)
+      p.text-muted
+        | Accepted: Images (jpg, png, gif, webp) up to 50MB, Videos (mp4, webm, mov) up to 50MB
+        br
+        | Media will display at its natural size without stretching
 
     h3 About Section
     .form-group

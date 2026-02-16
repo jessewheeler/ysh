@@ -521,6 +521,7 @@ router.get('/settings', requireSuperAdmin, (req, res) => {
 router.post('/settings', requireSuperAdmin, async (req, res) => {
   const keys = [
     'hero_title', 'hero_subtitle', 'hero_button_text', 'hero_button_url',
+    'hero_media_type',
     'about_quote', 'about_text', 'gallery_album_url', 'dues_amount_cents',
     'contact_email', 'stripe_publishable_key',
   ];
@@ -530,6 +531,16 @@ router.post('/settings', requireSuperAdmin, async (req, res) => {
       keyValues[key] = req.body[key];
     }
   }
+
+  // Handle hero media upload if provided
+  if (req.file) {
+    const heroMediaUrl = await handleUpload(req.file, 'hero');
+    keyValues.hero_media_url = heroMediaUrl;
+  } else if (req.body.hero_media_url) {
+    // Keep existing URL if no new file uploaded
+    keyValues.hero_media_url = req.body.hero_media_url;
+  }
+
   await settingsRepo.upsertMany(keyValues);
   req.session.flash_success = 'Settings saved.';
   res.redirect('/admin/settings');
