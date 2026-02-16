@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { activateMember, findMemberById } = require('../services/members');
 const paymentsService = require('../services/payments');
+const logger = require('../services/logger');
 
 router.post('/webhook', async (req, res) => {
   const sig = req.headers['stripe-signature'];
@@ -11,7 +12,7 @@ router.post('/webhook', async (req, res) => {
     const { constructWebhookEvent } = require('../services/stripe');
     event = constructWebhookEvent(req.body, sig);
   } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
+    logger.error('Webhook signature verification failed', { error: err.message });
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
@@ -46,7 +47,11 @@ router.post('/webhook', async (req, res) => {
           await generatePDF(member);
           await generatePNG(member);
         } catch (e) {
-          console.error(`Card generation error for ${member.member_number}:`, e.message);
+          logger.error('Card generation error', {
+            memberNumber: member.member_number,
+            error: e.message,
+            stack: e.stack
+          });
         }
       }
 
@@ -63,7 +68,7 @@ router.post('/webhook', async (req, res) => {
           await emailService.sendCardEmail(member);
         }
       } catch (e) {
-        console.error('Email send error:', e.message);
+        logger.error('Email send error', { error: e.message, stack: e.stack });
       }
     }
   }
