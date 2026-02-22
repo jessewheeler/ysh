@@ -64,6 +64,9 @@ block content
         a.btn(href=`/admin/members/${member.id}?edit=1`) Edit
         form(method="POST" action=`/admin/members/${member.id}/card` style="display:inline")
           button.btn-outline(type="submit") Generate Card
+        if !member.primary_member_id
+          form(method="POST" action=`/admin/members/${member.id}/send-renewal` style="display:inline" data-confirm=`Send renewal reminder to ${member.first_name} ${member.last_name}?`)
+            button.btn-outline(type="submit") Send Renewal Reminder
         form(method="POST" action=`/admin/members/${member.id}/delete` style="display:inline" data-confirm="Delete this member?")
           button.btn-danger(type="submit") Delete
 

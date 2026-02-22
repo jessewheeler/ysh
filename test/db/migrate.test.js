@@ -175,6 +175,36 @@ describe('migrate()', () => {
     ).not.toThrow();
   });
 
+  test('emails_log table accepts renewal_reminder email_type', async () => {
+    await migrate();
+    expect(() =>
+        db.prepare(
+            "INSERT INTO emails_log (to_email, email_type) VALUES ('a@b.com','renewal_reminder')"
+        ).run()
+    ).not.toThrow();
+  });
+
+  test('members table has expiry_date column', async () => {
+    await migrate();
+    db.prepare("INSERT INTO members (first_name, last_name, email, expiry_date) VALUES ('A','B','exp@a.com','2026-08-01')").run();
+    const member = db.prepare("SELECT expiry_date FROM members WHERE email = 'exp@a.com'").get();
+    expect(member.expiry_date).toBe('2026-08-01');
+  });
+
+  test('members table has renewal_token column', async () => {
+    await migrate();
+    db.prepare("INSERT INTO members (first_name, last_name, email, renewal_token) VALUES ('A','B','tok@a.com','abc123')").run();
+    const member = db.prepare("SELECT renewal_token FROM members WHERE email = 'tok@a.com'").get();
+    expect(member.renewal_token).toBe('abc123');
+  });
+
+  test('members table has renewal_token_expires_at column', async () => {
+    await migrate();
+    db.prepare("INSERT INTO members (first_name, last_name, email, renewal_token_expires_at) VALUES ('A','B','exp2@a.com','2026-10-01T00:00:00.000Z')").run();
+    const member = db.prepare("SELECT renewal_token_expires_at FROM members WHERE email = 'exp2@a.com'").get();
+    expect(member.renewal_token_expires_at).toBe('2026-10-01T00:00:00.000Z');
+  });
+
   test('members table has correct role CHECK constraint', async () => {
     await migrate();
     db.prepare(

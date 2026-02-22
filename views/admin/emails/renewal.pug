@@ -1,0 +1,41 @@
+extends ../layout
+
+block page_title
+    | Renewal Reminders
+
+block content
+    .admin-toolbar
+        a.btn-outline(href="/admin/emails") Back to Email Log
+
+    h3 Current Settings
+    table.admin-table(style="margin-bottom:2rem;")
+        tbody
+            tr
+                td
+                    strong Membership Expiry Date
+                td= expiryDate || '(not set)'
+            tr
+                td
+                    strong Send Reminders
+                td #{daysBefore} days before expiry
+            tr
+                td
+                    strong Eligible Members
+                td #{count} member#{count !== 1 ? 's' : ''} with expiry within #{daysBefore} days
+
+    if count > 0
+        p
+            | #{count} member#{count !== 1 ? 's' : ''} will receive a personalized renewal reminder with a pre-filled checkout link.
+
+        form(method="POST" action="/admin/emails/renewal" data-confirm=`Send renewal reminders to ${count} member${count !== 1 ? 's' : ''}?`)
+            .form-actions
+                button.btn(type="submit") Send Renewal Reminders
+                a.btn-outline(href="/admin/emails") Cancel
+    else
+        p.text-muted No members currently need renewal reminders. Members are eligible when they have an expiry date set within #{daysBefore} days and haven't renewed for the current year.
+
+    hr(style="margin:2rem 0;")
+    p.text-muted
+        | To configure expiry date and reminder timing, visit
+        a(href="/admin/settings")  Site Settings
+        | .

@@ -25,6 +25,9 @@ const SCHEMA = `
     otp_expires_at TEXT,
     otp_attempts INTEGER NOT NULL DEFAULT 0,
     join_date TEXT DEFAULT (datetime('now')),
+    expiry_date TEXT,
+    renewal_token TEXT,
+    renewal_token_expires_at TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );
@@ -90,7 +93,20 @@ const SCHEMA = `
     to_name TEXT,
     subject TEXT,
     body_html TEXT,
-    email_type TEXT CHECK(email_type IN ('welcome','payment_confirmation','card_delivery','blast','contact','otp')),
+    email_type
+    TEXT
+    CHECK (
+    email_type
+    IN
+  (
+    'welcome',
+    'payment_confirmation',
+    'card_delivery',
+    'blast',
+    'contact',
+    'otp',
+    'renewal_reminder'
+  )),
     status TEXT NOT NULL DEFAULT 'sent',
     error TEXT,
     member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,

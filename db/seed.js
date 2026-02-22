@@ -116,6 +116,8 @@ async function seed() {
     max_family_members: '6',
     contact_email: 'info@yellowstoneseahawkers.com',
     stripe_publishable_key: '',
+    membership_expiry_date: `${new Date().getFullYear()}-08-01`,
+    renewal_reminder_days_before: '30',
   };
   for (const [k, v] of Object.entries(settings)) {
     await db.run('INSERT OR IGNORE INTO site_settings (key, value) VALUES (?, ?)', k, v);

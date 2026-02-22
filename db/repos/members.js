@@ -133,6 +133,68 @@ async function findFamilyMembers(primaryMemberId) {
   );
 }
 
+async function findNeedingRenewal(currentYear, daysUntilExpiry) {
+    return await db.all(
+        `SELECT *
+         FROM members
+         WHERE primary_member_id IS NULL
+           AND status IN ('active', 'expired')
+           AND expiry_date IS NOT NULL
+           AND (membership_year IS NULL OR membership_year < ?)
+           AND expiry_date <= date ('now'
+             , '+' || ? || ' days')
+         ORDER BY expiry_date ASC`,
+        currentYear, daysUntilExpiry
+    );
+}
+
+async function setExpiryDate(id, expiryDate) {
+    return await db.run(
+        "UPDATE members SET expiry_date = ?, updated_at = datetime('now') WHERE id = ?",
+        expiryDate, id
+    );
+}
+
+async function setRenewalToken(id, token, expiresAt) {
+    return await db.run(
+        "UPDATE members SET renewal_token = ?, renewal_token_expires_at = ?, updated_at = datetime('now') WHERE id = ?",
+        token, expiresAt, id
+    );
+}
+
+async function findByRenewalToken(token) {
+    return await db.get(
+        "SELECT * FROM members WHERE renewal_token = ? AND renewal_token_expires_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+        token
+    );
+}
+
+async function clearRenewalToken(id) {
+    return await db.run(
+        "UPDATE members SET renewal_token = NULL, renewal_token_expires_at = NULL, updated_at = datetime('now') WHERE id = ?",
+        id
+    );
+}
+
+async function setMembershipYear(id, year) {
+    return await db.run(
+        "UPDATE members SET membership_year = ?, updated_at = datetime('now') WHERE id = ?",
+        year, id
+    );
+}
+
+async function addFamilyMember(primaryId, {first_name, last_name, email, membership_year, status}) {
+    const {generateMemberNumber} = require('../../services/members');
+    const year = membership_year || new Date().getFullYear();
+    const memberNumber = await generateMemberNumber(year);
+    return await db.run(
+        `INSERT INTO members (member_number, first_name, last_name, email, membership_year, status, membership_type,
+                              primary_member_id)
+         VALUES (?, ?, ?, ?, ?, ?, 'family', ?)`,
+        memberNumber, first_name, last_name, email || null, year, status || 'pending', primaryId
+    );
+}
+
 async function createWithFamily({ primaryMember, familyMembers = [], membershipType }) {
   const { generateMemberNumber } = require('../../services/members');
 
@@ -198,4 +260,11 @@ module.exports = {
   createAdmin,
   findFamilyMembers,
   createWithFamily,
+    findNeedingRenewal,
+    setExpiryDate,
+    setRenewalToken,
+    findByRenewalToken,
+    clearRenewalToken,
+    setMembershipYear,
+    addFamilyMember,
 };
