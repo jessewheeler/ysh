@@ -65,7 +65,7 @@ const migrate = require('../../db/migrate');
 
 const EXPECTED_TABLES = [
   'members', 'payments', 'announcements', 'gallery_images',
-  'bios', 'site_settings', 'emails_log', 'membership_cards',
+  'bios', 'site_settings', 'emails_log', 'membership_cards', 'audit_log',
 ];
 
 beforeEach(() => {
@@ -78,7 +78,7 @@ afterEach(() => {
 });
 
 describe('migrate()', () => {
-  test('creates all 8 tables', async () => {
+  test('creates all 9 tables', async () => {
     await migrate();
     const tables = db.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"

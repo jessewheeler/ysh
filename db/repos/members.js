@@ -1,4 +1,6 @@
 const db = require('../database');
+const {getActor} = require('../audit-context');
+const auditLog = require('./auditLog');
 
 async function findById(id) {
   return await db.get('SELECT * FROM members WHERE id = ?', id);
@@ -13,30 +15,78 @@ async function findAdminByEmail(email) {
 }
 
 async function create({ member_number, first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, join_date, status, notes }) {
-  return await db.run(
-    `INSERT INTO members (member_number, first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, join_date, status, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, ?)`,
-    member_number, first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, join_date || null, status || 'pending', notes || null
+    const actor = getActor();
+    const result = await db.run(
+        `INSERT INTO members (member_number, first_name, last_name, email, phone, address_street, address_city,
+                              address_state, address_zip, membership_year, join_date, status, notes, created_by,
+                              updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, ?, ?, ?)`,
+        member_number, first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, join_date || null, status || 'pending', notes || null, actor.id || null, actor.id || null
   );
+    const row = await db.get('SELECT * FROM members WHERE id = ?', result.lastInsertRowid);
+    await auditLog.insert({
+        tableName: 'members',
+        recordId: result.lastInsertRowid,
+        action: 'INSERT',
+        actor,
+        oldValues: null,
+        newValues: row
+    });
+    return result;
 }
 
 async function update(id, { first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, join_date, status, notes }) {
-  return await db.run(
-    `UPDATE members SET first_name=?, last_name=?, email=?, phone=?, address_street=?, address_city=?, address_state=?, address_zip=?, membership_year=?, join_date=?, status=?, notes=?, updated_at=datetime('now')
+    const actor = getActor();
+    const old = await db.get('SELECT * FROM members WHERE id = ?', id);
+    const result = await db.run(
+        `UPDATE members SET first_name=?, last_name=?, email=?, phone=?, address_street=?, address_city=?, address_state=?, address_zip=?, membership_year=?, join_date=?, status=?, notes=?, updated_at=datetime('now'), updated_by=?
      WHERE id=?`,
-    first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, join_date || null, status, notes || null, id
+        first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, join_date || null, status, notes || null, actor.id || null, id
   );
+    const row = await db.get('SELECT * FROM members WHERE id = ?', id);
+    await auditLog.insert({
+        tableName: 'members',
+        recordId: id,
+        action: 'UPDATE',
+        actor,
+        oldValues: old,
+        newValues: row
+    });
+    return result;
 }
 
 async function deleteById(id) {
-  return await db.run('DELETE FROM members WHERE id = ?', id);
+    const actor = getActor();
+    const old = await db.get('SELECT * FROM members WHERE id = ?', id);
+    const result = await db.run('DELETE FROM members WHERE id = ?', id);
+    await auditLog.insert({
+        tableName: 'members',
+        recordId: id,
+        action: 'DELETE',
+        actor,
+        oldValues: old,
+        newValues: null
+    });
+    return result;
 }
 
 async function activate(id) {
-  return await db.run(
-    "UPDATE members SET status = 'active', updated_at = datetime('now') WHERE id = ?",
-    id
+    const actor = getActor();
+    const old = await db.get('SELECT * FROM members WHERE id = ?', id);
+    const result = await db.run(
+        "UPDATE members SET status = 'active', updated_at = datetime('now'), updated_by = ? WHERE id = ?",
+        actor.id || null, id
   );
+    const row = await db.get('SELECT * FROM members WHERE id = ?', id);
+    await auditLog.insert({
+        tableName: 'members',
+        recordId: id,
+        action: 'UPDATE',
+        actor,
+        oldValues: old,
+        newValues: row
+    });
+    return result;
 }
 
 async function countAll() {
@@ -106,24 +156,59 @@ async function clearOtp(id) {
 }
 
 async function setRole(id, role) {
-  return await db.run(
-    "UPDATE members SET role = ?, updated_at = datetime('now') WHERE id = ?",
-    role, id
+    const actor = getActor();
+    const old = await db.get('SELECT * FROM members WHERE id = ?', id);
+    const result = await db.run(
+        "UPDATE members SET role = ?, updated_at = datetime('now'), updated_by = ? WHERE id = ?",
+        role, actor.id || null, id
   );
+    const row = await db.get('SELECT * FROM members WHERE id = ?', id);
+    await auditLog.insert({
+        tableName: 'members',
+        recordId: id,
+        action: 'UPDATE',
+        actor,
+        oldValues: old,
+        newValues: row
+    });
+    return result;
 }
 
 async function clearRole(id) {
-  return await db.run(
-    "UPDATE members SET role = NULL, updated_at = datetime('now') WHERE id = ?",
-    id
+    const actor = getActor();
+    const old = await db.get('SELECT * FROM members WHERE id = ?', id);
+    const result = await db.run(
+        "UPDATE members SET role = NULL, updated_at = datetime('now'), updated_by = ? WHERE id = ?",
+        actor.id || null, id
   );
+    const row = await db.get('SELECT * FROM members WHERE id = ?', id);
+    await auditLog.insert({
+        tableName: 'members',
+        recordId: id,
+        action: 'UPDATE',
+        actor,
+        oldValues: old,
+        newValues: row
+    });
+    return result;
 }
 
 async function createAdmin({ first_name, last_name, email, role }) {
-  return await db.run(
-    'INSERT INTO members (first_name, last_name, email, role) VALUES (?, ?, ?, ?)',
-    first_name, last_name, email, role
+    const actor = getActor();
+    const result = await db.run(
+        'INSERT INTO members (first_name, last_name, email, role, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?)',
+        first_name, last_name, email, role, actor.id || null, actor.id || null
   );
+    const row = await db.get('SELECT * FROM members WHERE id = ?', result.lastInsertRowid);
+    await auditLog.insert({
+        tableName: 'members',
+        recordId: result.lastInsertRowid,
+        action: 'INSERT',
+        actor,
+        oldValues: null,
+        newValues: row
+    });
+    return result;
 }
 
 async function findFamilyMembers(primaryMemberId) {
@@ -177,26 +262,50 @@ async function clearRenewalToken(id) {
 }
 
 async function setMembershipYear(id, year) {
-    return await db.run(
-        "UPDATE members SET membership_year = ?, updated_at = datetime('now') WHERE id = ?",
-        year, id
+    const actor = getActor();
+    const old = await db.get('SELECT * FROM members WHERE id = ?', id);
+    const result = await db.run(
+        "UPDATE members SET membership_year = ?, updated_at = datetime('now'), updated_by = ? WHERE id = ?",
+        year, actor.id || null, id
     );
+    const row = await db.get('SELECT * FROM members WHERE id = ?', id);
+    await auditLog.insert({
+        tableName: 'members',
+        recordId: id,
+        action: 'UPDATE',
+        actor,
+        oldValues: old,
+        newValues: row
+    });
+    return result;
 }
 
 async function addFamilyMember(primaryId, {first_name, last_name, email, membership_year, status}) {
+    const actor = getActor();
     const {generateMemberNumber} = require('../../services/members');
     const year = membership_year || new Date().getFullYear();
     const memberNumber = await generateMemberNumber(year);
-    return await db.run(
+    const result = await db.run(
         `INSERT INTO members (member_number, first_name, last_name, email, membership_year, status, membership_type,
-                              primary_member_id)
-         VALUES (?, ?, ?, ?, ?, ?, 'family', ?)`,
-        memberNumber, first_name, last_name, email || null, year, status || 'pending', primaryId
+                          primary_member_id, created_by, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?, 'family', ?, ?, ?)`,
+        memberNumber, first_name, last_name, email || null, year, status || 'pending', primaryId, actor.id || null, actor.id || null
     );
+    const row = await db.get('SELECT * FROM members WHERE id = ?', result.lastInsertRowid);
+    await auditLog.insert({
+        tableName: 'members',
+        recordId: result.lastInsertRowid,
+        action: 'INSERT',
+        actor,
+        oldValues: null,
+        newValues: row
+    });
+    return result;
 }
 
 async function createWithFamily({ primaryMember, familyMembers = [], membershipType }) {
   const { generateMemberNumber } = require('../../services/members');
+    const actor = getActor();
 
   return await db.transaction(async () => {
     const year = new Date().getFullYear();
@@ -206,15 +315,25 @@ async function createWithFamily({ primaryMember, familyMembers = [], membershipT
     const primaryResult = await db.run(
       `INSERT INTO members (member_number, first_name, last_name, email, phone,
         address_street, address_city, address_state, address_zip,
-        membership_year, join_date, status, membership_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, ?)`,
+                            membership_year, join_date, status, membership_type, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, ?, ?, ?)`,
       [primaryMemberNumber, primaryMember.first_name, primaryMember.last_name,
        primaryMember.email, primaryMember.phone || null, primaryMember.address_street || null,
        primaryMember.address_city || null, primaryMember.address_state || null, primaryMember.address_zip || null,
-       year, primaryMember.join_date || null, 'pending', membershipType]
+          year, primaryMember.join_date || null, 'pending', membershipType, actor.id || null, actor.id || null]
     );
 
     const primaryId = primaryResult.lastInsertRowid;
+      const primaryRow = await db.get('SELECT * FROM members WHERE id = ?', primaryId);
+      await auditLog.insert({
+          tableName: 'members',
+          recordId: primaryId,
+          action: 'INSERT',
+          actor,
+          oldValues: null,
+          newValues: primaryRow
+      });
+
     const familyMemberIds = [];
 
     // Create family members
@@ -224,12 +343,21 @@ async function createWithFamily({ primaryMember, familyMembers = [], membershipT
 
       const fmResult = await db.run(
         `INSERT INTO members (member_number, first_name, last_name, email,
-          membership_year, status, membership_type, primary_member_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                              membership_year, status, membership_type, primary_member_id, created_by, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [fmNumber, fm.first_name, fm.last_name, fmEmail,
-         year, 'pending', 'family', primaryId]
+            year, 'pending', 'family', primaryId, actor.id || null, actor.id || null]
       );
       familyMemberIds.push(fmResult.lastInsertRowid);
+        const fmRow = await db.get('SELECT * FROM members WHERE id = ?', fmResult.lastInsertRowid);
+        await auditLog.insert({
+            tableName: 'members',
+            recordId: fmResult.lastInsertRowid,
+            action: 'INSERT',
+            actor,
+            oldValues: null,
+            newValues: fmRow
+        });
     }
 
     return { primaryId, familyMemberIds };

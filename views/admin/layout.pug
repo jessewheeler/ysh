@@ -24,6 +24,7 @@ html(lang="en")
           if adminRole === 'super_admin'
             a(href="/admin/settings" class=(currentPath === '/admin/settings' ? 'active' : '')) Settings
             a(href="/admin/admins" class=(currentPath && currentPath.startsWith('/admin/admins') ? 'active' : '')) Admins
+            a(href="/admin/audit" class=(currentPath && currentPath.startsWith('/admin/audit') ? 'active' : '')) Audit Log
           hr
           a(href="/") View Site
           form(method="POST" action="/admin/logout" style="display:inline")

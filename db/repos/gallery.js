@@ -1,4 +1,6 @@
 const db = require('../database');
+const {getActor} = require('../audit-context');
+const auditLog = require('./auditLog');
 
 async function findAll() {
   return await db.all('SELECT * FROM gallery_images ORDER BY sort_order ASC');
@@ -18,21 +20,55 @@ async function getFilename(id) {
 }
 
 async function create({ filename, alt_text, caption, sort_order, is_visible }) {
-  return await db.run(
-    'INSERT INTO gallery_images (filename, alt_text, caption, sort_order, is_visible) VALUES (?, ?, ?, ?, ?)',
-    filename, alt_text || null, caption || null, parseInt(sort_order) || 0, is_visible ? 1 : 0
+    const actor = getActor();
+    const result = await db.run(
+        'INSERT INTO gallery_images (filename, alt_text, caption, sort_order, is_visible, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        filename, alt_text || null, caption || null, parseInt(sort_order) || 0, is_visible ? 1 : 0, actor.id || null, actor.id || null
   );
+    const row = await db.get('SELECT * FROM gallery_images WHERE id = ?', result.lastInsertRowid);
+    await auditLog.insert({
+        tableName: 'gallery_images',
+        recordId: result.lastInsertRowid,
+        action: 'INSERT',
+        actor,
+        oldValues: null,
+        newValues: row
+    });
+    return result;
 }
 
 async function update(id, { filename, alt_text, caption, sort_order, is_visible }) {
-  return await db.run(
-    'UPDATE gallery_images SET filename=?, alt_text=?, caption=?, sort_order=?, is_visible=? WHERE id=?',
-    filename, alt_text || null, caption || null, parseInt(sort_order) || 0, is_visible ? 1 : 0, id
+    const actor = getActor();
+    const old = await db.get('SELECT * FROM gallery_images WHERE id = ?', id);
+    const result = await db.run(
+        "UPDATE gallery_images SET filename=?, alt_text=?, caption=?, sort_order=?, is_visible=?, updated_at=datetime('now'), updated_by=? WHERE id=?",
+        filename, alt_text || null, caption || null, parseInt(sort_order) || 0, is_visible ? 1 : 0, actor.id || null, id
   );
+    const row = await db.get('SELECT * FROM gallery_images WHERE id = ?', id);
+    await auditLog.insert({
+        tableName: 'gallery_images',
+        recordId: id,
+        action: 'UPDATE',
+        actor,
+        oldValues: old,
+        newValues: row
+    });
+    return result;
 }
 
 async function deleteById(id) {
-  return await db.run('DELETE FROM gallery_images WHERE id = ?', id);
+    const actor = getActor();
+    const old = await db.get('SELECT * FROM gallery_images WHERE id = ?', id);
+    const result = await db.run('DELETE FROM gallery_images WHERE id = ?', id);
+    await auditLog.insert({
+        tableName: 'gallery_images',
+        recordId: id,
+        action: 'DELETE',
+        actor,
+        oldValues: old,
+        newValues: null
+    });
+    return result;
 }
 
 module.exports = {
