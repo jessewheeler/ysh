@@ -1,3 +1,16 @@
+const {runWithActor} = require('../db/audit-context');
+
+/**
+ * Sets the current actor (logged-in admin) in AsyncLocalStorage so repo
+ * functions can stamp created_by / updated_by without explicit threading.
+ */
+function captureActor(req, res, next) {
+    runWithActor(
+        {id: req.session?.adminId || null, email: req.session?.adminEmail || null},
+        next
+    );
+}
+
 function requireAdmin(req, res, next) {
   if (req.session && req.session.adminId) {
     return next();
@@ -18,4 +31,4 @@ function requireSuperAdmin(req, res, next) {
   res.redirect('/admin/login');
 }
 
-module.exports = { requireAdmin, requireSuperAdmin };
+module.exports = {requireAdmin, requireSuperAdmin, captureActor};

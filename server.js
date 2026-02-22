@@ -9,6 +9,7 @@ const multer = require('multer');
 const fs = require('fs');
 const seed = require('./db/seed');
 const { injectLocals } = require('./middleware/locals');
+const {captureActor} = require('./middleware/auth');
 const logger = require('./services/logger');
 const { attachRequestId, attachLogger, morganMiddleware, logError } = require('./middleware/requestLogger');
 
@@ -113,6 +114,9 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production',
   },
 }));
+
+// Capture authenticated admin as the audit actor for every request
+app.use(captureActor);
 
 // Parse multipart form data for admin routes before CSRF check
 // (multer populates req.body for multipart forms; without this, CSRF token is inaccessible)

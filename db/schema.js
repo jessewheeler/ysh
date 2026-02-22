@@ -29,7 +29,22 @@ const SCHEMA = `
     renewal_token TEXT,
     renewal_token_expires_at TEXT,
     created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT
+  (
+    datetime
+  (
+    'now'
+  )),
+    created_by INTEGER REFERENCES members
+  (
+    id
+  )
+                                                     ON DELETE SET NULL,
+    updated_by INTEGER REFERENCES members
+  (
+    id
+  )
+                                                     ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS payments (
@@ -43,7 +58,22 @@ const SCHEMA = `
     description TEXT,
     payment_method TEXT NOT NULL DEFAULT 'stripe',
     created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT
+  (
+    datetime
+  (
+    'now'
+  )),
+    created_by INTEGER REFERENCES members
+  (
+    id
+  )
+                                                      ON DELETE SET NULL,
+    updated_by INTEGER REFERENCES members
+  (
+    id
+  )
+                                                      ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS announcements (
@@ -56,7 +86,21 @@ const SCHEMA = `
     is_published INTEGER NOT NULL DEFAULT 1,
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT
+  (
+    datetime
+  (
+    'now'
+  )),
+    created_by INTEGER REFERENCES members
+  (
+    id
+  ) ON DELETE SET NULL,
+    updated_by INTEGER REFERENCES members
+  (
+    id
+  )
+    ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS gallery_images (
@@ -66,7 +110,28 @@ const SCHEMA = `
     caption TEXT,
     sort_order INTEGER NOT NULL DEFAULT 0,
     is_visible INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at
+    TEXT
+    DEFAULT (
+    datetime
+  (
+    'now'
+  )),
+    updated_at TEXT DEFAULT
+  (
+    datetime
+  (
+    'now'
+  )),
+    created_by INTEGER REFERENCES members
+  (
+    id
+  ) ON DELETE SET NULL,
+    updated_by INTEGER REFERENCES members
+  (
+    id
+  )
+    ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS bios (
@@ -78,13 +143,37 @@ const SCHEMA = `
     sort_order INTEGER NOT NULL DEFAULT 0,
     is_visible INTEGER NOT NULL DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT
+  (
+    datetime
+  (
+    'now'
+  )),
+    created_by INTEGER REFERENCES members
+  (
+    id
+  ) ON DELETE SET NULL,
+    updated_by INTEGER REFERENCES members
+  (
+    id
+  )
+    ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS site_settings (
     key TEXT PRIMARY KEY,
     value TEXT,
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at
+    TEXT
+    DEFAULT (
+    datetime
+  (
+    'now'
+  )),
+    updated_by INTEGER REFERENCES members
+  (
+    id
+  ) ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS emails_log (
@@ -110,7 +199,17 @@ const SCHEMA = `
     status TEXT NOT NULL DEFAULT 'sent',
     error TEXT,
     member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT
+  (
+    datetime
+  (
+    'now'
+  )),
+    created_by INTEGER REFERENCES members
+  (
+    id
+  )
+                                             ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS membership_cards (
@@ -119,8 +218,63 @@ const SCHEMA = `
     pdf_path TEXT,
     png_path TEXT,
     year INTEGER,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT
+  (
+    datetime
+  (
+    'now'
+  )),
+    created_by INTEGER REFERENCES members
+  (
+    id
+  )
+                                                      ON DELETE SET NULL
   );
+
+  CREATE TABLE IF NOT EXISTS audit_log
+  (
+    id
+    INTEGER
+    PRIMARY
+    KEY
+    AUTOINCREMENT,
+    table_name
+    TEXT
+    NOT
+    NULL,
+    record_id
+    TEXT
+    NOT
+    NULL,
+    action
+    TEXT
+    NOT
+    NULL
+    CHECK (
+    action
+    IN
+  (
+    'INSERT',
+    'UPDATE',
+    'DELETE'
+  )),
+    actor_id INTEGER REFERENCES members
+  (
+    id
+  ) ON DELETE SET NULL,
+    actor_email TEXT,
+    old_values TEXT,
+    new_values TEXT,
+    changed_at TEXT DEFAULT
+  (
+    datetime
+  (
+    'now'
+  ))
+    );
+
+  CREATE INDEX IF NOT EXISTS idx_audit_log_table_record ON audit_log(table_name, record_id);
+  CREATE INDEX IF NOT EXISTS idx_audit_log_changed_at ON audit_log(changed_at);
 `;
 
 /**
@@ -128,9 +282,9 @@ const SCHEMA = `
  */
 function toPgSchema(sql) {
   return sql
-    .replace(/INTEGER PRIMARY KEY AUTOINCREMENT/g, 'SERIAL PRIMARY KEY')
-    .replace(/datetime\(['"]now['"]\)/gi, 'NOW()')
-    .replace(/\bTEXT DEFAULT \(NOW\(\)\)/g, 'TIMESTAMP DEFAULT NOW()');
+      .replace(/INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT/g, 'SERIAL PRIMARY KEY')
+      .replace(/datetime\s*\(\s*['"]now['"]\s*\)/gi, 'NOW()')
+      .replace(/\bTEXT\s+DEFAULT\s+\(NOW\(\)\)/g, 'TIMESTAMP DEFAULT NOW()');
 }
 
 module.exports = { SCHEMA, toPgSchema };
