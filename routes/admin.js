@@ -14,6 +14,7 @@ const paymentRepo = require('../db/repos/payments');
 const emailLogRepo = require('../db/repos/emailLog');
 const cardsRepo = require('../db/repos/cards');
 const settingsRepo = require('../db/repos/settings');
+const logger = require('../services/logger');
 const isDevOrTest = ['development', 'test', 'dev'].includes(process.env.NODE_ENV);
 
 async function handleUpload(file, folder) {
@@ -48,13 +49,13 @@ router.post('/login', async (req, res) => {
     const otp = await authService.generateAndStoreOtp(admin.id);
 
     if (isDevOrTest) {
-      console.log(`DEV OTP for ${admin.email}: ${otp}`);
+      logger.debug('DEV OTP', {email: admin.email, otp});
     } else {
       try {
         const emailService = require('../services/email');
         await emailService.sendOtpEmail({ to: admin.email, toName: `${admin.first_name} ${admin.last_name}`, otp });
       } catch (e) {
-        console.error('OTP email error:', e);
+        logger.error('OTP email failed', {error: e.message, email: admin.email});
       }
     }
   }
@@ -106,13 +107,13 @@ router.post('/login/resend', async (req, res) => {
     const otp = await authService.generateAndStoreOtp(admin.id);
 
     if (isDevOrTest) {
-      console.log(`DEV OTP for ${admin.email}: ${otp}`);
+      logger.debug('DEV OTP resend', {email: admin.email, otp});
     } else {
       try {
         const emailService = require('../services/email');
         await emailService.sendOtpEmail({ to: admin.email, toName: `${admin.first_name} ${admin.last_name}`, otp });
       } catch (e) {
-        console.error('OTP resend error:', e);
+        logger.error('OTP resend email failed', {error: e.message, email: admin.email});
       }
     }
   }
@@ -321,9 +322,10 @@ router.post('/members/:id/card', async (req, res) => {
     const { generatePDF, generatePNG } = require('../services/card');
     await generatePDF(member);
     await generatePNG(member);
+    (req.logger || logger).info('Card generated', {memberId: member.id, memberNumber: member.member_number});
     req.session.flash_success = 'Membership card generated.';
   } catch (e) {
-    console.error('Card gen error:', e);
+    (req.logger || logger).error('Card generation failed', {error: e.message, stack: e.stack, memberId: member.id});
     req.session.flash_error = 'Card generation failed: ' + e.message;
   }
   res.redirect(`/admin/members/${req.params.id}`);
@@ -347,10 +349,34 @@ router.post('/members/:id/email-card', async (req, res) => {
   try {
     const emailService = require('../services/email');
     await emailService.sendCardEmail(member);
+    (req.logger || logger).info('Card emailed', {memberId: member.id, email: member.email});
     req.session.flash_success = 'Card emailed to member.';
   } catch (e) {
-    console.error('Email card error:', e);
+    (req.logger || logger).error('Card email failed', {error: e.message, memberId: member.id});
     req.session.flash_error = 'Failed to email card: ' + e.message;
+  }
+  res.redirect(`/admin/members/${req.params.id}`);
+});
+
+// --- Send Renewal Reminder ---
+router.post('/members/:id/send-renewal', async (req, res) => {
+  const member = await memberRepo.findById(req.params.id);
+  if (!member) {
+    req.session.flash_error = 'Member not found.';
+    return res.redirect('/admin/members');
+  }
+  try {
+    const renewalService = require('../services/renewal');
+    const emailService = require('../services/email');
+    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const token = await renewalService.generateRenewalToken(member.id);
+    const renewalLink = `${baseUrl}/renew/${token}`;
+    await emailService.sendRenewalReminderEmail(member, renewalLink);
+    (req.logger || logger).info('Renewal reminder sent', {memberId: member.id, email: member.email});
+    req.session.flash_success = `Renewal reminder sent to ${member.email}.`;
+  } catch (e) {
+    (req.logger || logger).error('Renewal reminder failed', {error: e.message, stack: e.stack, memberId: member.id});
+    req.session.flash_error = 'Failed to send renewal reminder: ' + e.message;
   }
   res.redirect(`/admin/members/${req.params.id}`);
 });
@@ -368,13 +394,41 @@ router.post('/members/:id/payments', async (req, res) => {
   }
 
   const amountCents = Math.round(dollars * 100);
+  const isActivating = activate_member === 'on' && member.status !== 'active';
   await paymentsService.recordOfflinePayment({
     memberId: member.id,
     amountCents,
     paymentMethod: payment_method,
     description,
-    activateMember: activate_member === 'on' && member.status !== 'active',
+    activateMember: isActivating,
   });
+
+  (req.logger || logger).info('Offline payment recorded', {
+    memberId: member.id,
+    amountCents,
+    paymentMethod: payment_method || 'cash',
+    activating: isActivating,
+  });
+
+  if (isActivating) {
+    const expiryDate = await settingsRepo.get('membership_expiry_date');
+    if (expiryDate) {
+      await memberRepo.setExpiryDate(member.id, expiryDate);
+      // Also activate and set expiry on family members
+      if (member.membership_type === 'family') {
+        const familyMembers = await memberRepo.findFamilyMembers(member.id);
+        for (const fm of familyMembers) {
+          await memberRepo.activate(fm.id);
+          await memberRepo.setExpiryDate(fm.id, expiryDate);
+        }
+      }
+    }
+    (req.logger || logger).info('Member activated via offline payment', {
+      memberId: member.id,
+      memberNumber: member.member_number,
+      expiryDate: await settingsRepo.get('membership_expiry_date'),
+    });
+  }
 
   req.session.flash_success = `Payment of $${dollars.toFixed(2)} recorded.`;
   res.redirect(`/admin/members/${req.params.id}`);
@@ -527,6 +581,7 @@ router.post('/settings', requireSuperAdmin, async (req, res) => {
     'hero_media_type',
     'about_quote', 'about_text', 'gallery_album_url', 'dues_amount_cents',
     'contact_email', 'stripe_publishable_key',
+    'membership_expiry_date', 'renewal_reminder_days_before',
   ];
   const keyValues = {};
   for (const key of keys) {
@@ -593,6 +648,31 @@ router.get('/emails', async (req, res, next) => {
   }
 });
 
+// --- Renewal reminders ---
+router.get('/emails/renewal', async (req, res, next) => {
+  try {
+    const renewalService = require('../services/renewal');
+    const members = await renewalService.findMembersNeedingRenewal();
+    const expiryDate = await settingsRepo.get('membership_expiry_date') || '';
+    const daysBefore = await settingsRepo.get('renewal_reminder_days_before') || '30';
+    res.render('admin/emails/renewal', {count: members.length, expiryDate, daysBefore});
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/emails/renewal', async (req, res) => {
+  try {
+    const renewalService = require('../services/renewal');
+    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const result = await renewalService.sendBulkRenewalReminders(baseUrl);
+    req.session.flash_success = `Renewal reminders sent: ${result.sent} sent, ${result.failed} failed (${result.total} eligible).`;
+  } catch (e) {
+    req.session.flash_error = 'Failed to send renewal reminders: ' + e.message;
+  }
+  res.redirect('/admin/emails');
+});
+
 // --- Email blast ---
 router.get('/emails/blast', async (req, res, next) => {
   try {
@@ -618,11 +698,17 @@ router.post('/emails/blast', async (req, res) => {
         await emailService.sendBlastEmail(member, subject, body_html);
         sent++;
       } catch (e) {
-        console.error(`Blast email failed for ${member.email}:`, e.message);
+        (req.logger || logger).error('Blast email failed', {
+          error: e.message,
+          memberId: member.id,
+          email: member.email
+        });
       }
     }
+    (req.logger || logger).info('Email blast completed', {sent, total: members.length, subject});
     req.session.flash_success = `Blast sent to ${sent} of ${members.length} members.`;
   } catch (e) {
+    (req.logger || logger).error('Email blast failed', {error: e.message, stack: e.stack});
     req.session.flash_error = 'Blast failed: ' + e.message;
   }
   res.redirect('/admin/emails');

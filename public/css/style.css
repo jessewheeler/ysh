@@ -360,7 +360,7 @@ blockquote {
   font-size: 1rem;
 }
 
-.form-group input,
+.form-group input:not([type="checkbox"]):not([type="radio"]),
 .form-group textarea {
   width: 100%;
   padding: 0.875rem 1rem;
@@ -580,7 +580,7 @@ footer {
     gap: 2rem;
   }
 
-  .form-group input,
+  .form-group input:not([type="checkbox"]):not([type="radio"]),
   .form-group textarea {
     font-size: 16px; /* Prevents iOS zoom on focus */
   }

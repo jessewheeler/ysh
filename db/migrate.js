@@ -13,12 +13,12 @@ async function migrate() {
   // then runs incremental ALTER TABLEs for existing databases missing newer columns.
   await db.exec(SCHEMA);
 
-  // Migrate emails_log CHECK constraint to include 'otp' type.
-  // SQLite can't ALTER constraints, so we swap the table if it lacks the 'otp' type.
-  const hasOtp = await db.get(
+  // Migrate emails_log CHECK constraint to include 'otp' and 'renewal_reminder' types.
+  // SQLite can't ALTER constraints, so we swap the table if it lacks the latest type.
+  const emailsLogSchema = await db.get(
     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
   );
-  if (hasOtp && !hasOtp.sql.includes("'otp'")) {
+  if (emailsLogSchema && !emailsLogSchema.sql.includes("'renewal_reminder'")) {
     await db.exec(`
       CREATE TABLE IF NOT EXISTS emails_log_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,7 +26,9 @@ async function migrate() {
         to_name TEXT,
         subject TEXT,
         body_html TEXT,
-        email_type TEXT CHECK(email_type IN ('welcome','payment_confirmation','card_delivery','blast','contact','otp')),
+        email_type TEXT CHECK (email_type IN
+                               ('welcome', 'payment_confirmation', 'card_delivery', 'blast', 'contact', 'otp',
+                                'renewal_reminder')),
         status TEXT NOT NULL DEFAULT 'sent',
         error TEXT,
         member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
@@ -170,6 +172,20 @@ async function migrate() {
     logger.info('Added join_date column to members table');
   } catch (_e) {
     // Column already exists
+  }
+
+  // Add renewal reminder columns
+  try {
+    await db.exec("ALTER TABLE members ADD COLUMN expiry_date TEXT");
+  } catch (_e) { /* Column already exists */
+  }
+  try {
+    await db.exec("ALTER TABLE members ADD COLUMN renewal_token TEXT");
+  } catch (_e) { /* Column already exists */
+  }
+  try {
+    await db.exec("ALTER TABLE members ADD COLUMN renewal_token_expires_at TEXT");
+  } catch (_e) { /* Column already exists */
   }
 
   logger.info('Database migration complete');

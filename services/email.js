@@ -3,6 +3,7 @@ const path = require('path');
 const settingsRepo = require('../db/repos/settings');
 const emailLogRepo = require('../db/repos/emailLog');
 const cardsRepo = require('../db/repos/cards');
+const logger = require('./logger');
 
 const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@yellowstoneseahawkers.com';
@@ -63,7 +64,7 @@ async function logEmail({ to_email, to_name, subject, body_html, email_type, sta
       member_id: safeMemberId
     });
   } catch (err) {
-    console.error('Failed to log email to DB:', err);
+    logger.error('Failed to log email to DB', {error: err.message});
   }
 }
 
@@ -113,7 +114,7 @@ async function sendEmail({ to, toName, subject, html, email_type, member_id, att
     await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'sent', member_id });
   } catch (err) {
     const errMsg = err.message || String(err);
-    console.error(`MailerSend error (${email_type}):`, errMsg);
+    logger.error('MailerSend send failed', {email_type, error: errMsg});
     await logEmail({ to_email: to, to_name: toName, subject, body_html: html, email_type, status: 'failed', error: errMsg, member_id });
     throw err;
   }
@@ -242,6 +243,36 @@ async function sendOtpEmail({ to, toName, otp }) {
   });
 }
 
+async function sendRenewalReminderEmail(member, renewalLink) {
+  const expiryDisplay = member.expiry_date
+      ? new Date(member.expiry_date).toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'})
+      : 'soon';
+  const html = `
+    <h2 style="color:#002a5c;">Time to Renew Your YSH Membership</h2>
+    <p>Hi ${member.first_name},</p>
+    <p>Your Yellowstone Sea Hawkers membership is coming up for renewal. Don't miss out on another great season with your fellow 12s!</p>
+    <table style="margin:20px 0; font-size:14px;">
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Member Number:</td><td>${member.member_number || 'N/A'}</td></tr>
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Membership Type:</td><td style="text-transform:capitalize;">${member.membership_type || 'individual'}</td></tr>
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Expiry Date:</td><td>${expiryDisplay}</td></tr>
+    </table>
+    <p>Click the button below to renew. Your information is already filled in — just review, update if needed, and complete payment.</p>
+    <p style="text-align:center; margin:30px 0;">
+      <a href="${renewalLink}" style="background:#002a5c; color:#fff; padding:14px 28px; text-decoration:none; border-radius:4px; font-size:16px; font-weight:bold; display:inline-block;">Renew My Membership</a>
+    </p>
+    <p style="font-size:13px; color:#666;">This link is unique to your account and expires in 60 days. If you have questions, reply to this email or contact us at info@yellowstoneseahawkers.com.</p>
+    <p style="color:#69be28; font-weight:bold; font-size:18px;">Go Hawks!</p>
+  `;
+  await sendEmail({
+    to: member.email,
+    toName: `${member.first_name} ${member.last_name}`,
+    subject: 'Renew Your YSH Membership',
+    html,
+    email_type: 'renewal_reminder',
+    member_id: member.id,
+  });
+}
+
 async function sendContactEmail({ name, email, message }) {
   const contactTo = await getContactEmail() ?? 'jesse.stuart.wheeler@gmail.com';
   const html = `
@@ -268,4 +299,5 @@ module.exports = {
   sendBlastEmail,
   sendOtpEmail,
   sendContactEmail,
+  sendRenewalReminderEmail,
 };

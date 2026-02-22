@@ -39,7 +39,24 @@ router.post('/webhook', async (req, res) => {
         }
       }
 
-      // 4. Generate cards for all members
+      // 4. Set expiry_date + membership_year for all activated members and clear renewal token on primary
+      try {
+        const settingsRepo = require('../db/repos/settings');
+        const expiryDate = await settingsRepo.get('membership_expiry_date');
+        const currentYear = new Date().getFullYear();
+        const allIds = [memberId, ...familyMembers.map(fm => fm.id)];
+        for (const id of allIds) {
+          if (expiryDate) {
+            await memberRepo.setExpiryDate(id, expiryDate);
+          }
+          await memberRepo.setMembershipYear(id, currentYear);
+        }
+        await memberRepo.clearRenewalToken(memberId);
+      } catch (e) {
+        logger.error('Error setting expiry date or clearing renewal token', {error: e.message});
+      }
+
+      // 5. Generate cards for all members
       const allMembers = [primaryMember, ...familyMembers];
       for (const member of allMembers) {
         try {
@@ -55,7 +72,7 @@ router.post('/webhook', async (req, res) => {
         }
       }
 
-      // 5. Send emails
+      // 6. Send emails
       try {
         const emailService = require('../services/email');
 

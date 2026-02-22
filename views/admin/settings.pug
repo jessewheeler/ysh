@@ -67,5 +67,15 @@ block content
       label(for="stripe_publishable_key") Stripe Publishable Key (for frontend)
       input#stripe_publishable_key(type="text" name="stripe_publishable_key" value=(site.stripe_publishable_key || ''))
 
+    h3 Renewal Reminders
+    .form-group
+      label(for="membership_expiry_date") Membership Expiry Date
+      input#membership_expiry_date(type="date" name="membership_expiry_date" value=(site.membership_expiry_date || ''))
+      p.text-muted The date when memberships expire. Used to set expiry on activation and to target renewal reminder emails.
+    .form-group
+      label(for="renewal_reminder_days_before") Send Reminders (days before expiry)
+      input#renewal_reminder_days_before(type="number" name="renewal_reminder_days_before" value=(site.renewal_reminder_days_before || '30') min="1" max="365")
+      p.text-muted Members with expiry dates within this many days will be included in renewal reminder sends.
+
     .form-actions
       button.btn(type="submit") Save Settings
