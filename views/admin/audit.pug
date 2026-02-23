@@ -1,0 +1,184 @@
+extends layout
+
+block page_title
+    | Audit Log
+
+block content
+    .audit-filters
+        form(method="GET" action="/admin/audit")
+            label(for="table-filter") Table:
+            select#table-filter(name="table" onchange="this.form.submit()")
+                option(value="" selected=(tableName === '')) All tables
+                each t in tables
+                    option(value=t selected=(tableName === t))= t
+            noscript
+                button(type="submit") Filter
+
+    p.audit-meta Showing #{rows.length} of #{total} entries
+
+    if rows.length === 0
+        p.empty-state No audit entries found.
+    else
+        .table-responsive
+            table.admin-table
+                thead
+                    tr
+                        th When
+                        th Table
+                        th Record
+                        th Action
+                        th Actor
+                        th Changes
+                tbody
+                    each entry in rows
+                        - const oldObj = entry.old_values ? JSON.parse(entry.old_values) : null
+                        - const newObj = entry.new_values ? JSON.parse(entry.new_values) : null
+                        - const changedKeys = newObj && oldObj ? Object.keys(newObj).filter(k => JSON.stringify(newObj[k]) !== JSON.stringify(oldObj[k])) : (newObj ? Object.keys(newObj) : (oldObj ? Object.keys(oldObj) : []))
+                        tr
+                            td.audit-ts= entry.changed_at
+                            td
+                                code= entry.table_name
+                            td
+                                code= entry.record_id
+                            td
+                                span(class=`audit-badge audit-badge--${entry.action.toLowerCase()}`)= entry.action
+                            td= entry.actor_email || '(system)'
+                            td
+                                if entry.action === 'INSERT' && newObj
+                                    details
+                                        summary #{Object.keys(newObj).length} fields set
+                                        pre.audit-json= JSON.stringify(newObj, null, 2)
+                                else if entry.action === 'DELETE' && oldObj
+                                    details
+                                        summary #{Object.keys(oldObj).length} fields removed
+                                        pre.audit-json= JSON.stringify(oldObj, null, 2)
+                                else if entry.action === 'UPDATE'
+                                    if changedKeys.length === 0
+                                        span.muted (no field changes)
+                                    else
+                                        details
+                                            summary #{changedKeys.length} field(s) changed
+                                            table.audit-diff
+                                                thead
+                                                    tr
+                                                        th Field
+                                                        th Before
+                                                        th After
+                                                tbody
+                                                    each k in changedKeys
+                                                        tr
+                                                            td
+                                                                code= k
+                                                            td.audit-old= oldObj ? JSON.stringify(oldObj[k]) : '—'
+                                                            td.audit-new= newObj ? JSON.stringify(newObj[k]) : '—'
+                                else
+                                    span —
+
+    if totalPages > 1
+        .pagination
+            if page > 1
+                a(href=`/admin/audit?page=${page - 1}&table=${tableName}`) &laquo; Prev
+            span Page #{page} of #{totalPages}
+            if page < totalPages
+                a(href=`/admin/audit?page=${page + 1}&table=${tableName}`) Next &raquo;
+
+style.
+    .audit-filters {
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+    }
+
+    .audit-filters select {
+        padding: .3rem .5rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    .audit-meta {
+        color: #666;
+        font-size: .875rem;
+        margin-bottom: .5rem;
+    }
+
+    .audit-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: .75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .audit-badge--insert {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .audit-badge--update {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .audit-badge--delete {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .audit-ts {
+        white-space: nowrap;
+        font-size: .8rem;
+        color: #555;
+    }
+
+    .audit-json {
+        max-height: 300px;
+        overflow: auto;
+        background: #f8f8f8;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: .5rem;
+        font-size: .75rem;
+        white-space: pre-wrap;
+    }
+
+    .audit-diff {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: .8rem;
+        margin-top: .4rem;
+    }
+
+    .audit-diff th, .audit-diff td {
+        padding: .2rem .5rem;
+        border: 1px solid #e5e7eb;
+    }
+
+    .audit-diff th {
+        background: #f3f4f6;
+        font-weight: 600;
+    }
+
+    .audit-old {
+        color: #991b1b;
+        background: #fff5f5;
+        word-break: break-all;
+    }
+
+    .audit-new {
+        color: #065f46;
+        background: #f0fff4;
+        word-break: break-all;
+    }
+
+    .muted {
+        color: #888;
+        font-size: .85rem;
+    }
+
+    details summary {
+        cursor: pointer;
+        font-size: .85rem;
+        color: #4b5563;
+    }

@@ -188,6 +188,47 @@ async function migrate() {
   } catch (_e) { /* Column already exists */
   }
 
+  // Add audit columns (created_by / updated_by) to all tables
+  const auditAlters = [
+    "ALTER TABLE members ADD COLUMN created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    "ALTER TABLE members ADD COLUMN updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    "ALTER TABLE payments ADD COLUMN created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    "ALTER TABLE payments ADD COLUMN updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    "ALTER TABLE announcements ADD COLUMN created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    "ALTER TABLE announcements ADD COLUMN updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    "ALTER TABLE gallery_images ADD COLUMN updated_at TEXT",
+    "ALTER TABLE gallery_images ADD COLUMN created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    "ALTER TABLE gallery_images ADD COLUMN updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    "ALTER TABLE bios ADD COLUMN created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    "ALTER TABLE bios ADD COLUMN updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    "ALTER TABLE site_settings ADD COLUMN updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    "ALTER TABLE emails_log ADD COLUMN created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    "ALTER TABLE membership_cards ADD COLUMN created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+  ];
+  for (const sql of auditAlters) {
+    try {
+      await db.exec(sql);
+    } catch (_e) { /* Column already exists */
+    }
+  }
+
+  // Create audit_log table and indexes (idempotent)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      table_name TEXT NOT NULL,
+      record_id TEXT NOT NULL,
+      action TEXT NOT NULL CHECK(action IN ('INSERT', 'UPDATE', 'DELETE')),
+      actor_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+      actor_email TEXT,
+      old_values TEXT,
+      new_values TEXT,
+      changed_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_audit_log_table_record ON audit_log(table_name, record_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_changed_at ON audit_log(changed_at);
+  `);
+
   logger.info('Database migration complete');
 }
 

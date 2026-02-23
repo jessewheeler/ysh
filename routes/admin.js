@@ -14,6 +14,7 @@ const paymentRepo = require('../db/repos/payments');
 const emailLogRepo = require('../db/repos/emailLog');
 const cardsRepo = require('../db/repos/cards');
 const settingsRepo = require('../db/repos/settings');
+const auditLogRepo = require('../db/repos/auditLog');
 const logger = require('../services/logger');
 const isDevOrTest = ['development', 'test', 'dev'].includes(process.env.NODE_ENV);
 
@@ -712,6 +713,22 @@ router.post('/emails/blast', async (req, res) => {
     req.session.flash_error = 'Blast failed: ' + e.message;
   }
   res.redirect('/admin/emails');
+});
+
+// --- Audit log (super_admin only) ---
+router.get('/audit', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = 50;
+    const offset = (page - 1) * limit;
+    const tableName = req.query.table || '';
+    const {rows, total} = await auditLogRepo.list({limit, offset, tableName: tableName || undefined});
+    const totalPages = Math.ceil(total / limit);
+    const tables = ['members', 'payments', 'announcements', 'bios', 'gallery_images', 'site_settings', 'emails_log', 'membership_cards'];
+    res.render('admin/audit', {rows, page, totalPages, total, tableName, tables});
+  } catch (err) {
+    next(err);
+  }
 });
 
 // --- Admin management (super_admin only) ---

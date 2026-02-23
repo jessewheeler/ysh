@@ -1,19 +1,47 @@
 const db = require('../database');
+const {getActor} = require('../audit-context');
+const auditLog = require('./auditLog');
 
 async function create({ member_id, stripe_session_id, amount_cents, currency, status, description, payment_method }) {
-  return await db.run(
-    `INSERT INTO payments (member_id, stripe_session_id, amount_cents, currency, status, description, payment_method)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    member_id, stripe_session_id || null, amount_cents, currency || 'usd', status || 'pending', description || null, payment_method || 'stripe'
+    const actor = getActor();
+    const result = await db.run(
+        `INSERT INTO payments (member_id, stripe_session_id, amount_cents, currency, status, description,
+                               payment_method, created_by, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        member_id, stripe_session_id || null, amount_cents, currency || 'usd', status || 'pending', description || null, payment_method || 'stripe', actor.id || null, actor.id || null
   );
+    const row = await db.get('SELECT * FROM payments WHERE id = ?', result.lastInsertRowid);
+    await auditLog.insert({
+        tableName: 'payments',
+        recordId: result.lastInsertRowid,
+        action: 'INSERT',
+        actor,
+        oldValues: null,
+        newValues: row
+    });
+    return result;
 }
 
 async function completeBySessionId(sessionId, paymentIntent) {
-  return await db.run(
-    `UPDATE payments SET status = 'completed', stripe_payment_intent = ?, updated_at = datetime('now')
+    const actor = getActor();
+    const old = await db.get('SELECT * FROM payments WHERE stripe_session_id = ?', sessionId);
+    const result = await db.run(
+        `UPDATE payments SET status = 'completed', stripe_payment_intent = ?, updated_at = datetime('now'), updated_by = ?
      WHERE stripe_session_id = ?`,
-    paymentIntent, sessionId
+        paymentIntent, actor.id || null, sessionId
   );
+    if (old) {
+        const row = await db.get('SELECT * FROM payments WHERE id = ?', old.id);
+        await auditLog.insert({
+            tableName: 'payments',
+            recordId: old.id,
+            action: 'UPDATE',
+            actor,
+            oldValues: old,
+            newValues: row
+        });
+    }
+    return result;
 }
 
 async function findByMemberId(memberId) {
