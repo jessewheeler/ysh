@@ -3,6 +3,7 @@ html(lang="en")
   head
     meta(charset="UTF-8")
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    meta(name="csrf-token" content=csrfToken)
     title Admin — Yellowstone Sea Hawkers
     link(rel="stylesheet" href="/css/style.css")
     link(rel="stylesheet" href="/css/admin.css")
@@ -45,17 +46,3 @@ html(lang="en")
           block content
 
     script(src="/js/admin.js")
-    script.
-      document.querySelector('.admin-sidebar-toggle').addEventListener('click', function() {
-        document.querySelector('.admin-wrapper').classList.toggle('sidebar-open');
-      });
-      // Auto-inject CSRF tokens into all POST forms
-      document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(form) {
-        if (!form.querySelector('input[name="_csrf"]')) {
-          var input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = '_csrf';
-          input.value = '#{csrfToken}';
-          form.prepend(input);
-        }
-      });

@@ -93,9 +93,10 @@ router.post('/login/verify', async (req, res) => {
   req.session.adminEmail = admin.email;
   delete req.session.otpEmail;
 
-  const returnTo = req.session.returnTo ?? '/admin/dashboard';
+  const returnTo = req.session.returnTo;
   delete req.session.returnTo;
-  res.redirect(returnTo);
+  const safeReturnTo = (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')) ? returnTo : '/admin/dashboard';
+  res.redirect(safeReturnTo);
 });
 
 router.post('/login/resend', async (req, res) => {
@@ -335,13 +336,23 @@ router.post('/members/:id/card', async (req, res) => {
 router.get('/members/:id/card/pdf', async (req, res) => {
   const card = await cardsRepo.findLatestByMemberId(req.params.id);
   if (!card || !card.pdf_path) { req.session.flash_error = 'No card found.'; return res.redirect(`/admin/members/${req.params.id}`); }
-  res.download(path.join(__dirname, '..', card.pdf_path));
+  const cardsDir = path.resolve(__dirname, '..', 'data', 'cards');
+  const resolved = path.resolve(__dirname, '..', card.pdf_path);
+  if (!resolved.startsWith(cardsDir + path.sep) && resolved !== cardsDir) {
+    return res.status(403).send('Invalid file path');
+  }
+  res.download(resolved);
 });
 
 router.get('/members/:id/card/png', async (req, res) => {
   const card = await cardsRepo.findLatestByMemberId(req.params.id);
   if (!card || !card.png_path) { req.session.flash_error = 'No card found.'; return res.redirect(`/admin/members/${req.params.id}`); }
-  res.download(path.join(__dirname, '..', card.png_path));
+  const cardsDir = path.resolve(__dirname, '..', 'data', 'cards');
+  const resolved = path.resolve(__dirname, '..', card.png_path);
+  if (!resolved.startsWith(cardsDir + path.sep) && resolved !== cardsDir) {
+    return res.status(403).send('Invalid file path');
+  }
+  res.download(resolved);
 });
 
 router.post('/members/:id/email-card', async (req, res) => {
@@ -350,7 +361,7 @@ router.post('/members/:id/email-card', async (req, res) => {
   try {
     const emailService = require('../services/email');
     await emailService.sendCardEmail(member);
-    (req.logger || logger).info('Card emailed', {memberId: member.id, email: member.email});
+    (req.logger || logger).info('Card emailed', {memberId: member.id});
     req.session.flash_success = 'Card emailed to member.';
   } catch (e) {
     (req.logger || logger).error('Card email failed', {error: e.message, memberId: member.id});
@@ -373,7 +384,7 @@ router.post('/members/:id/send-renewal', async (req, res) => {
     const token = await renewalService.generateRenewalToken(member.id);
     const renewalLink = `${baseUrl}/renew/${token}`;
     await emailService.sendRenewalReminderEmail(member, renewalLink);
-    (req.logger || logger).info('Renewal reminder sent', {memberId: member.id, email: member.email});
+    (req.logger || logger).info('Renewal reminder sent', {memberId: member.id});
     req.session.flash_success = `Renewal reminder sent to ${member.email}.`;
   } catch (e) {
     (req.logger || logger).error('Renewal reminder failed', {error: e.message, stack: e.stack, memberId: member.id});

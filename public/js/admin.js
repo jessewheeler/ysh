@@ -1,5 +1,27 @@
 // Confirm dialogs for delete actions
 document.addEventListener('DOMContentLoaded', function () {
+    // Sidebar toggle
+    var sidebarToggle = document.querySelector('.admin-sidebar-toggle');
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', function () {
+            document.querySelector('.admin-wrapper').classList.toggle('sidebar-open');
+        });
+    }
+
+    // Auto-inject CSRF tokens into all POST forms using the meta tag
+    var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+    document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function (form) {
+        if (!form.querySelector('input[name="_csrf"]')) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = '_csrf';
+            input.value = csrfToken;
+            form.prepend(input);
+        }
+    });
+
+
   document.querySelectorAll('[data-confirm]').forEach(function (form) {
     form.addEventListener('submit', function (e) {
       if (!confirm(form.dataset.confirm)) {

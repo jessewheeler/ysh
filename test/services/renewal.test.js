@@ -34,7 +34,7 @@ describe('generateRenewalToken', () => {
         expect(updated.renewal_token_expires_at).toBeTruthy();
     });
 
-    test('token expiry is approximately 60 days from now', async () => {
+  test('token expiry is approximately 30 days from now', async () => {
         const testDb = getTestDb();
         const member = insertMember(testDb, {email: 'b@b.com', status: 'active'});
 
@@ -44,10 +44,10 @@ describe('generateRenewalToken', () => {
 
         const updated = testDb.prepare('SELECT renewal_token_expires_at FROM members WHERE id = ?').get(member.id);
         const expiryMs = new Date(updated.renewal_token_expires_at).getTime();
-        const sixtyDaysMs = 60 * 24 * 60 * 60 * 1000;
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
 
-        expect(expiryMs).toBeGreaterThanOrEqual(before + sixtyDaysMs - 1000);
-        expect(expiryMs).toBeLessThanOrEqual(after + sixtyDaysMs + 1000);
+    expect(expiryMs).toBeGreaterThanOrEqual(before + thirtyDaysMs - 1000);
+    expect(expiryMs).toBeLessThanOrEqual(after + thirtyDaysMs + 1000);
     });
 });
 
