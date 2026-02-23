@@ -4,6 +4,7 @@ const contentService = require('../services/content');
 const memberRepo = require('../db/repos/members');
 const settingsRepo = require('../db/repos/settings');
 const logger = require('../services/logger');
+const { requireCaptcha } = require('../middleware/captcha');
 
 // Homepage
 router.get('/', async (req, res, next) => {
@@ -36,7 +37,7 @@ router.get('/membership', async (req, res) => {
 });
 
 // Membership POST — create pending member + redirect to Stripe
-router.post('/membership', async (req, res) => {
+router.post('/membership', requireCaptcha('/membership'), async (req, res) => {
   try {
     const {
       membership_type = 'individual',
@@ -132,7 +133,7 @@ router.get('/membership/cancel', (req, res) => {
 });
 
 // Contact form POST
-router.post('/contact', async (req, res) => {
+router.post('/contact', requireCaptcha('/#contact'), async (req, res) => {
   try {
     const { name, email, message } = req.body;
     if (!name || !email || !message) {

@@ -32,11 +32,11 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://js.stripe.com"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "https://js.stripe.com", "https://js.hcaptcha.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://assets.hcaptcha.com"],
       imgSrc: ["'self'", "data:", "https:", process.env.B2_PUBLIC_URL].filter(Boolean),
-      connectSrc: ["'self'", "https://api.stripe.com"],
-      frameSrc: ["https://js.stripe.com"],
+      connectSrc: ["'self'", "https://api.stripe.com", "https://hcaptcha.com", "https://*.hcaptcha.com"],
+      frameSrc: ["https://js.stripe.com", "https://newassets.hcaptcha.com"],
     },
   },
   crossOriginEmbedderPolicy: false,
