@@ -57,6 +57,9 @@ block content
 
           button.btn-outline(type="button" id="add-family-member") + Add Family Member
 
+        if hcaptchaSiteKey
+          .form-group(style="margin-top: 1.5rem;")
+            .h-captcha(data-sitekey=hcaptchaSiteKey)
         button.btn(type="submit" style="margin-top: 2rem;") Continue to Payment
 
   script.

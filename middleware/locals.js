@@ -17,6 +17,9 @@ async function injectLocals(req, res, next) {
       delete req.session.flash_error;
     }
 
+    // hCaptcha site key (empty string when not configured — widget is hidden)
+    res.locals.hcaptchaSiteKey = process.env.HCAPTCHA_SITE_KEY || '';
+
     // Date formatting helper (handles both SQLite strings and PostgreSQL Date objects)
     res.locals.formatDate = function(date) {
       if (!date) return '';
