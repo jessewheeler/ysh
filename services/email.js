@@ -8,6 +8,16 @@ const logger = require('./logger');
 const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@yellowstoneseahawkers.com';
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+}
+
 async function getContactEmail() {
   const contactEmail = await settingsRepo.get('contact_email');
   return contactEmail || FROM_EMAIL;
@@ -123,11 +133,11 @@ async function sendEmail({ to, toName, subject, html, email_type, member_id, att
 async function sendWelcomeEmail(member) {
   const html = `
     <h2 style="color:#002a5c;">Welcome to the Yellowstone Sea Hawkers!</h2>
-    <p>Hi ${member.first_name},</p>
+    <p>Hi ${escapeHtml(member.first_name)},</p>
     <p>Thank you for joining the Yellowstone Sea Hawkers! We're thrilled to have you as a member.</p>
     <table style="margin:20px 0; font-size:14px;">
-      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Member Number:</td><td>${member.member_number}</td></tr>
-      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Season:</td><td>${member.membership_year}</td></tr>
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Member Number:</td><td>${escapeHtml(member.member_number)}</td></tr>
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Season:</td><td>${escapeHtml(member.membership_year)}</td></tr>
       <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Status:</td><td style="color:#69be28; font-weight:bold;">Active</td></tr>
     </table>
     <p>Your membership card will be sent in a separate email. Look for us at the Red Door Lounge on game days!</p>
@@ -149,12 +159,12 @@ async function sendPaymentConfirmation(member, stripeSession) {
     : 'N/A';
   const html = `
     <h2 style="color:#002a5c;">Payment Confirmation</h2>
-    <p>Hi ${member.first_name},</p>
+    <p>Hi ${escapeHtml(member.first_name)},</p>
     <p>We've received your membership dues payment. Here are your receipt details:</p>
     <table style="margin:20px 0; font-size:14px; border-collapse:collapse;">
-      <tr><td style="padding:8px 15px 8px 0; font-weight:bold; border-bottom:1px solid #eee;">Amount:</td><td style="padding:8px 0; border-bottom:1px solid #eee;">$${amountDollars}</td></tr>
+      <tr><td style="padding:8px 15px 8px 0; font-weight:bold; border-bottom:1px solid #eee;">Amount:</td><td style="padding:8px 0; border-bottom:1px solid #eee;">$${escapeHtml(amountDollars)}</td></tr>
       <tr><td style="padding:8px 15px 8px 0; font-weight:bold; border-bottom:1px solid #eee;">Date:</td><td style="padding:8px 0; border-bottom:1px solid #eee;">${new Date().toLocaleDateString()}</td></tr>
-      <tr><td style="padding:8px 15px 8px 0; font-weight:bold;">Member Number:</td><td style="padding:8px 0;">${member.member_number}</td></tr>
+      <tr><td style="padding:8px 15px 8px 0; font-weight:bold;">Member Number:</td><td style="padding:8px 0;">${escapeHtml(member.member_number)}</td></tr>
     </table>
     <p>Thank you for your support!</p>
   `;
@@ -199,8 +209,8 @@ async function sendCardEmail(member) {
 
   const html = `
     <h2 style="color:#002a5c;">Your Membership Card</h2>
-    <p>Hi ${member.first_name},</p>
-    <p>Your ${member.membership_year} Yellowstone Sea Hawkers membership card is attached to this email in both PDF and PNG formats.</p>
+    <p>Hi ${escapeHtml(member.first_name)},</p>
+    <p>Your ${escapeHtml(member.membership_year)} Yellowstone Sea Hawkers membership card is attached to this email in both PDF and PNG formats.</p>
     <p>Show it with pride at our next watch party!</p>
     <p style="color:#69be28; font-weight:bold; font-size:18px;">Go Hawks!</p>
   `;
@@ -229,9 +239,9 @@ async function sendBlastEmail(member, subject, bodyHtml) {
 async function sendOtpEmail({ to, toName, otp }) {
   const html = `
     <h2 style="color:#002a5c;">Your Login Code</h2>
-    <p>Hi ${toName},</p>
+    <p>Hi ${escapeHtml(toName)},</p>
     <p>Your one-time login code is:</p>
-    <p style="font-size:32px; font-weight:bold; letter-spacing:8px; color:#002a5c; text-align:center; margin:20px 0;">${otp}</p>
+    <p style="font-size:32px; font-weight:bold; letter-spacing:8px; color:#002a5c; text-align:center; margin:20px 0;">${escapeHtml(otp)}</p>
     <p>This code expires in 10 minutes. If you didn't request this, you can safely ignore this email.</p>
   `;
   await sendEmail({
@@ -249,18 +259,18 @@ async function sendRenewalReminderEmail(member, renewalLink) {
       : 'soon';
   const html = `
     <h2 style="color:#002a5c;">Time to Renew Your YSH Membership</h2>
-    <p>Hi ${member.first_name},</p>
+    <p>Hi ${escapeHtml(member.first_name)},</p>
     <p>Your Yellowstone Sea Hawkers membership is coming up for renewal. Don't miss out on another great season with your fellow 12s!</p>
     <table style="margin:20px 0; font-size:14px;">
-      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Member Number:</td><td>${member.member_number || 'N/A'}</td></tr>
-      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Membership Type:</td><td style="text-transform:capitalize;">${member.membership_type || 'individual'}</td></tr>
-      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Expiry Date:</td><td>${expiryDisplay}</td></tr>
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Member Number:</td><td>${escapeHtml(member.member_number || 'N/A')}</td></tr>
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Membership Type:</td><td style="text-transform:capitalize;">${escapeHtml(member.membership_type || 'individual')}</td></tr>
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Expiry Date:</td><td>${escapeHtml(expiryDisplay)}</td></tr>
     </table>
     <p>Click the button below to renew. Your information is already filled in — just review, update if needed, and complete payment.</p>
     <p style="text-align:center; margin:30px 0;">
       <a href="${renewalLink}" style="background:#002a5c; color:#fff; padding:14px 28px; text-decoration:none; border-radius:4px; font-size:16px; font-weight:bold; display:inline-block;">Renew My Membership</a>
     </p>
-    <p style="font-size:13px; color:#666;">This link is unique to your account and expires in 60 days. If you have questions, reply to this email or contact us at info@yellowstoneseahawkers.com.</p>
+    <p style="font-size:13px; color:#666;">This link is unique to your account and expires in 30 days. If you have questions, reply to this email or contact us at info@yellowstoneseahawkers.com.</p>
     <p style="color:#69be28; font-weight:bold; font-size:18px;">Go Hawks!</p>
   `;
   await sendEmail({
@@ -274,13 +284,13 @@ async function sendRenewalReminderEmail(member, renewalLink) {
 }
 
 async function sendContactEmail({ name, email, message }) {
-  const contactTo = await getContactEmail() ?? 'jesse.stuart.wheeler@gmail.com';
+  const contactTo = await getContactEmail();
   const html = `
     <h2 style="color:#002a5c;">New Contact Form Submission</h2>
     <table style="margin:20px 0; font-size:14px;">
-      <tr><td style="padding:5px 15px 5px 0; font-weight:bold; vertical-align:top;">From:</td><td>${name}</td></tr>
-      <tr><td style="padding:5px 15px 5px 0; font-weight:bold; vertical-align:top;">Email:</td><td><a href="mailto:${email}">${email}</a></td></tr>
-      <tr><td style="padding:5px 15px 5px 0; font-weight:bold; vertical-align:top;">Message:</td><td>${message.replace(/\n/g, '<br>')}</td></tr>
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold; vertical-align:top;">From:</td><td>${escapeHtml(name)}</td></tr>
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold; vertical-align:top;">Email:</td><td><a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></td></tr>
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold; vertical-align:top;">Message:</td><td>${escapeHtml(message).replace(/\n/g, '<br>')}</td></tr>
     </table>
   `;
   await sendEmail({

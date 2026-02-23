@@ -6,7 +6,7 @@ const logger = require('./logger');
 
 async function generateRenewalToken(memberId) {
     const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(); // 60 days
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
     await membersRepo.setRenewalToken(memberId, token, expiresAt);
     return token;
 }
@@ -31,7 +31,6 @@ async function sendBulkRenewalReminders(baseUrl) {
             logger.error('Renewal reminder failed for member', {
                 error: e.message,
                 memberId: member.id,
-                email: member.email
             });
             failed++;
         }

@@ -29,12 +29,22 @@ for (const dir of ['data', 'data/cards', 'data/uploads']) {
 
 // Security headers
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://js.stripe.com"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:", process.env.B2_PUBLIC_URL].filter(Boolean),
+      connectSrc: ["'self'", "https://api.stripe.com"],
+      frameSrc: ["https://js.stripe.com"],
+    },
+  },
   crossOriginEmbedderPolicy: false,
 }));
 
 // Rate limiters
 const isTest = process.env.NODE_ENV === 'test';
+const isDev = process.env.NODE_ENV === 'development';
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isTest ? 1000 : 10,
@@ -91,7 +101,9 @@ if (process.env.DATABASE_URL) {
   const { Pool } = require('pg');
   const sessionPool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false }
+    ssl: process.env.DATABASE_URL.includes('localhost')
+        ? false
+        : {rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false'}
   });
   store = new PgSimpleStore({
     pool: sessionPool,
@@ -104,7 +116,9 @@ if (process.env.DATABASE_URL) {
 
 app.use(session({
   store,
-  secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
+  secret: process.env.SESSION_SECRET || (isTest || isDev ? 'dev-secret-change-me' : (() => {
+    throw new Error('SESSION_SECRET env var is required in production');
+  })()),
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -168,6 +182,8 @@ app.use(injectLocals);
 
 // Apply rate limiters to specific routes
 app.use('/admin/login', loginLimiter);
+app.use('/admin/login/verify', loginLimiter);
+app.use('/admin/login/resend', loginLimiter);
 app.use('/membership', formLimiter);
 app.use('/contact', formLimiter);
 

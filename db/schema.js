@@ -282,9 +282,9 @@ const SCHEMA = `
  */
 function toPgSchema(sql) {
   return sql
-    .replace(/INTEGER PRIMARY KEY AUTOINCREMENT/g, 'SERIAL PRIMARY KEY')
-    .replace(/datetime\(['"]now['"]\)/gi, 'NOW()')
-    .replace(/\bTEXT DEFAULT \(NOW\(\)\)/g, 'TIMESTAMP DEFAULT NOW()');
+      .replace(/INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT/g, 'SERIAL PRIMARY KEY')
+      .replace(/datetime\s*\(\s*['"]now['"]\s*\)/gi, 'NOW()')
+      .replace(/\bTEXT\s+DEFAULT\s+\(NOW\(\)\)/g, 'TIMESTAMP DEFAULT NOW()');
 }
 
 module.exports = { SCHEMA, toPgSchema };
