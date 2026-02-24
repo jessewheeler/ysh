@@ -32,11 +32,13 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://js.stripe.com"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "https://js.stripe.com", "https://js.hcaptcha.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://assets.hcaptcha.com"],
       imgSrc: ["'self'", "data:", "https:", process.env.B2_PUBLIC_URL].filter(Boolean),
-      connectSrc: ["'self'", "https://api.stripe.com"],
-      frameSrc: ["https://js.stripe.com"],
+      connectSrc: ["'self'", "https://api.stripe.com", "https://hcaptcha.com", "https://*.hcaptcha.com"],
+      frameSrc: ["https://js.stripe.com", "https://newassets.hcaptcha.com"],
+      formAction: ["'self'", "https://checkout.stripe.com"],
+      upgradeInsecureRequests: process.env.NODE_ENV === 'development' ? null : [],
     },
   },
   crossOriginEmbedderPolicy: false,
@@ -64,9 +66,15 @@ const formLimiter = rateLimit({
 // Stripe webhook needs raw body — must be before express.json()
 app.use('/stripe/webhook', express.raw({ type: 'application/json' }));
 
-// Body parsing
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body parsing — explicitly skip /stripe/webhook so express.json() never overwrites the raw Buffer
+app.use((req, res, next) => {
+  if (req.path === '/stripe/webhook') return next();
+  express.json()(req, res, next);
+});
+app.use((req, res, next) => {
+  if (req.path === '/stripe/webhook') return next();
+  express.urlencoded({extended: true})(req, res, next);
+});
 
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));

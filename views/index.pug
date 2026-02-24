@@ -97,4 +97,7 @@ block content
         .form-group
           label(for="message") Message
           textarea#message(name="message" rows="5" placeholder="Your message" required)
+        if hcaptchaSiteKey
+          .form-group
+            .h-captcha(data-sitekey=hcaptchaSiteKey)
         button.btn(type="submit") Send Message
