@@ -131,6 +131,55 @@ describe('sendCardEmail', () => {
     const log = await db.get("SELECT * FROM emails_log WHERE email_type = 'card_delivery'");
     expect(log).toBeDefined();
   });
+
+    test('fetches attachment from B2 URL when card paths are http URLs', async () => {
+        const testDb = db.__getCurrentDb();
+        insertCard(testDb, {
+            member_id: testMember.id,
+            pdf_path: 'https://b2.example.com/cards/card-1-2025.pdf',
+            png_path: 'https://b2.example.com/cards/card-1-2025.png',
+            year: 2025,
+        });
+
+        const fakeBuffer = Buffer.from('card-data');
+        global.fetch = jest.fn().mockImplementation((url) => {
+            if (url.startsWith('https://b2.example.com')) {
+                return Promise.resolve({
+                    ok: true,
+                    arrayBuffer: () => Promise.resolve(fakeBuffer.buffer),
+                });
+            }
+            return Promise.resolve({ok: true, status: 202});
+        });
+
+        await emailService.sendCardEmail(testMember);
+
+        // Should have fetched both card files from B2
+        const b2Calls = global.fetch.mock.calls.filter(([url]) => url.startsWith('https://b2.example.com'));
+        expect(b2Calls).toHaveLength(2);
+    });
+
+    test('sends email even when B2 URL card fetch fails', async () => {
+        const testDb = db.__getCurrentDb();
+        insertCard(testDb, {
+            member_id: testMember.id,
+            pdf_path: 'https://b2.example.com/cards/card-1-2025.pdf',
+            png_path: null,
+            year: 2025,
+        });
+
+        global.fetch = jest.fn().mockImplementation((url) => {
+            if (url.startsWith('https://b2.example.com')) {
+                return Promise.resolve({ok: false, status: 404});
+            }
+            return Promise.resolve({ok: true, status: 202});
+        });
+
+        await emailService.sendCardEmail(testMember);
+        expect(global.fetch).toHaveBeenCalled();
+        const log = await db.get("SELECT * FROM emails_log WHERE email_type = 'card_delivery'");
+        expect(log).toBeDefined();
+    });
 });
 
 describe('sendBlastEmail', () => {

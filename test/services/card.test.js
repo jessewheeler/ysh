@@ -41,7 +41,7 @@ jest.mock('pdfkit', () => {
   }));
 });
 
-// Mock fs — use jest.requireActual inside the factory to avoid out-of-scope variable issue
+// Mock fs
 jest.mock('fs', () => {
   const actual = jest.requireActual('fs');
   return {
@@ -49,13 +49,19 @@ jest.mock('fs', () => {
     writeFileSync: jest.fn(),
     existsSync: jest.fn().mockReturnValue(true),
     mkdirSync: jest.fn(),
-    createWriteStream: jest.fn(),
   };
 });
+
+// Mock storage — default to not configured (local path)
+jest.mock('../../services/storage', () => ({
+    isConfigured: jest.fn().mockReturnValue(false),
+    uploadFileAtKey: jest.fn(),
+}));
 
 jest.mock('../../db/database', () => require('../helpers/setupDb'));
 
 const fs = require('fs');
+const storage = require('../../services/storage');
 const db = require('../../db/database');
 const { insertMember, insertCard } = require('../helpers/fixtures');
 
@@ -71,18 +77,18 @@ beforeEach(() => {
   fs.writeFileSync.mockImplementation(() => {});
   fs.mkdirSync.mockImplementation(() => {});
 
-  // Setup createWriteStream to emit 'finish' when piped to
-  const { EventEmitter } = require('events');
-  const mockStream = new EventEmitter();
-  mockStream.path = '/fake/path';
-  fs.createWriteStream.mockReturnValue(mockStream);
+    // Default storage: not configured
+    storage.isConfigured.mockReturnValue(false);
 
-  // When doc.end() is called, emit 'finish' on the stream
+    // When doc.end() is called, emit 'end' on the piped-to PassThrough stream
   mockPdfEnd.mockImplementation(() => {
-    process.nextTick(() => mockStream.emit('finish'));
+      process.nextTick(() => {
+          const pipedTo = mockPdfPipe.mock.calls[mockPdfPipe.mock.calls.length - 1]?.[0];
+          if (pipedTo && typeof pipedTo.emit === 'function') {
+              pipedTo.emit('end');
+          }
+      });
   });
-
-  mockPdfPipe.mockReturnValue(mockStream);
 
   jest.isolateModules(() => {
     cardService = require('../../services/card');
@@ -144,15 +150,48 @@ describe('generatePNG', () => {
   });
 });
 
+describe('generatePNG with B2 configured', () => {
+    const B2_URL = 'https://f002.backblazeb2.com/file/ysh-cards';
+
+    beforeEach(() => {
+        storage.isConfigured.mockReturnValue(true);
+        storage.uploadFileAtKey.mockResolvedValue(`${B2_URL}/cards/card-${testMember.id}-2025.png`);
+    });
+
+    test('uploads PNG to B2 with deterministic key', async () => {
+        await cardService.generatePNG(testMember);
+        expect(storage.uploadFileAtKey).toHaveBeenCalledWith(
+            expect.any(Buffer),
+            `cards/card-${testMember.id}-2025.png`,
+            'image/png'
+        );
+    });
+
+    test('stores B2 URL in DB', async () => {
+        await cardService.generatePNG(testMember);
+        const card = db.prepare('SELECT * FROM membership_cards WHERE member_id = ?').get(testMember.id);
+        expect(card.png_path).toBe(`${B2_URL}/cards/card-${testMember.id}-2025.png`);
+    });
+
+    test('does not write local file when B2 is configured', async () => {
+        await cardService.generatePNG(testMember);
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+    });
+
+    test('returns B2 URL', async () => {
+        const result = await cardService.generatePNG(testMember);
+        expect(result).toBe(`${B2_URL}/cards/card-${testMember.id}-2025.png`);
+    });
+});
+
 describe('generatePDF', () => {
   test('returns file path with correct name pattern', async () => {
     const result = await cardService.generatePDF(testMember);
     expect(result).toContain(`card-${testMember.id}-2025.pdf`);
   });
 
-  test('pipes to writeStream', async () => {
+    test('pipes PDF to a stream', async () => {
     await cardService.generatePDF(testMember);
-    expect(fs.createWriteStream).toHaveBeenCalled();
     expect(mockPdfPipe).toHaveBeenCalled();
   });
 
@@ -183,4 +222,46 @@ describe('generatePDF', () => {
     await cardService.generatePDF(testMember);
     expect(mockPdfEnd).toHaveBeenCalled();
   });
+
+    test('writes PDF buffer to local file', async () => {
+        await cardService.generatePDF(testMember);
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+            expect.stringContaining(`card-${testMember.id}-2025.pdf`),
+            expect.any(Buffer)
+        );
+    });
+});
+
+describe('generatePDF with B2 configured', () => {
+    const B2_URL = 'https://f002.backblazeb2.com/file/ysh-cards';
+
+    beforeEach(() => {
+        storage.isConfigured.mockReturnValue(true);
+        storage.uploadFileAtKey.mockResolvedValue(`${B2_URL}/cards/card-${testMember.id}-2025.pdf`);
+    });
+
+    test('uploads PDF to B2 with deterministic key', async () => {
+        await cardService.generatePDF(testMember);
+        expect(storage.uploadFileAtKey).toHaveBeenCalledWith(
+            expect.any(Buffer),
+            `cards/card-${testMember.id}-2025.pdf`,
+            'application/pdf'
+        );
+    });
+
+    test('stores B2 URL in DB', async () => {
+        await cardService.generatePDF(testMember);
+        const card = db.prepare('SELECT * FROM membership_cards WHERE member_id = ?').get(testMember.id);
+        expect(card.pdf_path).toBe(`${B2_URL}/cards/card-${testMember.id}-2025.pdf`);
+    });
+
+    test('does not write local file when B2 is configured', async () => {
+        await cardService.generatePDF(testMember);
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+    });
+
+    test('returns B2 URL', async () => {
+        const result = await cardService.generatePDF(testMember);
+        expect(result).toBe(`${B2_URL}/cards/card-${testMember.id}-2025.pdf`);
+    });
 });

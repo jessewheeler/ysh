@@ -49,6 +49,17 @@ async function deleteFile(fileUrl) {
   }));
 }
 
+async function uploadFileAtKey(buffer, key, contentType) {
+    const client = getClient();
+    await client.send(new PutObjectCommand({
+        Bucket: process.env.B2_BUCKET,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+    }));
+    return `${process.env.B2_PUBLIC_URL}/${key}`;
+}
+
 function mimeFromExt(ext) {
   const types = {
     '.jpg': 'image/jpeg',
@@ -56,8 +67,9 @@ function mimeFromExt(ext) {
     '.png': 'image/png',
     '.gif': 'image/gif',
     '.webp': 'image/webp',
+      '.pdf': 'application/pdf',
   };
   return types[ext.toLowerCase()] || 'application/octet-stream';
 }
 
-module.exports = { uploadFile, deleteFile, isConfigured };
+module.exports = {uploadFile, uploadFileAtKey, deleteFile, isConfigured};

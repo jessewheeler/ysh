@@ -1,8 +1,10 @@
 const PDFDocument = require('pdfkit');
 const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs');
+const {PassThrough} = require('stream');
 const path = require('path');
 const cardsRepo = require('../db/repos/cards');
+const storage = require('./storage');
 
 const CARD_WIDTH = 1050;
 const CARD_HEIGHT = 600;
@@ -26,8 +28,6 @@ async function getLogo() {
 }
 
 async function generatePNG(member) {
-  ensureCardsDir();
-
   const canvas = createCanvas(CARD_WIDTH, CARD_HEIGHT);
   const ctx = canvas.getContext('2d');
 
@@ -82,33 +82,39 @@ async function generatePNG(member) {
   ctx.font = 'bold 24px Arial, sans-serif';
   ctx.fillText('Go Hawks!', CARD_WIDTH - 180, CARD_HEIGHT - 15);
 
-  // Save PNG
   const filename = `card-${member.id}-${member.membership_year}.png`;
-  const filePath = path.join(cardsDir, filename);
   const buffer = canvas.toBuffer('image/png');
-  fs.writeFileSync(filePath, buffer);
 
+    if (storage.isConfigured()) {
+        const url = await storage.uploadFileAtKey(buffer, `cards/${filename}`, 'image/png');
+        await cardsRepo.upsertPng(member.id, member.membership_year, url);
+        return url;
+    }
+
+    ensureCardsDir();
+    const filePath = path.join(cardsDir, filename);
+  fs.writeFileSync(filePath, buffer);
   const relativePath = `data/cards/${filename}`;
   await cardsRepo.upsertPng(member.id, member.membership_year, relativePath);
-
   return filePath;
 }
 
 async function generatePDF(member) {
-  ensureCardsDir();
-
   const filename = `card-${member.id}-${member.membership_year}.pdf`;
-  const filePath = path.join(cardsDir, filename);
 
-  return new Promise((resolve, reject) => {
+    const buffer = await new Promise((resolve, reject) => {
     // PDF at 3.5" x 2" (252pt x 144pt) — scaled up for quality
     const doc = new PDFDocument({
       size: [525, 300],
       margins: { top: 0, bottom: 0, left: 0, right: 0 },
     });
 
-    const stream = fs.createWriteStream(filePath);
-    doc.pipe(stream);
+        const chunks = [];
+        const pass = new PassThrough();
+        doc.pipe(pass);
+        pass.on('data', chunk => chunks.push(chunk));
+        pass.on('end', () => resolve(Buffer.concat(chunks)));
+        pass.on('error', reject);
 
     // Navy top stripe
     doc.rect(0, 0, 525, 80).fill(NAVY);
@@ -145,19 +151,20 @@ async function generatePDF(member) {
       .text('Go Hawks!', 430, 279, { width: 80 });
 
     doc.end();
-
-    stream.on('finish', async () => {
-      const relativePath = `data/cards/${filename}`;
-      try {
-        await cardsRepo.upsertPdf(member.id, member.membership_year, relativePath);
-        resolve(filePath);
-      } catch (err) {
-        reject(err);
-      }
     });
 
-    stream.on('error', reject);
-  });
+    if (storage.isConfigured()) {
+        const url = await storage.uploadFileAtKey(buffer, `cards/${filename}`, 'application/pdf');
+        await cardsRepo.upsertPdf(member.id, member.membership_year, url);
+        return url;
+    }
+
+    ensureCardsDir();
+    const filePath = path.join(cardsDir, filename);
+    fs.writeFileSync(filePath, buffer);
+    const relativePath = `data/cards/${filename}`;
+    await cardsRepo.upsertPdf(member.id, member.membership_year, relativePath);
+    return filePath;
 }
 
 module.exports = { generatePDF, generatePNG };
