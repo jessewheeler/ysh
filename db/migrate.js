@@ -5,6 +5,62 @@ const logger = require('../services/logger');
 async function migrate() {
   if (db.dialect === 'pg') {
     await db.exec(toPgSchema(SCHEMA));
+
+    // For existing PG databases created from older schemas, add missing columns idempotently.
+    // PostgreSQL supports ADD COLUMN IF NOT EXISTS (v9.6+).
+    const pgAlters = [
+      // payments: payment_method added for offline payments
+      "ALTER TABLE payments ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'stripe'",
+      // members: admin columns merged from admins table
+      "ALTER TABLE members ADD COLUMN IF NOT EXISTS role TEXT CHECK(role IN ('super_admin','editor'))",
+      "ALTER TABLE members ADD COLUMN IF NOT EXISTS otp_hash TEXT",
+      "ALTER TABLE members ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMP",
+      "ALTER TABLE members ADD COLUMN IF NOT EXISTS otp_attempts INTEGER NOT NULL DEFAULT 0",
+      // members: family membership columns
+      "ALTER TABLE members ADD COLUMN IF NOT EXISTS membership_type TEXT NOT NULL DEFAULT 'individual' CHECK(membership_type IN ('individual','family'))",
+      "ALTER TABLE members ADD COLUMN IF NOT EXISTS primary_member_id INTEGER REFERENCES members(id) ON DELETE CASCADE",
+      // members: join/renewal columns
+      "ALTER TABLE members ADD COLUMN IF NOT EXISTS join_date TIMESTAMP",
+      "ALTER TABLE members ADD COLUMN IF NOT EXISTS expiry_date TIMESTAMP",
+      "ALTER TABLE members ADD COLUMN IF NOT EXISTS renewal_token TEXT",
+      "ALTER TABLE members ADD COLUMN IF NOT EXISTS renewal_token_expires_at TIMESTAMP",
+      // audit columns
+      "ALTER TABLE members ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      "ALTER TABLE members ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      "ALTER TABLE payments ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      "ALTER TABLE payments ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      "ALTER TABLE announcements ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      "ALTER TABLE announcements ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      "ALTER TABLE gallery_images ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      "ALTER TABLE gallery_images ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      "ALTER TABLE bios ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      "ALTER TABLE bios ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      "ALTER TABLE emails_log ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      "ALTER TABLE membership_cards ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    ];
+    for (const sql of pgAlters) {
+      await db.exec(sql);
+    }
+
+    // audit_log table and indexes (idempotent)
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS audit_log
+      (
+        id          SERIAL PRIMARY KEY,
+        table_name  TEXT    NOT NULL,
+        record_id   TEXT    NOT NULL,
+        action      TEXT    NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE')),
+        actor_id    INTEGER REFERENCES members (id) ON DELETE SET NULL,
+        actor_email TEXT,
+        old_values  TEXT,
+        new_values  TEXT,
+        changed_at  TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_log_table_record ON audit_log (table_name, record_id);
+      CREATE INDEX IF NOT EXISTS idx_audit_log_changed_at ON audit_log (changed_at);
+    `);
+
     logger.info('PostgreSQL schema creation complete');
     return;
   }
