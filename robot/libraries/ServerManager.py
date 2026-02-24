@@ -36,6 +36,10 @@ class ServerManager:
         env['BASE_URL'] = base_url
         env['NODE_ENV'] = 'test'
         env['DATABASE_PATH'] = os.path.join(self.project_root, 'data', 'ysh-robot.db')
+        # Force SQLite — set DATABASE_URL to empty string so the app uses SQLite.
+        # dotenv (loaded by server.js) won't override an already-set env var, and an
+        # empty string is falsy in JS so db/database.js will choose the SQLite path.
+        env['DATABASE_URL'] = ''
 
         self.process = subprocess.Popen(
             ['node', 'server.js'],
