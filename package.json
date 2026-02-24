@@ -9,7 +9,8 @@
     "migrate": "node db/migrate.js",
     "create-admin": "node scripts/create-admin.js",
     "lint": "eslint .",
-    "test": "jest --verbose --forceExit"
+    "test": "jest --verbose --forceExit",
+    "postinstall": "npm rebuild better-sqlite3"
   },
   "keywords": [],
   "author": "Jesse Wheeler",
