@@ -131,12 +131,30 @@ describe('verifyCaptchaToken', () => {
 });
 
 describe('requireCaptcha middleware', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+
   afterEach(() => {
+      process.env.NODE_ENV = originalNodeEnv;
     delete process.env.HCAPTCHA_SECRET_KEY;
     jest.resetAllMocks();
   });
 
+    test('calls next() in dev/test mode regardless of key or token', async () => {
+        process.env.NODE_ENV = 'development';
+        process.env.HCAPTCHA_SECRET_KEY = 'test-secret';
+        const middleware = requireCaptcha('/fallback');
+        const req = buildReq({'h-captcha-response': ''});
+        const res = buildRes();
+        const next = jest.fn();
+
+        await middleware(req, res, next);
+
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(res.redirect).not.toHaveBeenCalled();
+    });
+
   test('calls next() when HCAPTCHA_SECRET_KEY is not set (dev passthrough)', async () => {
+      process.env.NODE_ENV = 'production';
     const middleware = requireCaptcha('/fallback');
     const req = buildReq({ 'h-captcha-response': '' });
     const res = buildRes();
@@ -149,6 +167,7 @@ describe('requireCaptcha middleware', () => {
   });
 
   test('redirects to provided path on failed CAPTCHA', async () => {
+      process.env.NODE_ENV = 'production';
     process.env.HCAPTCHA_SECRET_KEY = 'test-secret';
 
     const mockRequest = {
@@ -181,6 +200,7 @@ describe('requireCaptcha middleware', () => {
   });
 
   test('falls back to Referer header when no redirectPath provided', async () => {
+      process.env.NODE_ENV = 'production';
     process.env.HCAPTCHA_SECRET_KEY = 'test-secret';
 
     const mockRequest = {
@@ -212,6 +232,7 @@ describe('requireCaptcha middleware', () => {
   });
 
   test('falls back to / when no redirectPath and no Referer', async () => {
+      process.env.NODE_ENV = 'production';
     process.env.HCAPTCHA_SECRET_KEY = 'test-secret';
 
     const mockRequest = {
@@ -244,6 +265,7 @@ describe('requireCaptcha middleware', () => {
   });
 
   test('calls next() when CAPTCHA verification succeeds', async () => {
+      process.env.NODE_ENV = 'production';
     process.env.HCAPTCHA_SECRET_KEY = 'test-secret';
 
     const mockRequest = {

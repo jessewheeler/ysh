@@ -37,7 +37,7 @@ router.get('/membership', async (req, res) => {
 });
 
 // Membership POST — create pending member + redirect to Stripe
-router.post('/membership', requireCaptcha('/membership'), async (req, res) => {
+router.post('/membership', async (req, res) => {
   try {
     const {
       membership_type = 'individual',

@@ -51,6 +51,7 @@ async function verifyCaptchaToken(token) {
  */
 function requireCaptcha(redirectPath) {
   return async (req, res, next) => {
+    if (['development', 'test', 'dev'].includes(process.env.NODE_ENV)) return next();
     const token = req.body['h-captcha-response'];
     const valid = await verifyCaptchaToken(token);
     if (!valid) {
