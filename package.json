@@ -15,7 +15,7 @@
   "author": "Jesse Wheeler",
   "license": "ISC",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "description": "Web application for the Yellowstone Sea Hawkers - Montana's official Seattle Seahawks booster club chapter. Manages memberships, announcements, and community engagement for dedicated Seahawks fans.",
   "dependencies": {
