@@ -35,6 +35,7 @@ class ServerManager:
         env['FROM_EMAIL'] = 'test@example.com'
         env['BASE_URL'] = base_url
         env['NODE_ENV'] = 'test'
+        env['DATABASE_PATH'] = os.path.join(self.project_root, 'data', 'ysh-robot.db')
 
         self.process = subprocess.Popen(
             ['node', 'server.js'],

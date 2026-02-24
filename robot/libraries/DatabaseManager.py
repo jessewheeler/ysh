@@ -13,7 +13,7 @@ class DatabaseManager:
 
     def __init__(self, project_root):
         self.project_root = project_root
-        self.db_path = os.path.join(project_root, 'data', 'ysh.db')
+        self.db_path = os.path.join(project_root, 'data', 'ysh-robot.db')
         self.conn = None
 
     def connect_to_database(self):
