@@ -109,6 +109,33 @@ describe('uploadFile', () => {
   });
 });
 
+describe('uploadFileAtKey', () => {
+    test('sends PutObjectCommand with specified key and content type', async () => {
+        const buffer = Buffer.from('pdf-data');
+        await storage.uploadFileAtKey(buffer, 'cards/card-1-2025.pdf', 'application/pdf');
+
+        expect(PutObjectCommand).toHaveBeenCalledWith({
+            Bucket: 'ysh-gallery',
+            Key: 'cards/card-1-2025.pdf',
+            Body: buffer,
+            ContentType: 'application/pdf',
+        });
+        expect(mockSend).toHaveBeenCalled();
+    });
+
+    test('returns public URL with the given key', async () => {
+        const url = await storage.uploadFileAtKey(Buffer.from('x'), 'cards/card-1-2025.png', 'image/png');
+        expect(url).toBe('https://f002.backblazeb2.com/file/ysh-gallery/cards/card-1-2025.png');
+    });
+
+    test('propagates S3 errors', async () => {
+        mockSend.mockRejectedValueOnce(new Error('B2 failure'));
+        await expect(
+            storage.uploadFileAtKey(Buffer.from('x'), 'cards/card.pdf', 'application/pdf')
+        ).rejects.toThrow('B2 failure');
+    });
+});
+
 describe('deleteFile', () => {
   test('sends DeleteObjectCommand for B2 URLs', async () => {
     await storage.deleteFile('https://f002.backblazeb2.com/file/ysh-gallery/gallery/123-abc.jpg');

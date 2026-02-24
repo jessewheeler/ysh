@@ -336,6 +336,9 @@ router.post('/members/:id/card', async (req, res) => {
 router.get('/members/:id/card/pdf', async (req, res) => {
   const card = await cardsRepo.findLatestByMemberId(req.params.id);
   if (!card || !card.pdf_path) { req.session.flash_error = 'No card found.'; return res.redirect(`/admin/members/${req.params.id}`); }
+  if (card.pdf_path.startsWith('http')) {
+    return res.redirect(card.pdf_path);
+  }
   const cardsDir = path.resolve(__dirname, '..', 'data', 'cards');
   const resolved = path.resolve(__dirname, '..', card.pdf_path);
   if (!resolved.startsWith(cardsDir + path.sep) && resolved !== cardsDir) {
@@ -347,6 +350,9 @@ router.get('/members/:id/card/pdf', async (req, res) => {
 router.get('/members/:id/card/png', async (req, res) => {
   const card = await cardsRepo.findLatestByMemberId(req.params.id);
   if (!card || !card.png_path) { req.session.flash_error = 'No card found.'; return res.redirect(`/admin/members/${req.params.id}`); }
+  if (card.png_path.startsWith('http')) {
+    return res.redirect(card.png_path);
+  }
   const cardsDir = path.resolve(__dirname, '..', 'data', 'cards');
   const resolved = path.resolve(__dirname, '..', card.png_path);
   if (!resolved.startsWith(cardsDir + path.sep) && resolved !== cardsDir) {

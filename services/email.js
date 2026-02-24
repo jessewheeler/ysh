@@ -178,6 +178,17 @@ async function sendPaymentConfirmation(member, stripeSession) {
   });
 }
 
+async function getCardBuffer(cardPath) {
+  if (cardPath.startsWith('http')) {
+    const res = await fetch(cardPath);
+    if (!res.ok) return null;
+    return Buffer.from(await res.arrayBuffer());
+  }
+  const fullPath = path.join(__dirname, '..', cardPath);
+  if (fs.existsSync(fullPath)) return fs.readFileSync(fullPath);
+  return null;
+}
+
 async function sendCardEmail(member) {
   const card = await cardsRepo.findLatestByMemberId(member.id);
 
@@ -185,10 +196,10 @@ async function sendCardEmail(member) {
 
   const attachments = [];
   if (card.pdf_path) {
-    const pdfFullPath = path.join(__dirname, '..', card.pdf_path);
-    if (fs.existsSync(pdfFullPath)) {
+    const buf = await getCardBuffer(card.pdf_path);
+    if (buf) {
       attachments.push({
-        content: fs.readFileSync(pdfFullPath).toString('base64'),
+        content: buf.toString('base64'),
         filename: `YSH-Membership-Card-${member.membership_year}.pdf`,
         type: 'application/pdf',
         disposition: 'attachment',
@@ -196,10 +207,10 @@ async function sendCardEmail(member) {
     }
   }
   if (card.png_path) {
-    const pngFullPath = path.join(__dirname, '..', card.png_path);
-    if (fs.existsSync(pngFullPath)) {
+    const buf = await getCardBuffer(card.png_path);
+    if (buf) {
       attachments.push({
-        content: fs.readFileSync(pngFullPath).toString('base64'),
+        content: buf.toString('base64'),
         filename: `YSH-Membership-Card-${member.membership_year}.png`,
         type: 'image/png',
         disposition: 'attachment',
