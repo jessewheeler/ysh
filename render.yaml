@@ -6,8 +6,7 @@ services:
     buildCommand: >
       apt-get update && apt-get install -y
       build-essential python3 python3-dev libcairo2-dev libjpeg-dev libpango1.0-dev libgif-dev librsvg2-dev
-      && npm ci
-      && npm rebuild better-sqlite3 --build-from-source
+      && npm_config_build_from_source=true npm ci
     startCommand: npm start
     disk:
       name: ysh-data
