@@ -53,7 +53,17 @@ html(lang="en")
       .footer-bottom
         p &copy; 2026 #[a(href="https://jessewheeler.dev" target="_blank") Built with love by a local 12.]
 
+    if gaMeasurementId
+      script(async src=`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`)
+      script.
+        window.dataLayer = window.dataLayer || [];
+        function gtag() {
+          dataLayer.push(arguments);
+        }
+        gtag('js', new Date());
+        gtag('config', '#{gaMeasurementId}');
+
     if hcaptchaSiteKey
       script(src="https://js.hcaptcha.com/1/api.js" async defer)
 
-      script(src="/js/nav.js")
+    script(src="/js/nav.js")
