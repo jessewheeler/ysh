@@ -29,6 +29,21 @@ describe('pg-translate', () => {
     expect(translateSql("SELECT datetime('now')")).toBe('SELECT NOW()');
   });
 
+  test('translateSql handles date("now", "+N days") dynamic interval', () => {
+    const sql = `SELECT * FROM members WHERE expiry_date <= date ('now'\n    , '+' || ? || ' days')`;
+    const result = translateSql(sql);
+    expect(result).toContain("(CURRENT_DATE + (? * INTERVAL '1 day'))");
+    expect(result).not.toContain("date (");
+  });
+
+  test('translateSql handles date("now") standalone', () => {
+    expect(translateSql("SELECT date('now')")).toBe('SELECT CURRENT_DATE');
+  });
+
+  test('translateSql handles strftime(..., "now")', () => {
+    expect(translateSql("SELECT strftime('%Y-%m-%dT%H:%M:%SZ', 'now')")).toBe('SELECT NOW()');
+  });
+
   test('translateSql handles INSERT OR IGNORE', () => {
     expect(translateSql('INSERT OR IGNORE INTO tags (name) VALUES (?)'))
       .toBe('INSERT INTO tags (name) VALUES (?) ON CONFLICT DO NOTHING');
