@@ -280,7 +280,78 @@ async function setMembershipYear(id, year) {
     return result;
 }
 
-async function addFamilyMember(primaryId, {first_name, last_name, email, membership_year, status}) {
+async function listFamilyPrimaries() {
+    return await db.all(
+        "SELECT * FROM members WHERE membership_type = 'family' AND primary_member_id IS NULL ORDER BY last_name ASC, first_name ASC"
+    );
+}
+
+async function attachToFamily(id, primaryId) {
+    const actor = getActor();
+    const old = await db.get('SELECT * FROM members WHERE id = ?', id);
+    const result = await db.run(
+        "UPDATE members SET membership_type = 'family', primary_member_id = ?, status = 'active', updated_at = datetime('now'), updated_by = ? WHERE id = ?",
+        primaryId, actor.id || null, id
+    );
+    const row = await db.get('SELECT * FROM members WHERE id = ?', id);
+    await auditLog.insert({
+        tableName: 'members',
+        recordId: id,
+        action: 'UPDATE',
+        actor,
+        oldValues: old,
+        newValues: row
+    });
+    return result;
+}
+
+async function emailConflictsWithPrimary(email, excludeId) {
+    const row = await db.get(
+        'SELECT id FROM members WHERE email = ? AND primary_member_id IS NULL AND id != ?',
+        email, excludeId
+    );
+    return !!row;
+}
+
+async function upgradeMembershipType(id, type) {
+    const actor = getActor();
+    const old = await db.get('SELECT * FROM members WHERE id = ?', id);
+    const result = await db.run(
+        "UPDATE members SET membership_type = ?, updated_at = datetime('now'), updated_by = ? WHERE id = ?",
+        type, actor.id || null, id
+    );
+    const row = await db.get('SELECT * FROM members WHERE id = ?', id);
+    await auditLog.insert({
+        tableName: 'members',
+        recordId: id,
+        action: 'UPDATE',
+        actor,
+        oldValues: old,
+        newValues: row
+    });
+    return result;
+}
+
+async function detachFamilyMember(id) {
+    const actor = getActor();
+    const old = await db.get('SELECT * FROM members WHERE id = ?', id);
+    const result = await db.run(
+        "UPDATE members SET membership_type = 'individual', primary_member_id = NULL, status = 'cancelled', updated_at = datetime('now'), updated_by = ? WHERE id = ?",
+        actor.id || null, id
+    );
+    const row = await db.get('SELECT * FROM members WHERE id = ?', id);
+    await auditLog.insert({
+        tableName: 'members',
+        recordId: id,
+        action: 'UPDATE',
+        actor,
+        oldValues: old,
+        newValues: row
+    });
+    return result;
+}
+
+async function addFamilyMember(primaryId, {first_name, last_name, email, membership_year}) {
     const actor = getActor();
     const {generateMemberNumber} = require('../../services/members');
     const year = membership_year || new Date().getFullYear();
@@ -288,8 +359,8 @@ async function addFamilyMember(primaryId, {first_name, last_name, email, members
     const result = await db.run(
         `INSERT INTO members (member_number, first_name, last_name, email, membership_year, status, membership_type,
                           primary_member_id, created_by, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, 'family', ?, ?, ?)`,
-        memberNumber, first_name, last_name, email || null, year, status || 'pending', primaryId, actor.id || null, actor.id || null
+         VALUES (?, ?, ?, ?, ?, 'active', 'family', ?, ?, ?)`,
+        memberNumber, first_name, last_name, email || null, year, primaryId, actor.id || null, actor.id || null
     );
     const row = await db.get('SELECT * FROM members WHERE id = ?', result.lastInsertRowid);
     await auditLog.insert({
@@ -395,4 +466,9 @@ module.exports = {
     clearRenewalToken,
     setMembershipYear,
     addFamilyMember,
+    upgradeMembershipType,
+    detachFamilyMember,
+    emailConflictsWithPrimary,
+    listFamilyPrimaries,
+    attachToFamily,
 };

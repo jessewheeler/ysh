@@ -275,6 +275,7 @@ const SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS idx_audit_log_table_record ON audit_log(table_name, record_id);
   CREATE INDEX IF NOT EXISTS idx_audit_log_changed_at ON audit_log(changed_at);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_members_email_primary ON members(email) WHERE primary_member_id IS NULL;
 `;
 
 /**
