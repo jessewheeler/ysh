@@ -19,6 +19,18 @@ function translateSql(sql) {
   // datetime('now') -> NOW()
   translated = translated.replace(/datetime\(['"]now['"]\)/gi, 'NOW()');
 
+  // date('now', '+' || ? || ' days') -> (CURRENT_DATE + (? * INTERVAL '1 day'))
+  translated = translated.replace(
+    /date\s*\(\s*'now'\s*,\s*'\+'\s*\|\|\s*\?\s*\|\|\s*' days'\s*\)/gi,
+    "(CURRENT_DATE + (? * INTERVAL '1 day'))"
+  );
+
+  // date('now') -> CURRENT_DATE
+  translated = translated.replace(/date\s*\(\s*'now'\s*\)/gi, 'CURRENT_DATE');
+
+  // strftime('%Y-%m-%dT%H:%M:%SZ', 'now') -> NOW()
+  translated = translated.replace(/strftime\s*\(\s*'[^']*'\s*,\s*'now'\s*\)/gi, 'NOW()');
+
   // INSERT OR IGNORE INTO -> INSERT INTO ... ON CONFLICT DO NOTHING
   if (/INSERT OR IGNORE INTO/i.test(translated)) {
     translated = translated.replace(/INSERT OR IGNORE INTO/i, 'INSERT INTO');
