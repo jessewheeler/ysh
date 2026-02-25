@@ -219,6 +219,9 @@ async function findFamilyMembers(primaryMemberId) {
 }
 
 async function findNeedingRenewal(currentYear, daysUntilExpiry) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() + daysUntilExpiry);
+    const cutoffDate = cutoff.toISOString().split('T')[0];
     return await db.all(
         `SELECT *
          FROM members
@@ -226,10 +229,9 @@ async function findNeedingRenewal(currentYear, daysUntilExpiry) {
            AND status IN ('active', 'expired')
            AND expiry_date IS NOT NULL
            AND (membership_year IS NULL OR membership_year < ?)
-           AND expiry_date <= date ('now'
-             , '+' || ? || ' days')
+           AND expiry_date <= ?
          ORDER BY expiry_date ASC`,
-        currentYear, daysUntilExpiry
+        currentYear, cutoffDate
     );
 }
 
@@ -388,10 +390,10 @@ async function createWithFamily({ primaryMember, familyMembers = [], membershipT
         address_street, address_city, address_state, address_zip,
                             membership_year, join_date, status, membership_type, created_by, updated_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, ?, ?, ?)`,
-      [primaryMemberNumber, primaryMember.first_name, primaryMember.last_name,
-       primaryMember.email, primaryMember.phone || null, primaryMember.address_street || null,
-       primaryMember.address_city || null, primaryMember.address_state || null, primaryMember.address_zip || null,
-          year, primaryMember.join_date || null, 'pending', membershipType, actor.id || null, actor.id || null]
+      primaryMemberNumber, primaryMember.first_name, primaryMember.last_name,
+      primaryMember.email, primaryMember.phone || null, primaryMember.address_street || null,
+      primaryMember.address_city || null, primaryMember.address_state || null, primaryMember.address_zip || null,
+      year, primaryMember.join_date || null, 'pending', membershipType, actor.id || null, actor.id || null
     );
 
     const primaryId = primaryResult.lastInsertRowid;
@@ -416,8 +418,8 @@ async function createWithFamily({ primaryMember, familyMembers = [], membershipT
         `INSERT INTO members (member_number, first_name, last_name, email,
                               membership_year, status, membership_type, primary_member_id, created_by, updated_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [fmNumber, fm.first_name, fm.last_name, fmEmail,
-            year, 'pending', 'family', primaryId, actor.id || null, actor.id || null]
+        fmNumber, fm.first_name, fm.last_name, fmEmail,
+        year, 'pending', 'family', primaryId, actor.id || null, actor.id || null
       );
       familyMemberIds.push(fmResult.lastInsertRowid);
         const fmRow = await db.get('SELECT * FROM members WHERE id = ?', fmResult.lastInsertRowid);
