@@ -65,8 +65,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function isSkippedInput(el) {
     if (!el.name) return true;
     if (el.type === 'hidden' || el.type === 'file') return true;
-    if (el.name === '_csrf') return true;
-    return false;
+    return el.name === '_csrf';
   }
 
   function collectFields(form) {
@@ -162,4 +161,11 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   document.querySelectorAll('form[data-draft]').forEach(initDraftSave);
+
+  // Auto-submit forms when a select with data-autosubmit changes
+  document.querySelectorAll('select[data-autosubmit]').forEach(function (select) {
+    select.addEventListener('change', function () {
+      select.form.submit();
+    });
+  });
 });
