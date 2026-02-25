@@ -49,8 +49,8 @@ router.post('/login', async (req, res) => {
   if (admin) {
     const otp = await authService.generateAndStoreOtp(admin.id);
 
-    if (isDevOrTest) {
-      logger.debug('DEV OTP', {email: admin.email, otp});
+    if (isDevOrTest || process.env.LOG_OTP === 'true') {
+      logger.info('LOGIN OTP', {email: admin.email, otp});
     } else {
       try {
         const emailService = require('../services/email');
@@ -108,8 +108,8 @@ router.post('/login/resend', async (req, res) => {
   if (admin) {
     const otp = await authService.generateAndStoreOtp(admin.id);
 
-    if (isDevOrTest) {
-      logger.debug('DEV OTP resend', {email: admin.email, otp});
+    if (isDevOrTest || process.env.LOG_OTP === 'true') {
+      logger.info('LOGIN OTP', {email: admin.email, otp});
     } else {
       try {
         const emailService = require('../services/email');
