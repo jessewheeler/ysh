@@ -4,15 +4,90 @@ block page_title
     | Audit Log
 
 block content
+    style.
+        .audit-filters {
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+        }
+
+        .audit-filters select {
+            padding: .3rem .5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .audit-meta {
+            color: #666;
+            font-size: .875rem;
+            margin-bottom: .5rem;
+        }
+
+        .audit-ts {
+            white-space: nowrap;
+            font-size: .8rem;
+            color: #555;
+        }
+
+        .audit-json {
+            max-height: 300px;
+            overflow: auto;
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: .5rem;
+            font-size: .75rem;
+            white-space: pre-wrap;
+        }
+
+        .audit-diff {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .8rem;
+            margin-top: .4rem;
+        }
+
+        .audit-diff th, .audit-diff td {
+            padding: .2rem .5rem;
+            border: 1px solid #e5e7eb;
+        }
+
+        .audit-diff th {
+            background: #f3f4f6;
+            font-weight: 600;
+        }
+
+        .audit-old {
+            color: #991b1b;
+            background: #fff5f5;
+            word-break: break-all;
+        }
+
+        .audit-new {
+            color: #065f46;
+            background: #f0fff4;
+            word-break: break-all;
+        }
+
+        .muted {
+            color: #888;
+            font-size: .85rem;
+        }
+
+        details summary {
+            cursor: pointer;
+            font-size: .85rem;
+            color: #4b5563;
+        }
+
     .audit-filters
         form(method="GET" action="/admin/audit")
             label(for="table-filter") Table:
-            select#table-filter(name="table" onchange="this.form.submit()")
+            select#table-filter(name="table" data-autosubmit)
                 option(value="" selected=(tableName === '')) All tables
                 each t in tables
                     option(value=t selected=(tableName === t))= t
-            noscript
-                button(type="submit") Filter
 
     p.audit-meta Showing #{rows.length} of #{total} entries
 
@@ -82,103 +157,3 @@ block content
             if page < totalPages
                 a(href=`/admin/audit?page=${page + 1}&table=${tableName}`) Next &raquo;
 
-style.
-    .audit-filters {
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: center;
-        gap: .75rem;
-    }
-
-    .audit-filters select {
-        padding: .3rem .5rem;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-    }
-
-    .audit-meta {
-        color: #666;
-        font-size: .875rem;
-        margin-bottom: .5rem;
-    }
-
-    .audit-badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: .75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-    }
-
-    .audit-badge--insert {
-        background: #d1fae5;
-        color: #065f46;
-    }
-
-    .audit-badge--update {
-        background: #fef3c7;
-        color: #92400e;
-    }
-
-    .audit-badge--delete {
-        background: #fee2e2;
-        color: #991b1b;
-    }
-
-    .audit-ts {
-        white-space: nowrap;
-        font-size: .8rem;
-        color: #555;
-    }
-
-    .audit-json {
-        max-height: 300px;
-        overflow: auto;
-        background: #f8f8f8;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: .5rem;
-        font-size: .75rem;
-        white-space: pre-wrap;
-    }
-
-    .audit-diff {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: .8rem;
-        margin-top: .4rem;
-    }
-
-    .audit-diff th, .audit-diff td {
-        padding: .2rem .5rem;
-        border: 1px solid #e5e7eb;
-    }
-
-    .audit-diff th {
-        background: #f3f4f6;
-        font-weight: 600;
-    }
-
-    .audit-old {
-        color: #991b1b;
-        background: #fff5f5;
-        word-break: break-all;
-    }
-
-    .audit-new {
-        color: #065f46;
-        background: #f0fff4;
-        word-break: break-all;
-    }
-
-    .muted {
-        color: #888;
-        font-size: .85rem;
-    }
-
-    details summary {
-        cursor: pointer;
-        font-size: .85rem;
-        color: #4b5563;
-    }
