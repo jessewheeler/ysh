@@ -42,14 +42,21 @@ block content
             th Primary Member
             td
               a(href=`/admin/members/${primaryMember.id}`) #{primaryMember.first_name} #{primaryMember.last_name} (#{primaryMember.member_number})
-        else if member.membership_type === 'family' && familyMembers.length
+        else if member.membership_type === 'family'
           tr
             th Family Members
             td
-              ul(style="margin: 0; padding-left: 1.5rem;")
-                each fm in familyMembers
-                  li
-                    a(href=`/admin/members/${fm.id}`) #{fm.first_name} #{fm.last_name} (#{fm.member_number})
+              if familyMembers.length
+                ul(style="margin: 0 0 0.5rem; padding-left: 1.5rem;")
+                  each fm in familyMembers
+                    li(style="margin-bottom: 0.25rem;")
+                      a(href=`/admin/members/${fm.id}`) #{fm.first_name} #{fm.last_name} (#{fm.member_number})
+                      |
+                      - const confirmMsg = fm.wouldDeleteOnRemove ? `${fm.first_name} ${fm.last_name} shares an email with an existing primary member — removing them will permanently delete their record. Continue?` : `Remove ${fm.first_name} ${fm.last_name} from this family membership?`
+                      form(method="POST" action=`/admin/members/${member.id}/family-members/${fm.id}/remove` style="display:inline" data-confirm=confirmMsg)
+                        button.btn-sm.btn-danger(type="submit" style="padding: 1px 8px; font-size: 0.75rem;")= fm.wouldDeleteOnRemove ? 'Remove (deletes record)' : 'Remove'
+              else
+                span.text-muted No family members yet.
         tr
           th Notes
           td= member.notes || '—'
@@ -67,6 +74,9 @@ block content
         if !member.primary_member_id
           form(method="POST" action=`/admin/members/${member.id}/send-renewal` style="display:inline" data-confirm=`Send renewal reminder to ${member.first_name} ${member.last_name}?`)
             button.btn-outline(type="submit") Send Renewal Reminder
+        if member.membership_type !== 'family' && !member.primary_member_id
+          form(method="POST" action=`/admin/members/${member.id}/upgrade-to-family` style="display:inline" data-confirm=`Upgrade ${member.first_name} ${member.last_name} to a family membership?`)
+            button.btn-outline(type="submit") Upgrade to Family
         form(method="POST" action=`/admin/members/${member.id}/delete` style="display:inline" data-confirm="Delete this member?")
           button.btn-danger(type="submit") Delete
 
@@ -84,6 +94,35 @@ block content
               button.btn-sm(type="submit") Email Card
       else
         p.text-muted No cards generated yet.
+
+  if member.membership_type !== 'family' && !member.primary_member_id && familyPrimaries.length
+    .admin-panel
+      h3 Attach to Family
+      form(method="POST" action=`/admin/members/${member.id}/attach-to-family`)
+        .form-group
+          label(for="primary_member_id") Family
+          select#primary_member_id.form-control(name="primary_member_id" required)
+            option(value="" disabled selected) — select a family —
+            each p in familyPrimaries
+              option(value=p.id) #{p.first_name} #{p.last_name} (#{p.member_number})
+        .form-actions
+          button.btn(type="submit") Attach to Family
+
+  if member.membership_type === 'family' && !member.primary_member_id
+    .admin-panel
+      h3 Add Family Member
+      form(method="POST" action=`/admin/members/${member.id}/family-members`)
+        .form-group
+          label(for="fm_first_name") First Name
+          input#fm_first_name.form-control(type="text" name="first_name" required)
+        .form-group
+          label(for="fm_last_name") Last Name
+          input#fm_last_name.form-control(type="text" name="last_name" required)
+        .form-group
+          label(for="fm_email") Email (optional)
+          input#fm_email.form-control(type="email" name="email" placeholder=`Defaults to ${member.email}`)
+        .form-actions
+          button.btn(type="submit") Add Family Member
 
   .admin-panel
     h3 Payments

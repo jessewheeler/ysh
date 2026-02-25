@@ -275,6 +275,7 @@ router.get('/members/:id', async (req, res, next) => {
     // Get family relationships
     let familyMembers = [];
     let primaryMember = null;
+    let familyPrimaries = [];
 
     if (member.membership_type === 'family') {
       if (member.primary_member_id) {
@@ -283,12 +284,20 @@ router.get('/members/:id', async (req, res, next) => {
         const allFamily = await memberRepo.findFamilyMembers(member.primary_member_id);
         familyMembers = allFamily.filter(fm => fm.id !== member.id);
       } else {
-        // This is a primary member
-        familyMembers = await memberRepo.findFamilyMembers(member.id);
+        // This is a primary member — annotate each family member with conflict info
+        const raw = await memberRepo.findFamilyMembers(member.id);
+        familyMembers = await Promise.all(raw.map(async (fm) => ({
+          ...fm,
+          wouldDeleteOnRemove: await memberRepo.emailConflictsWithPrimary(fm.email, fm.id),
+        })));
       }
     }
 
-    res.render('admin/members/view', { member, payments, cards, emails, familyMembers, primaryMember });
+    if (member.membership_type !== 'family' && !member.primary_member_id) {
+      familyPrimaries = await memberRepo.listFamilyPrimaries();
+    }
+
+    res.render('admin/members/view', {member, payments, cards, emails, familyMembers, primaryMember, familyPrimaries});
   } catch (err) {
     next(err);
   }
@@ -449,6 +458,113 @@ router.post('/members/:id/payments', async (req, res) => {
   }
 
   req.session.flash_success = `Payment of $${dollars.toFixed(2)} recorded.`;
+  res.redirect(`/admin/members/${req.params.id}`);
+});
+
+// --- Upgrade individual membership to family ---
+router.post('/members/:id/upgrade-to-family', async (req, res) => {
+  const member = await memberRepo.findById(req.params.id);
+  if (!member) {
+    req.session.flash_error = 'Member not found.';
+    return res.redirect('/admin/members');
+  }
+  if (member.primary_member_id) {
+    req.session.flash_error = 'Cannot upgrade a family sub-member — upgrade the primary account holder.';
+    return res.redirect(`/admin/members/${req.params.id}`);
+  }
+  if (member.membership_type === 'family') {
+    req.session.flash_error = 'Membership is already a family type.';
+    return res.redirect(`/admin/members/${req.params.id}`);
+  }
+  try {
+    await memberRepo.upgradeMembershipType(req.params.id, 'family');
+    req.session.flash_success = `${member.first_name} ${member.last_name}'s membership upgraded to family.`;
+  } catch (e) {
+    req.session.flash_error = e.message;
+  }
+  res.redirect(`/admin/members/${req.params.id}`);
+});
+
+// --- Attach an individual member to an existing family ---
+router.post('/members/:id/attach-to-family', async (req, res) => {
+  const member = await memberRepo.findById(req.params.id);
+  if (!member) {
+    req.session.flash_error = 'Member not found.';
+    return res.redirect('/admin/members');
+  }
+  if (member.primary_member_id) {
+    req.session.flash_error = 'Member is already part of a family.';
+    return res.redirect(`/admin/members/${req.params.id}`);
+  }
+  const {primary_member_id} = req.body;
+  if (!primary_member_id) {
+    req.session.flash_error = 'Please select a family to attach to.';
+    return res.redirect(`/admin/members/${req.params.id}`);
+  }
+  const primary = await memberRepo.findById(primary_member_id);
+  if (!primary || primary.membership_type !== 'family' || primary.primary_member_id) {
+    req.session.flash_error = 'Invalid primary member selected.';
+    return res.redirect(`/admin/members/${req.params.id}`);
+  }
+  try {
+    await memberRepo.attachToFamily(req.params.id, primary_member_id);
+    req.session.flash_success = `${member.first_name} ${member.last_name} attached to ${primary.first_name} ${primary.last_name}'s family.`;
+  } catch (e) {
+    req.session.flash_error = e.message;
+  }
+  res.redirect(`/admin/members/${req.params.id}`);
+});
+
+// --- Add family member to existing family membership ---
+router.post('/members/:id/family-members', async (req, res) => {
+  const member = await memberRepo.findById(req.params.id);
+  if (!member) {
+    req.session.flash_error = 'Member not found.';
+    return res.redirect('/admin/members');
+  }
+  if (member.membership_type !== 'family' || member.primary_member_id) {
+    req.session.flash_error = 'Only the primary account holder of a family membership can have family members added.';
+    return res.redirect(`/admin/members/${req.params.id}`);
+  }
+  const {first_name, last_name, email} = req.body;
+  if (!first_name?.trim() || !last_name?.trim()) {
+    req.session.flash_error = 'First and last name are required.';
+    return res.redirect(`/admin/members/${req.params.id}`);
+  }
+  try {
+    await memberRepo.addFamilyMember(req.params.id, {
+      first_name: first_name.trim(),
+      last_name: last_name.trim(),
+      email: email?.trim() || member.email,
+      membership_year: member.membership_year,
+      status: member.status,
+    });
+    req.session.flash_success = `Family member ${first_name.trim()} ${last_name.trim()} added.`;
+  } catch (e) {
+    req.session.flash_error = e.message;
+  }
+  res.redirect(`/admin/members/${req.params.id}`);
+});
+
+// --- Remove (detach) a family member ---
+router.post('/members/:id/family-members/:familyId/remove', async (req, res) => {
+  const familyMember = await memberRepo.findById(req.params.familyId);
+  if (!familyMember || String(familyMember.primary_member_id) !== String(req.params.id)) {
+    req.session.flash_error = 'Family member not found on this account.';
+    return res.redirect(`/admin/members/${req.params.id}`);
+  }
+  try {
+    const wouldDelete = await memberRepo.emailConflictsWithPrimary(familyMember.email, familyMember.id);
+    if (wouldDelete) {
+      await memberRepo.deleteById(req.params.familyId);
+      req.session.flash_success = `${familyMember.first_name} ${familyMember.last_name} was deleted — their email (${familyMember.email}) is already used by another primary member.`;
+    } else {
+      await memberRepo.detachFamilyMember(req.params.familyId);
+      req.session.flash_success = `${familyMember.first_name} ${familyMember.last_name} removed from family membership and converted to individual.`;
+    }
+  } catch (e) {
+    req.session.flash_error = e.message;
+  }
   res.redirect(`/admin/members/${req.params.id}`);
 });
 

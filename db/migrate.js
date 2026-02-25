@@ -16,6 +16,9 @@ async function migrate() {
       "ALTER TABLE members ADD COLUMN IF NOT EXISTS otp_hash TEXT",
       "ALTER TABLE members ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMP",
       "ALTER TABLE members ADD COLUMN IF NOT EXISTS otp_attempts INTEGER NOT NULL DEFAULT 0",
+      // members: replace full unique constraint on email with a partial one (primary members only)
+      "ALTER TABLE members DROP CONSTRAINT IF EXISTS members_email_key",
+      "CREATE UNIQUE INDEX IF NOT EXISTS members_email_primary_unique ON members (email) WHERE primary_member_id IS NULL",
       // members: family membership columns
       "ALTER TABLE members ADD COLUMN IF NOT EXISTS membership_type TEXT NOT NULL DEFAULT 'individual' CHECK(membership_type IN ('individual','family'))",
       "ALTER TABLE members ADD COLUMN IF NOT EXISTS primary_member_id INTEGER REFERENCES members(id) ON DELETE CASCADE",

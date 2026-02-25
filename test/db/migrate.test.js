@@ -122,13 +122,23 @@ describe('migrate()', () => {
     ).toThrow();
   });
 
-  test('members table allows duplicate emails (for family members)', async () => {
+  test('members table allows duplicate emails for family sub-members', async () => {
     await migrate();
-    db.prepare("INSERT INTO members (first_name, last_name, email, membership_type) VALUES ('A','B','shared@family.com','family')").run();
-    // Family members can share the same email
+    const {lastInsertRowid: primaryId} = db.prepare(
+        "INSERT INTO members (first_name, last_name, email, membership_type) VALUES ('A','B','shared@family.com','family')"
+    ).run();
+    // Sub-members (primary_member_id IS NOT NULL) can share the primary's email
     expect(() =>
-      db.prepare("INSERT INTO members (first_name, last_name, email, membership_type) VALUES ('C','D','shared@family.com','family')").run()
+        db.prepare("INSERT INTO members (first_name, last_name, email, membership_type, primary_member_id) VALUES ('C','D','shared@family.com','family',?)").run(primaryId)
     ).not.toThrow();
+  });
+
+  test('members table enforces unique emails among primary members', async () => {
+    await migrate();
+    db.prepare("INSERT INTO members (first_name, last_name, email) VALUES ('A','B','dup@test.com')").run();
+    expect(() =>
+        db.prepare("INSERT INTO members (first_name, last_name, email) VALUES ('C','D','dup@test.com')").run()
+    ).toThrow();
   });
 
   test('members table has UNIQUE constraint on member_number', async () => {
