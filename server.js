@@ -212,6 +212,7 @@ app.use(logError);
 
 // Error handler
 app.use((err, req, res, _next) => {
+  if (res.headersSent) return;
   res.status(500).render('error', { status: 500, message: 'Something went wrong' });
 });
 
