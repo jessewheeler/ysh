@@ -1,0 +1,33 @@
+extends ../layout
+
+block page_title
+    | Votes
+
+block content
+    .admin-toolbar
+        a.btn(href="/admin/votes/new") + New Vote
+
+    if votes.length
+        table.admin-table
+            thead
+                tr
+                    th Title
+                    th Status
+                    th Created
+                    th Actions
+            tbody
+                each vote in votes
+                    tr
+                        td= vote.title
+                        td
+                            span(class=`badge badge-${vote.status === 'open' ? 'active' : 'cancelled'}`)= vote.status
+                        td= formatDateLong(vote.created_at)
+                        td
+                            a(href=`/admin/votes/${vote.id}/results`) Results
+                            if vote.status === 'open'
+                                |  &nbsp;
+                                form(method="POST" action=`/admin/votes/${vote.id}/close` style="display:inline")
+                                    input(type="hidden" name="_csrf" value=csrfToken)
+                                    button.btn-sm(type="submit" onclick="return confirm('Close this vote?')") Close
+    else
+        p No votes yet.

@@ -5,6 +5,7 @@ async function injectLocals(req, res, next) {
     // Site settings
     res.locals.site = await settingsRepo.getAll();
     res.locals.isAdmin = !!(req.session && req.session.adminId);
+      res.locals.isMember = !!(req.session && req.session.memberId);
     res.locals.adminRole = (req.session && req.session.adminRole) || null;
     res.locals.adminEmail = (req.session && req.session.adminEmail) || null;
     res.locals.currentPath = req.path;
@@ -34,6 +35,14 @@ async function injectLocals(req, res, next) {
       }
       return '';
     };
+
+      // Human-readable date: "March 8, 2026"
+      res.locals.formatDateLong = function (date) {
+          if (!date) return '';
+          const d = date instanceof Date ? date : new Date(date);
+          if (isNaN(d)) return '';
+          return d.toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC'});
+      };
 
     next();
   } catch (err) {

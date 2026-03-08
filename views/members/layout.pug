@@ -1,0 +1,41 @@
+doctype html
+html(lang="en")
+    head
+        meta(charset="UTF-8")
+        meta(name="viewport" content="width=device-width, initial-scale=1.0")
+        meta(name="csrf-token" content=csrfToken)
+        title Members — Yellowstone Sea Hawkers
+        link(rel="stylesheet" href="/css/style.css")
+        link(rel="stylesheet" href="/css/admin.css")
+    body.admin-body
+        .admin-wrapper
+            aside.admin-sidebar
+                .sidebar-brand
+                    a(href="/members")
+                        img(src="/img/logo.png" alt="YSH" style="height:40px")
+                        span YSH Members
+                nav.sidebar-nav
+                    a(href="/members" class=(currentPath === '/members' ? 'active' : '')) Dashboard
+                    a(href="/members/events" class=(currentPath && currentPath.startsWith('/members/events') ? 'active' : '')) Events
+                    a(href="/members/profile" class=(currentPath === '/members/profile' ? 'active' : '')) My Profile
+                    hr
+                    a(href="/") View Site
+                    form(method="POST" action="/members/logout" style="display:inline")
+                        input(type="hidden" name="_csrf" value=csrfToken)
+                        button.sidebar-logout(type="submit") Logout
+
+            main.admin-main
+                .admin-topbar
+                    h1.admin-page-title
+                        block page_title
+                    button.admin-sidebar-toggle(aria-label="Toggle sidebar") &#9776;
+
+                if flash_success
+                    .flash.flash-success= flash_success
+                if flash_error
+                    .flash.flash-error= flash_error
+
+                .admin-content
+                    block content
+
+        script(src="/js/admin.js")

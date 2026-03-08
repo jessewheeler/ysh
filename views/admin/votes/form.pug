@@ -1,0 +1,41 @@
+extends ../layout
+
+block page_title
+    | New Vote
+
+block content
+    form(method="POST" action="/admin/votes")
+        input(type="hidden" name="_csrf" value=csrfToken)
+        .form-group
+            label(for="title") Title *
+            input#title(type="text" name="title" required autofocus)
+        .form-group
+            label(for="description") Description
+            textarea#description(name="description" rows="3")
+        .form-group
+            label(for="closes_at") Closes At (optional)
+            input#closes_at(type="date" name="closes_at")
+        .form-group
+            label Voting Options *
+            p.text-muted Add at least two options (e.g. "Yes" and "No"). One per line.
+            #options-list
+                .option-row(style="display:flex; gap:0.5rem; margin-bottom:0.5rem")
+                    input.option-input(type="text" name="options" placeholder="Option 1" required style="flex:1")
+                .option-row(style="display:flex; gap:0.5rem; margin-bottom:0.5rem")
+                    input.option-input(type="text" name="options" placeholder="Option 2" required style="flex:1")
+            button.btn-outline(type="button" id="add-option") + Add Option
+
+        .form-actions
+            button.btn(type="submit") Create Vote
+            a.btn-outline(href="/admin/votes") Cancel
+
+    script.
+        document.getElementById('add-option').addEventListener('click', function () {
+            const list = document.getElementById('options-list');
+            const count = list.querySelectorAll('.option-row').length + 1;
+            const row = document.createElement('div');
+            row.className = 'option-row';
+            row.style.cssText = 'display:flex; gap:0.5rem; margin-bottom:0.5rem';
+            row.innerHTML = `<input class="option-input" type="text" name="options" placeholder="Option ${count}" style="flex:1">`;
+            list.appendChild(row);
+        });

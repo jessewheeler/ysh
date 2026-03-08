@@ -1,0 +1,14 @@
+extends ../layout
+
+block content
+    .container(style="max-width:440px; margin:4rem auto")
+        h1 Member Login
+        p Enter your membership email address and we'll send you a one-time login code.
+
+        form(method="POST" action="/members/login")
+            input(type="hidden" name="_csrf" value=csrfToken)
+            .form-group
+                label(for="email") Email Address
+                input#email(type="email" name="email" required autofocus placeholder="you@example.com")
+            .form-actions
+                button.btn(type="submit") Send Login Code

@@ -1,0 +1,15 @@
+extends ../layout
+
+block content
+    .container(style="max-width:440px; margin:4rem auto")
+        h1 Enter Your Code
+        p We sent a 6-digit code to #{maskedEmail}. It expires in 10 minutes.
+
+        form(method="POST" action="/members/login/verify")
+            input(type="hidden" name="_csrf" value=csrfToken)
+            .form-group
+                label(for="code") Login Code
+                input#code(type="text" name="code" required autofocus maxlength="6" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" style="letter-spacing:0.25em; font-size:1.5rem")
+            .form-actions
+                button.btn(type="submit") Verify
+                a.btn-outline(href="/members/login") Start over

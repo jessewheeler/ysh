@@ -31,4 +31,12 @@ function requireSuperAdmin(req, res, next) {
   res.redirect('/admin/login');
 }
 
-module.exports = {requireAdmin, requireSuperAdmin, captureActor};
+function requireMember(req, res, next) {
+    if (req.session && req.session.memberId) {
+        return next();
+    }
+    req.session.returnTo = req.originalUrl;
+    res.redirect('/members/login');
+}
+
+module.exports = {requireAdmin, requireSuperAdmin, requireMember, captureActor};

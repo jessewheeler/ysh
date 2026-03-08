@@ -1,0 +1,43 @@
+extends layout
+
+block page_title
+    | My Profile
+
+block content
+    form(method="POST" action="/members/profile")
+        input(type="hidden" name="_csrf" value=csrfToken)
+        .form-grid
+            .form-group
+                label(for="first_name") First Name *
+                input#first_name(type="text" name="first_name" value=member.first_name required)
+            .form-group
+                label(for="last_name") Last Name *
+                input#last_name(type="text" name="last_name" value=member.last_name required)
+        .form-group
+            label Email
+            input(type="email" value=member.email disabled)
+            small.text-muted Email cannot be changed. Contact an admin if needed.
+        .form-group
+            label(for="phone") Phone
+            input#phone(type="tel" name="phone" value=(member.phone || ''))
+        .form-group
+            label(for="address_street") Street Address
+            input#address_street(type="text" name="address_street" value=(member.address_street || ''))
+        .form-grid
+            .form-group
+                label(for="address_city") City
+                input#address_city(type="text" name="address_city" value=(member.address_city || ''))
+            .form-group
+                label(for="address_state") State
+                input#address_state(type="text" name="address_state" value=(member.address_state || '') maxlength="2")
+            .form-group
+                label(for="address_zip") Zip
+                input#address_zip(type="text" name="address_zip" value=(member.address_zip || ''))
+        .form-group
+            label Member #
+            input(type="text" value=(member.member_number || '—') disabled)
+        .form-group
+            label Membership Status
+            input(type="text" value=member.status disabled)
+        .form-actions
+            button.btn(type="submit") Save Changes

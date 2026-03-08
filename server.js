@@ -49,7 +49,7 @@ const isTest = process.env.NODE_ENV === 'test';
 const isDev = process.env.NODE_ENV === 'development';
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isTest ? 1000 : 10,
+    max: isTest || isDev ? 1000 : 10,
   message: 'Too many login attempts. Please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -192,12 +192,15 @@ app.use(injectLocals);
 app.use('/admin/login', loginLimiter);
 app.use('/admin/login/verify', loginLimiter);
 app.use('/admin/login/resend', loginLimiter);
+app.use('/members/login', loginLimiter);
+app.use('/members/login/verify', loginLimiter);
 app.use('/membership', formLimiter);
 app.use('/contact', formLimiter);
 
 // Routes
 app.use('/', require('./routes/index'));
 app.use('/stripe', require('./routes/stripe'));
+app.use('/members', require('./routes/members'));
 
 // Admin routes (multer already applied above, before CSRF)
 app.use('/admin', require('./routes/admin'));

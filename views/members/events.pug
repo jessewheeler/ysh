@@ -1,0 +1,21 @@
+extends layout
+
+block page_title
+    | Events
+
+block content
+    if events.length
+        .admin-grid
+            each event in events
+                .admin-panel
+                    p(style="margin-bottom:0.5rem")
+                        span(class=`badge badge-${event.event_type === 'watch_party' ? 'pending' : 'active'}`)= event.event_type === 'watch_party' ? 'Watch Party' : 'Annual Game'
+                    h3(style="margin-bottom:0.5rem")= event.title
+                    if event.event_date
+                        p(style="color:#555; margin-bottom:0.25rem") #{formatDateLong(event.event_date)}
+                    if event.location
+                        p(style="color:#555; margin-bottom:1rem") #{event.location}
+                    a.btn(href=`/members/events/${event.id}`) View Details
+    else
+        .admin-panel
+            p(style="color:#666; text-align:center") No upcoming events. Check back soon!

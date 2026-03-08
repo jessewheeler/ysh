@@ -1,0 +1,44 @@
+extends layout
+
+block page_title
+    | Dashboard
+
+block content
+    p(style="color:#666; margin-bottom:2rem") Welcome back, #{member.first_name}!
+
+    if openVotes.length
+        section(style="margin-bottom:2rem")
+            h2(style="color:#002a5c; font-size:1.1rem; font-weight:600; margin-bottom:1rem; text-transform:uppercase; letter-spacing:0.05em") Open Votes
+            .admin-grid
+                each vote in openVotes
+                    .admin-panel
+                        h3(style="margin-bottom:0.5rem")= vote.title
+                        if vote.description
+                            p(style="color:#555; margin-bottom:1rem")= vote.description
+                        if vote.closes_at
+                            p.text-muted(style="margin-bottom:1rem; font-size:0.875rem") Closes #{formatDateLong(vote.closes_at)}
+                        if vote.myResponse
+                            p(style="margin-bottom:1rem")
+                                span.badge.badge-active Your vote: #{vote.myResponse.label}
+                            a.btn-outline(href=`/members/votes/${vote.id}`) View Results
+                        else
+                            a.btn(href=`/members/votes/${vote.id}`) Cast Your Vote
+
+    if events.length
+        section(style="margin-bottom:2rem")
+            h2(style="color:#002a5c; font-size:1.1rem; font-weight:600; margin-bottom:1rem; text-transform:uppercase; letter-spacing:0.05em") Upcoming Events
+            .admin-grid
+                each event in events
+                    .admin-panel
+                        p(style="margin-bottom:0.5rem")
+                            span(class=`badge badge-${event.event_type === 'watch_party' ? 'pending' : 'active'}`)= event.event_type === 'watch_party' ? 'Watch Party' : 'Annual Game'
+                        h3(style="margin-bottom:0.5rem")= event.title
+                        if event.event_date
+                            p(style="color:#555; margin-bottom:0.25rem") #{formatDateLong(event.event_date)}
+                        if event.location
+                            p(style="color:#555; margin-bottom:1rem") #{event.location}
+                        a.btn-outline(href=`/members/events/${event.id}`) View Details
+
+    if !openVotes.length && !events.length
+        .admin-panel
+            p(style="color:#666; text-align:center") Nothing happening right now — check back soon!

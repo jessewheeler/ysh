@@ -1,0 +1,37 @@
+extends ../layout
+
+block page_title
+    | Events
+
+block content
+    .admin-toolbar
+        a.btn(href="/admin/events/new") + New Event
+
+    if events.length
+        table.admin-table
+            thead
+                tr
+                    th Title
+                    th Type
+                    th Date
+                    th Status
+                    th Actions
+            tbody
+                each event in events
+                    tr
+                        td= event.title
+                        td= event.event_type === 'watch_party' ? 'Watch Party' : 'Annual Game'
+                        td= event.event_date ? formatDateLong(event.event_date) : '—'
+                        td
+                            span(class=`badge badge-${event.status === 'published' ? 'active' : 'pending'}`)= event.status
+                        td
+                            a(href=`/admin/events/${event.id}/edit`) Edit
+                            if event.event_type === 'watch_party'
+                                |  &nbsp;&middot;&nbsp;
+                                a(href=`/admin/events/${event.id}/volunteers`) Volunteers
+                            |  &nbsp;&middot;&nbsp;
+                            form(method="POST" action=`/admin/events/${event.id}/delete` style="display:inline")
+                                input(type="hidden" name="_csrf" value=csrfToken)
+                                button.btn-sm.btn-danger(type="submit" onclick="return confirm('Delete this event?')") Delete
+    else
+        p No events yet.

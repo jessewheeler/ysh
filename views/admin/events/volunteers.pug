@@ -1,0 +1,35 @@
+extends ../layout
+
+block page_title
+    | Volunteers: #{event.title}
+
+block content
+    a.btn-outline(href=`/admin/events/${event.id}/edit` style="margin-bottom:1.5rem; display:inline-block") &larr; Back to Event
+
+    p(style="color:#666; margin-bottom:1.5rem") #{signups.length} #{signups.length === 1 ? 'volunteer' : 'volunteers'} signed up
+
+    if roles.length
+        each role in roles
+            - const roleSignups = signups.filter(s => s.role_name === role.role_name)
+            .admin-panel(style="margin-bottom:1.5rem")
+                div(style="display:flex; align-items:baseline; gap:0.75rem; margin-bottom:1rem")
+                    h3(style="margin:0")= role.role_name
+                    span(style="color:#666; font-size:0.875rem") #{roleSignups.length}#{role.max_volunteers ? '/' + role.max_volunteers : ''} signed up
+                if roleSignups.length
+                    table.admin-table
+                        thead
+                            tr
+                                th Name
+                                th Email
+                                th Signed Up
+                        tbody
+                            each s in roleSignups
+                                tr
+                                    td #{s.first_name} #{s.last_name}
+                                    td= s.email
+                                    td= formatDateLong(s.signed_up_at)
+                else
+                    p.text-muted No signups for this role yet.
+    else
+        .admin-panel
+            p.text-muted No volunteer roles configured for this event.

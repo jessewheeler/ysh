@@ -14,6 +14,13 @@ async function findAdminByEmail(email) {
   return await db.get('SELECT * FROM members WHERE email = ? AND role IS NOT NULL', email);
 }
 
+async function findActivePrimaryByEmail(email) {
+    return await db.get(
+        "SELECT * FROM members WHERE email = ? AND primary_member_id IS NULL AND status = 'active'",
+        email
+    );
+}
+
 async function create({ member_number, first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, join_date, status, notes }) {
     const actor = getActor();
     const result = await db.run(
@@ -441,6 +448,7 @@ module.exports = {
   findById,
   findByEmail,
   findAdminByEmail,
+    findActivePrimaryByEmail,
   create,
   update,
   deleteById,

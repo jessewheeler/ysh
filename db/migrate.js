@@ -64,6 +64,64 @@ async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_audit_log_changed_at ON audit_log (changed_at);
     `);
 
+      // Member portal tables (idempotent)
+      await db.exec(`
+          CREATE TABLE IF NOT EXISTS votes
+          (
+              id          SERIAL PRIMARY KEY,
+              title       TEXT NOT NULL,
+              description TEXT,
+              status      TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+              closes_at   TIMESTAMP,
+              created_at  TIMESTAMP     DEFAULT NOW()
+          );
+          CREATE TABLE IF NOT EXISTS vote_options
+          (
+              id            SERIAL PRIMARY KEY,
+              vote_id       INTEGER NOT NULL REFERENCES votes (id) ON DELETE CASCADE,
+              label         TEXT    NOT NULL,
+              display_order INTEGER NOT NULL DEFAULT 0
+          );
+          CREATE TABLE IF NOT EXISTS vote_responses
+          (
+              id        SERIAL PRIMARY KEY,
+              vote_id   INTEGER NOT NULL REFERENCES votes (id) ON DELETE CASCADE,
+              member_id INTEGER NOT NULL REFERENCES members (id) ON DELETE CASCADE,
+              option_id INTEGER NOT NULL REFERENCES vote_options (id) ON DELETE CASCADE,
+              voted_at  TIMESTAMP DEFAULT NOW(),
+              UNIQUE (vote_id, member_id)
+          );
+          CREATE TABLE IF NOT EXISTS events
+          (
+              id         SERIAL PRIMARY KEY,
+              title      TEXT NOT NULL,
+              body       TEXT,
+              event_type TEXT NOT NULL CHECK (event_type IN ('game', 'watch_party')),
+              event_date TIMESTAMP,
+              location   TEXT,
+              status     TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
+              created_at TIMESTAMP     DEFAULT NOW(),
+              updated_at TIMESTAMP     DEFAULT NOW()
+          );
+          CREATE TABLE IF NOT EXISTS event_volunteer_roles
+          (
+              id             SERIAL PRIMARY KEY,
+              event_id       INTEGER NOT NULL REFERENCES events (id) ON DELETE CASCADE,
+              role_name      TEXT    NOT NULL,
+              max_volunteers INTEGER,
+              display_order  INTEGER NOT NULL DEFAULT 0
+          );
+          CREATE TABLE IF NOT EXISTS volunteer_signups
+          (
+              id           SERIAL PRIMARY KEY,
+              event_id     INTEGER NOT NULL REFERENCES events (id) ON DELETE CASCADE,
+              role_id      INTEGER NOT NULL REFERENCES event_volunteer_roles (id) ON DELETE CASCADE,
+              member_id    INTEGER NOT NULL REFERENCES members (id) ON DELETE CASCADE,
+              signed_up_at TIMESTAMP DEFAULT NOW(),
+              UNIQUE (event_id, member_id)
+          );
+      `);
+
     logger.info('PostgreSQL schema creation complete');
     return;
   }

@@ -1,0 +1,35 @@
+extends ../layout
+
+block page_title
+    | Results: #{vote.title}
+
+block content
+    a.btn-outline(href="/admin/votes" style="margin-bottom:1.5rem; display:inline-block") &larr; Back
+
+    .admin-panel(style="margin-bottom:1.5rem")
+        div(style="display:flex; align-items:center; gap:1rem; margin-bottom:0.75rem")
+            span(class=`badge badge-${vote.status === 'open' ? 'active' : 'cancelled'}`)= vote.status
+            span(style="color:#666; font-size:0.9rem") #{totalVotes} #{totalVotes === 1 ? 'vote' : 'votes'} cast
+        if vote.description
+            p(style="color:#555; margin-bottom:1rem")= vote.description
+        if vote.closes_at
+            p.text-muted(style="font-size:0.875rem") #{vote.status === 'closed' ? 'Closed' : 'Closes'} #{formatDateLong(vote.closes_at)}
+
+    if results.length
+        .admin-panel
+            each result in results
+                - const pct = totalVotes > 0 ? Math.round(result.count / totalVotes * 100) : 0
+                div(style="margin-bottom:1.25rem")
+                    div(style="display:flex; justify-content:space-between; margin-bottom:0.375rem")
+                        span(style="font-weight:500")= result.label
+                        span(style="color:#666; font-size:0.875rem") #{result.count} (#{pct}%)
+                    div(style="background:#e5e5e5; border-radius:4px; height:10px")
+                        div(style=`background:#69be28; border-radius:4px; height:10px; width:${pct}%`)
+    else
+        .admin-panel
+            p(style="color:#666") No votes cast yet.
+
+    if vote.status === 'open'
+        form(method="POST" action=`/admin/votes/${vote.id}/close` style="margin-top:1rem")
+            input(type="hidden" name="_csrf" value=csrfToken)
+            button.btn(type="submit" onclick="return confirm('Close this vote?')") Close Vote

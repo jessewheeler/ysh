@@ -902,4 +902,176 @@ router.post('/admins/:id/delete', requireSuperAdmin, async (req, res) => {
   res.redirect('/admin/admins');
 });
 
+// --- Votes ---
+
+const votesRepo = require('../db/repos/votes');
+
+router.get('/votes', async (req, res, next) => {
+    try {
+        const votes = await votesRepo.listAll();
+        res.render('admin/votes/list', {votes});
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.get('/votes/new', (req, res) => {
+    res.render('admin/votes/form', {vote: null});
+});
+
+router.post('/votes', async (req, res, next) => {
+    try {
+        const {title, description, closes_at, options} = req.body;
+        if (!title) {
+            req.session.flash_error = 'Title is required.';
+            return res.redirect('/admin/votes/new');
+        }
+        const labels = (Array.isArray(options) ? options : [options])
+            .map(l => (l || '').trim())
+            .filter(Boolean);
+        if (labels.length < 2) {
+            req.session.flash_error = 'At least two options are required.';
+            return res.redirect('/admin/votes/new');
+        }
+        const vote = await votesRepo.create({title, description, closes_at: closes_at || null});
+        await votesRepo.createOptions(vote.id, labels);
+        req.session.flash_success = 'Vote created.';
+        res.redirect('/admin/votes');
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.post('/votes/:id/close', async (req, res, next) => {
+    try {
+        await votesRepo.close(req.params.id);
+        req.session.flash_success = 'Vote closed.';
+        res.redirect('/admin/votes');
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.get('/votes/:id/results', async (req, res, next) => {
+    try {
+        const vote = await votesRepo.findById(req.params.id);
+        if (!vote) return res.status(404).render('error', {status: 404, message: 'Vote not found'});
+        const options = await votesRepo.getOptions(vote.id);
+        const results = await votesRepo.getResults(vote.id);
+        const totalVotes = await votesRepo.getTotalVotes(vote.id);
+        res.render('admin/votes/results', {vote, options, results, totalVotes});
+    } catch (err) {
+        next(err);
+    }
+});
+
+// --- Events ---
+
+const eventsRepo = require('../db/repos/events');
+
+router.get('/events', async (req, res, next) => {
+    try {
+        const events = await eventsRepo.listAll();
+        res.render('admin/events/list', {events});
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.get('/events/new', (req, res) => {
+    res.render('admin/events/form', {event: null, roles: []});
+});
+
+router.post('/events', async (req, res, next) => {
+    try {
+        const {title, body, event_type, event_date, location, status} = req.body;
+        if (!title || !event_type) {
+            req.session.flash_error = 'Title and event type are required.';
+            return res.redirect('/admin/events/new');
+        }
+        const event = await eventsRepo.create({title, body, event_type, event_date, location, status});
+        req.session.flash_success = 'Event created.';
+        res.redirect(`/admin/events/${event.id}/edit`);
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.get('/events/:id/edit', async (req, res, next) => {
+    try {
+        const event = await eventsRepo.findById(req.params.id);
+        if (!event) return res.status(404).render('error', {status: 404, message: 'Event not found'});
+        const roles = await eventsRepo.getRoles(event.id);
+        res.render('admin/events/form', {event, roles});
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.post('/events/:id', async (req, res, next) => {
+    try {
+        const {title, body, event_type, event_date, location, status} = req.body;
+        if (!title || !event_type) {
+            req.session.flash_error = 'Title and event type are required.';
+            return res.redirect(`/admin/events/${req.params.id}/edit`);
+        }
+        await eventsRepo.update(req.params.id, {title, body, event_type, event_date, location, status});
+        req.session.flash_success = 'Event updated.';
+        res.redirect(`/admin/events/${req.params.id}/edit`);
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.post('/events/:id/delete', async (req, res, next) => {
+    try {
+        await eventsRepo.deleteById(req.params.id);
+        req.session.flash_success = 'Event deleted.';
+        res.redirect('/admin/events');
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Volunteer role management
+router.post('/events/:id/roles', async (req, res, next) => {
+    try {
+        const {role_name, max_volunteers} = req.body;
+        if (!role_name) {
+            req.session.flash_error = 'Role name is required.';
+            return res.redirect(`/admin/events/${req.params.id}/edit`);
+        }
+        const roles = await eventsRepo.getRoles(req.params.id);
+        await eventsRepo.createRole(req.params.id, {
+            role_name: role_name.trim(),
+            max_volunteers: max_volunteers ? parseInt(max_volunteers) : null,
+            display_order: roles.length,
+        });
+        res.redirect(`/admin/events/${req.params.id}/edit`);
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.post('/events/:id/roles/:roleId/delete', async (req, res, next) => {
+    try {
+        await eventsRepo.deleteRole(req.params.roleId);
+        res.redirect(`/admin/events/${req.params.id}/edit`);
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.get('/events/:id/volunteers', async (req, res, next) => {
+    try {
+        const event = await eventsRepo.findById(req.params.id);
+        if (!event) return res.status(404).render('error', {status: 404, message: 'Event not found'});
+        const signups = await eventsRepo.getSignupsByEvent(event.id);
+        const roles = await eventsRepo.getRoles(event.id);
+        res.render('admin/events/volunteers', {event, signups, roles});
+    } catch (err) {
+        next(err);
+    }
+});
+
 module.exports = router;

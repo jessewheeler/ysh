@@ -276,6 +276,60 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_audit_log_table_record ON audit_log(table_name, record_id);
   CREATE INDEX IF NOT EXISTS idx_audit_log_changed_at ON audit_log(changed_at);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_members_email_primary ON members(email) WHERE primary_member_id IS NULL;
+
+  CREATE TABLE IF NOT EXISTS votes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','closed')),
+    closes_at TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS vote_options (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vote_id INTEGER NOT NULL REFERENCES votes(id) ON DELETE CASCADE,
+    label TEXT NOT NULL,
+    display_order INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS vote_responses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vote_id INTEGER NOT NULL REFERENCES votes(id) ON DELETE CASCADE,
+    member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    option_id INTEGER NOT NULL REFERENCES vote_options(id) ON DELETE CASCADE,
+    voted_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(vote_id, member_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    body TEXT,
+    event_type TEXT NOT NULL CHECK(event_type IN ('game','watch_party')),
+    event_date TEXT,
+    location TEXT,
+    status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','published')),
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS event_volunteer_roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    role_name TEXT NOT NULL,
+    max_volunteers INTEGER,
+    display_order INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS volunteer_signups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    role_id INTEGER NOT NULL REFERENCES event_volunteer_roles(id) ON DELETE CASCADE,
+    member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    signed_up_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(event_id, member_id)
+  );
 `;
 
 /**

@@ -1,0 +1,52 @@
+extends layout
+
+block page_title
+    | #{event.title}
+
+block content
+    a.btn-outline(href="/members/events" style="margin-bottom:1.5rem; display:inline-block") &larr; All Events
+
+    .admin-panel(style="margin-bottom:1.5rem")
+        p(style="margin-bottom:0.5rem")
+            span(class=`badge badge-${event.event_type === 'watch_party' ? 'pending' : 'active'}`)= event.event_type === 'watch_party' ? 'Watch Party' : 'Annual Game'
+        h2(style="margin-bottom:1rem")= event.title
+        if event.event_date || event.location
+            table(style="font-size:0.95rem; margin-bottom:1rem")
+                if event.event_date
+                    tr
+                        td(style="color:#666; padding-right:1.5rem; padding-bottom:0.25rem; white-space:nowrap") Date
+                        td= formatDateLong(event.event_date)
+                if event.location
+                    tr
+                        td(style="color:#666; padding-right:1.5rem; padding-bottom:0.25rem; white-space:nowrap") Location
+                        td= event.location
+        if event.body
+            .rich-text!= event.body
+
+    if event.event_type === 'watch_party'
+        .admin-panel
+            h3(style="margin-bottom:1rem") Volunteer Sign-Up
+
+            if mySignup
+                .flash.flash-success(style="margin-bottom:1rem") You're signed up as: #{mySignup.role_name}
+                form(method="POST" action=`/members/events/${event.id}/volunteer/remove`)
+                    input(type="hidden" name="_csrf" value=csrfToken)
+                    button.btn-outline(type="submit") Remove My Signup
+            else if roles.length
+                form(method="POST" action=`/members/events/${event.id}/volunteer`)
+                    input(type="hidden" name="_csrf" value=csrfToken)
+                    .form-group(style="margin-bottom:1rem")
+                        label(style="display:block; margin-bottom:0.5rem; font-weight:600") Select a role
+                        each role in roles
+                            label(style=`display:flex; align-items:center; gap:0.75rem; padding:0.625rem 0.75rem; border:1px solid ${role.isFull ? '#e0e0e0' : '#ccc'}; border-radius:6px; margin-bottom:0.5rem; cursor:${role.isFull ? 'not-allowed' : 'pointer'}; background:${role.isFull ? '#f8f8f8' : '#fff'}; color:${role.isFull ? '#999' : 'inherit'}`)
+                                input(type="radio" name="role_id" value=role.id disabled=role.isFull)
+                                span
+                                    | #{role.role_name}
+                                    if role.max_volunteers
+                                        span(style="color:#888; font-size:0.875rem; margin-left:0.5rem") #{role.signupCount}/#{role.max_volunteers} signed up
+                                    if role.isFull
+                                        span.badge.badge-expired(style="margin-left:0.5rem; font-size:0.75rem") Full
+                    .form-actions
+                        button.btn(type="submit") Sign Up to Volunteer
+            else
+                p(style="color:#666") No volunteer roles have been configured for this event yet.

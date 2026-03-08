@@ -1,0 +1,73 @@
+extends ../layout
+
+block page_title
+    if event
+        | Edit Event
+    else
+        | New Event
+
+block content
+    form(method="POST" action=event ? `/admin/events/${event.id}` : '/admin/events')
+        input(type="hidden" name="_csrf" value=csrfToken)
+        .form-group
+            label(for="title") Title *
+            input#title(type="text" name="title" value=(event ? event.title : '') required autofocus)
+        .form-group
+            label(for="event_type") Type *
+            select#event_type(name="event_type" required)
+                option(value="game" selected=(event && event.event_type === 'game')) Annual Game
+                option(value="watch_party" selected=(event && event.event_type === 'watch_party')) Watch Party
+        .form-grid
+            .form-group
+                label(for="event_date") Date
+                input#event_date(type="date" name="event_date" value=(event && event.event_date ? event.event_date.split('T')[0] : ''))
+            .form-group
+                label(for="location") Location
+                input#location(type="text" name="location" value=(event ? event.location || '' : ''))
+        .form-group
+            label(for="body") Details (rich text)
+            textarea#body(name="body" rows="10")= event ? event.body || '' : ''
+        .form-group
+            label
+                input(type="checkbox" name="status" value="published" checked=(event && event.status === 'published'))
+                |  Published (visible to members)
+        .form-actions
+            button.btn(type="submit")= event ? 'Save Changes' : 'Create Event'
+            a.btn-outline(href="/admin/events") Cancel
+
+    if event && event.event_type === 'watch_party'
+        hr(style="margin:2rem 0")
+        .admin-panel
+            h3(style="margin-bottom:0.25rem") Volunteer Roles
+            p.text-muted(style="margin-bottom:1.25rem") Configure what roles members can sign up for.
+
+            if roles.length
+                table.admin-table(style="margin-bottom:1.5rem")
+                    thead
+                        tr
+                            th Role
+                            th Max Volunteers
+                            th
+                    tbody
+                        each role in roles
+                            tr
+                                td= role.role_name
+                                td= role.max_volunteers || 'Unlimited'
+                                td
+                                    form(method="POST" action=`/admin/events/${event.id}/roles/${role.id}/delete` style="display:inline")
+                                        input(type="hidden" name="_csrf" value=csrfToken)
+                                        button.btn-sm.btn-danger(type="submit" onclick="return confirm('Delete this role?')") Delete
+
+            form(method="POST" action=`/admin/events/${event.id}/roles`)
+                input(type="hidden" name="_csrf" value=csrfToken)
+                .form-grid
+                    .form-group
+                        label(for="role_name") Role Name *
+                        input#role_name(type="text" name="role_name" placeholder="e.g. Setup, Greeter, Food & Drinks")
+                    .form-group
+                        label(for="max_volunteers") Max Volunteers (leave blank for unlimited)
+                        input#max_volunteers(type="number" name="max_volunteers" min="1" placeholder="Unlimited")
+                button.btn-outline(type="submit") Add Role
+
+            if roles.length
+                p(style="margin-top:1rem"): a(href=`/admin/events/${event.id}/volunteers`) View volunteer signups &rarr;
