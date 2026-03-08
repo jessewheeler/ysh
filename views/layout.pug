@@ -18,15 +18,15 @@ html(lang="en")
           ul.dropdown-menu
             li: a(href="/bios") Board Member Bios
         li: a(href="/#news") Team News
-          li.dropdown
-              a.dropdown-toggle(href="/membership") Membership
-              ul.dropdown-menu
-                  li: a(href="/membership") Join / Renew
-                  li: a(href="/members/login") Member Login
+        li.dropdown
+          a.dropdown-toggle(href="/membership") Membership
+          ul.dropdown-menu
+            li: a(href="/membership") Join / Renew
+            li: a(href="/members/login") Member Login
         li: a(href="/#charitable") Charitable Activity
         li: a(href="/#contact") Contact
-          if isMember
-              li: a(href="/members") Members
+        if isMember
+          li: a(href="/members") Members
         if isAdmin
           li: a(href="/admin/dashboard" style="color: #69be28") Admin
 

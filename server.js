@@ -49,7 +49,7 @@ const isTest = process.env.NODE_ENV === 'test';
 const isDev = process.env.NODE_ENV === 'development';
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-    max: isTest || isDev ? 1000 : 10,
+  max: isTest || isDev ? 1000 : 10,
   message: 'Too many login attempts. Please try again later.',
   standardHeaders: true,
   legacyHeaders: false,

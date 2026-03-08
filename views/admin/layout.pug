@@ -21,8 +21,8 @@ html(lang="en")
           a(href="/admin/gallery" class=(currentPath && currentPath.startsWith('/admin/gallery') ? 'active' : '')) Gallery
           a(href="/admin/bios" class=(currentPath && currentPath.startsWith('/admin/bios') ? 'active' : '')) Bios
           a(href="/admin/payments" class=(currentPath && currentPath.startsWith('/admin/payments') ? 'active' : '')) Payments
-            a(href="/admin/votes" class=(currentPath && currentPath.startsWith('/admin/votes') ? 'active' : '')) Votes
-            a(href="/admin/events" class=(currentPath && currentPath.startsWith('/admin/events') ? 'active' : '')) Events
+          a(href="/admin/votes" class=(currentPath && currentPath.startsWith('/admin/votes') ? 'active' : '')) Votes
+          a(href="/admin/events" class=(currentPath && currentPath.startsWith('/admin/events') ? 'active' : '')) Events
           a(href="/admin/emails" class=(currentPath && currentPath.startsWith('/admin/emails') ? 'active' : '')) Emails
           if adminRole === 'super_admin'
             a(href="/admin/settings" class=(currentPath === '/admin/settings' ? 'active' : '')) Settings
