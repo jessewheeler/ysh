@@ -162,6 +162,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.querySelectorAll('form[data-draft]').forEach(initDraftSave);
 
+  // Spinner + disable on forms with data-spinner
+  document.querySelectorAll('form[data-spinner]').forEach(function (form) {
+    form.addEventListener('submit', function () {
+      var btn = form.querySelector('button[type="submit"]');
+      if (!btn || btn.disabled) return;
+      btn.disabled = true;
+      btn.dataset.originalText = btn.textContent;
+      btn.innerHTML = '<span class="btn-spinner"></span> ' + form.dataset.spinner;
+    });
+  });
+
   // Auto-submit forms when a select with data-autosubmit changes
   document.querySelectorAll('select[data-autosubmit]').forEach(function (select) {
     select.addEventListener('change', function () {
