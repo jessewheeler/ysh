@@ -343,31 +343,51 @@ router.post('/members/:id/card', async (req, res) => {
 });
 
 router.get('/members/:id/card/pdf', async (req, res) => {
+  const member = await memberRepo.findById(req.params.id);
+  if (!member) {
+    req.session.flash_error = 'Member not found.';
+    return res.redirect('/admin/members');
+  }
   const card = await cardsRepo.findLatestByMemberId(req.params.id);
   if (!card || !card.pdf_path) { req.session.flash_error = 'No card found.'; return res.redirect(`/admin/members/${req.params.id}`); }
+  const filename = `YSH-${member.first_name}-${member.last_name}-${card.year || 'card'}.pdf`;
   if (card.pdf_path.startsWith('http')) {
-    return res.redirect(card.pdf_path);
+    const resp = await fetch(card.pdf_path);
+    const buffer = Buffer.from(await resp.arrayBuffer());
+    res.set('Content-Type', 'application/pdf');
+    res.set('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(buffer);
   }
   const cardsDir = path.resolve(__dirname, '..', 'data', 'cards');
   const resolved = path.resolve(__dirname, '..', card.pdf_path);
   if (!resolved.startsWith(cardsDir + path.sep) && resolved !== cardsDir) {
     return res.status(403).send('Invalid file path');
   }
-  res.download(resolved);
+  res.download(resolved, filename);
 });
 
 router.get('/members/:id/card/png', async (req, res) => {
+  const member = await memberRepo.findById(req.params.id);
+  if (!member) {
+    req.session.flash_error = 'Member not found.';
+    return res.redirect('/admin/members');
+  }
   const card = await cardsRepo.findLatestByMemberId(req.params.id);
   if (!card || !card.png_path) { req.session.flash_error = 'No card found.'; return res.redirect(`/admin/members/${req.params.id}`); }
+  const filename = `YSH-${member.first_name}-${member.last_name}-${card.year || 'card'}.png`;
   if (card.png_path.startsWith('http')) {
-    return res.redirect(card.png_path);
+    const resp = await fetch(card.png_path);
+    const buffer = Buffer.from(await resp.arrayBuffer());
+    res.set('Content-Type', 'image/png');
+    res.set('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(buffer);
   }
   const cardsDir = path.resolve(__dirname, '..', 'data', 'cards');
   const resolved = path.resolve(__dirname, '..', card.png_path);
   if (!resolved.startsWith(cardsDir + path.sep) && resolved !== cardsDir) {
     return res.status(403).send('Invalid file path');
   }
-  res.download(resolved);
+  res.download(resolved, filename);
 });
 
 router.post('/members/:id/email-card', async (req, res) => {
