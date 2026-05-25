@@ -6,11 +6,31 @@ const path = require('path');
 const cardsRepo = require('../db/repos/cards');
 const storage = require('./storage');
 
-const CARD_WIDTH = 1050;
-const CARD_HEIGHT = 600;
+// Template-based card design — the background PNG is the official Sea Hawkers
+// membership card for the current season.  Only the member's name is stamped
+// on top.  To update for a new season see docs/card-template.md.
+const TEMPLATE_PNG = path.join(__dirname, '..', 'public', 'img', 'card-template.png');
+
+// Canvas dimensions must match the template PNG exactly.
+const CARD_WIDTH = 1008;
+const CARD_HEIGHT = 557;
+
 const NAVY = '#002a5c';
-const GREEN = '#69be28';
-const WHITE = '#ffffff';
+
+// ── Name-field calibration ────────────────────────────────────────────────────
+// These pixel coordinates point at the blank "Member Name:" underline on the
+// 1008×557 template.  If you replace the template PNG, re-calibrate these by
+// following the steps in docs/card-template.md.
+const NAME_X = 300;            // left edge of name text (after "Member Name:" label)
+const NAME_Y = 344;            // canvas baseline — sits on the underline
+const NAME_MAX_WIDTH = 680;    // clip before right border
+const NAME_FONT_SIZE = 36;     // px — tweak to taste
+// ─────────────────────────────────────────────────────────────────────────────
+
+// PDF output dimensions (0.5× of the 1008×557 template)
+const PDF_SCALE = 0.5;
+const PDF_WIDTH = Math.round(CARD_WIDTH * PDF_SCALE);   // 504
+const PDF_HEIGHT = Math.round(CARD_HEIGHT * PDF_SCALE); // 279
 
 const cardsDir = path.join(__dirname, '..', 'data', 'cards');
 
@@ -18,69 +38,18 @@ function ensureCardsDir() {
   if (!fs.existsSync(cardsDir)) fs.mkdirSync(cardsDir, { recursive: true });
 }
 
-// Try to load the logo image
-async function getLogo() {
-  const logoPath = path.join(__dirname, '..', 'public', 'img', 'logo.png');
-  if (fs.existsSync(logoPath)) {
-    return await loadImage(logoPath);
-  }
-  return null;
-}
-
 async function generatePNG(member) {
   const canvas = createCanvas(CARD_WIDTH, CARD_HEIGHT);
   const ctx = canvas.getContext('2d');
 
-  // Background
-  ctx.fillStyle = WHITE;
-  ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
+    // Draw official template as background
+    const template = await loadImage(TEMPLATE_PNG);
+    ctx.drawImage(template, 0, 0, CARD_WIDTH, CARD_HEIGHT);
 
-  // Navy top stripe (160px)
+    // Stamp member name on the blank "Member Name:" field
   ctx.fillStyle = NAVY;
-  ctx.fillRect(0, 0, CARD_WIDTH, 160);
-
-  // Logo
-  try {
-    const logo = await getLogo();
-    if (logo) {
-      ctx.drawImage(logo, 30, 20, 120, 120);
-    }
-  } catch (_e) { /* skip logo */ }
-
-  // Title text on navy stripe
-  ctx.fillStyle = WHITE;
-  ctx.font = 'bold 42px Arial, sans-serif';
-  ctx.fillText('YELLOWSTONE SEA HAWKERS', 170, 75);
-
-  ctx.font = '22px Arial, sans-serif';
-  ctx.fillStyle = GREEN;
-  ctx.fillText('Official Member Card', 170, 115);
-
-  // Member info on white body
-  ctx.fillStyle = '#333333';
-  ctx.font = 'bold 36px Arial, sans-serif';
-  ctx.fillText(`${member.first_name} ${member.last_name}`, 60, 240);
-
-  ctx.fillStyle = '#666666';
-  ctx.font = '26px Arial, sans-serif';
-  ctx.fillText(`Member #: ${member.member_number}`, 60, 300);
-  ctx.fillText(`Season: ${member.membership_year}`, 60, 345);
-
-  // Status badge
-  if (member.status === 'active') {
-    ctx.fillStyle = GREEN;
-    ctx.font = 'bold 22px Arial, sans-serif';
-    ctx.fillText('ACTIVE MEMBER', 60, 400);
-  }
-
-  // Green bottom accent bar (50px)
-  ctx.fillStyle = GREEN;
-  ctx.fillRect(0, CARD_HEIGHT - 50, CARD_WIDTH, 50);
-
-  // "Go Hawks!" text
-  ctx.fillStyle = WHITE;
-  ctx.font = 'bold 24px Arial, sans-serif';
-  ctx.fillText('Go Hawks!', CARD_WIDTH - 180, CARD_HEIGHT - 15);
+    ctx.font = `bold ${NAME_FONT_SIZE}px Arial, sans-serif`;
+    ctx.fillText(`${member.first_name} ${member.last_name}`, NAME_X, NAME_Y, NAME_MAX_WIDTH);
 
   const filename = `card-${member.id}-${member.membership_year}.png`;
   const buffer = canvas.toBuffer('image/png');
@@ -103,9 +72,8 @@ async function generatePDF(member) {
   const filename = `card-${member.id}-${member.membership_year}.pdf`;
 
     const buffer = await new Promise((resolve, reject) => {
-    // PDF at 3.5" x 2" (252pt x 144pt) — scaled up for quality
     const doc = new PDFDocument({
-      size: [525, 300],
+        size: [PDF_WIDTH, PDF_HEIGHT],
       margins: { top: 0, bottom: 0, left: 0, right: 0 },
     });
 
@@ -116,39 +84,23 @@ async function generatePDF(member) {
         pass.on('end', () => resolve(Buffer.concat(chunks)));
         pass.on('error', reject);
 
-    // Navy top stripe
-    doc.rect(0, 0, 525, 80).fill(NAVY);
+        // Draw official template as background
+        doc.image(TEMPLATE_PNG, 0, 0, {width: PDF_WIDTH, height: PDF_HEIGHT});
 
-    // Logo
-    const logoPath = path.join(__dirname, '..', 'public', 'img', 'logo.png');
-    if (fs.existsSync(logoPath)) {
-      try {
-        doc.image(logoPath, 15, 10, { width: 60 });
-      } catch (_e) { /* skip */ }
-    }
+        // Stamp member name — PDFKit y is top-of-text, so subtract font ascent
+        const pdfFontSize = NAME_FONT_SIZE * PDF_SCALE;
+        const pdfNameX = NAME_X * PDF_SCALE;
+        const pdfNameY = (NAME_Y - NAME_FONT_SIZE) * PDF_SCALE;
 
-    // Title
-    doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(20)
-      .text('YELLOWSTONE SEA HAWKERS', 85, 22, { width: 420 });
-    doc.fillColor(GREEN).font('Helvetica').fontSize(11)
-      .text('Official Member Card', 85, 52, { width: 420 });
-
-    // White body
-    doc.fillColor('#333333').font('Helvetica-Bold').fontSize(18)
-      .text(`${member.first_name} ${member.last_name}`, 30, 100, { width: 465 });
-    doc.fillColor('#666666').font('Helvetica').fontSize(13)
-      .text(`Member #: ${member.member_number}`, 30, 130, { width: 465 });
-    doc.text(`Season: ${member.membership_year}`, 30, 152, { width: 465 });
-
-    if (member.status === 'active') {
-      doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(11)
-        .text('ACTIVE MEMBER', 30, 185, { width: 465 });
-    }
-
-    // Green bottom bar
-    doc.rect(0, 275, 525, 25).fill(GREEN);
-    doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(12)
-      .text('Go Hawks!', 430, 279, { width: 80 });
+        doc.fillColor(NAVY)
+            .font('Helvetica-Bold')
+            .fontSize(pdfFontSize)
+            .text(
+                `${member.first_name} ${member.last_name}`,
+                pdfNameX,
+                pdfNameY,
+                {width: NAME_MAX_WIDTH * PDF_SCALE, lineBreak: false}
+            );
 
     doc.end();
     });

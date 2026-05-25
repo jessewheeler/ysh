@@ -14,11 +14,21 @@ async function findByMemberId(memberId) {
   );
 }
 
-async function upsertPng(memberId, year, pngPath) {
-  const existing = await db.get(
+async function findByMemberAndYear(memberId, year) {
+    if (year == null) {
+        return await db.get(
+            'SELECT id FROM membership_cards WHERE member_id = ? AND year IS NULL',
+            memberId
+        );
+    }
+    return await db.get(
     'SELECT id FROM membership_cards WHERE member_id = ? AND year = ?',
     memberId, year
   );
+}
+
+async function upsertPng(memberId, year, pngPath) {
+    const existing = await findByMemberAndYear(memberId, year);
 
   if (existing) {
     return await db.run('UPDATE membership_cards SET png_path = ? WHERE id = ?', pngPath, existing.id);
@@ -30,10 +40,7 @@ async function upsertPng(memberId, year, pngPath) {
 }
 
 async function upsertPdf(memberId, year, pdfPath) {
-  const existing = await db.get(
-    'SELECT id FROM membership_cards WHERE member_id = ? AND year = ?',
-    memberId, year
-  );
+    const existing = await findByMemberAndYear(memberId, year);
 
   if (existing) {
     return await db.run('UPDATE membership_cards SET pdf_path = ? WHERE id = ?', pdfPath, existing.id);
