@@ -8,3 +8,4 @@ logs/
 coverage/
 robot/results/
 /.output.txt
+backups/

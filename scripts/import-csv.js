@@ -156,6 +156,7 @@ async function main() {
     const {generateMemberNumber} = require('../services/members');
     const paymentRepo = require('../db/repos/payments');
     const auditLog = require('../db/repos/auditLog');
+    const {runWithActor} = require('../db/audit-context');
 
     // ── Parse CSV ───────────────────────────────────────────────────────────────
     const text = fs.readFileSync(CSV_PATH, 'utf-8');
@@ -355,66 +356,75 @@ async function main() {
         }
 
         try {
-            // Insert primary member with membership_type and expiry_date inline
-            const result = await db.run(
-                `INSERT INTO members
-                 (member_number, first_name, last_name, email, phone,
-                  address_street, address_city, address_state, address_zip,
-                  membership_year, membership_type, join_date, expiry_date, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, 'active')`,
-                memberNumber,
-                firstName,
-                lastName,
-                email,
-                (row[C.phone] || '').trim() || null,
-                (row[C.address] || '').trim() || null,
-                (row[C.city] || '').trim() || null,
-                (row[C.state] || '').trim() || null,
-                (row[C.zip] || '').trim() || null,
-                MEMBERSHIP_YEAR,
-                membershipType,
-                joinDate ?? null,
-                EXPIRY_DATE
+            const counts = await runWithActor({id: null, email: 'csv-import'}, () =>
+                db.transaction(async () => {
+                    const result = await db.run(
+                        `INSERT INTO members
+                         (member_number, first_name, last_name, email, phone,
+                          address_street, address_city, address_state, address_zip,
+                          membership_year, membership_type, join_date, expiry_date, status)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, 'active')`,
+                        memberNumber,
+                        firstName,
+                        lastName,
+                        email,
+                        (row[C.phone] || '').trim() || null,
+                        (row[C.address] || '').trim() || null,
+                        (row[C.city] || '').trim() || null,
+                        (row[C.state] || '').trim() || null,
+                        (row[C.zip] || '').trim() || null,
+                        MEMBERSHIP_YEAR,
+                        membershipType,
+                        joinDate ?? null,
+                        EXPIRY_DATE
+                    );
+                    const primaryId = result.lastInsertRowid;
+
+                    // Audit log for primary member — construct from known insert data, no extra SELECT
+                    await auditLog.insert({
+                        tableName: 'members',
+                        recordId: primaryId,
+                        action: 'INSERT',
+                        actor: {id: null, email: 'csv-import'},
+                        oldValues: null,
+                        newValues: {
+                            id: primaryId, member_number: memberNumber,
+                            first_name: firstName, last_name: lastName, email,
+                            phone: (row[C.phone] || '').trim() || null,
+                            address_street: (row[C.address] || '').trim() || null,
+                            address_city: (row[C.city] || '').trim() || null,
+                            address_state: (row[C.state] || '').trim() || null,
+                            address_zip: (row[C.zip] || '').trim() || null,
+                            membership_year: MEMBERSHIP_YEAR, membership_type: membershipType,
+                            join_date: joinDate ?? null, expiry_date: EXPIRY_DATE, status: 'active',
+                        },
+                    });
+
+                    // Payment record
+                    let payments = 0;
+                    if (payment && payment.amount_cents) {
+                        await paymentRepo.create({
+                            member_id: primaryId,
+                            amount_cents: payment.amount_cents,
+                            status: 'completed',
+                            payment_method: payment.payment_method,
+                            description: `${MEMBERSHIP_YEAR}-${MEMBERSHIP_YEAR + 1} membership`,
+                        });
+                        payments = 1;
+                    }
+
+                    // Family sub-members (idempotent — upsertSubMembers checks before each insert)
+                    let subMembers = 0;
+                    if (membershipType === 'family') {
+                        subMembers = await upsertSubMembers(primaryId);
+                    }
+
+                    return {payments, subMembers};
+                })
             );
-            const primaryId = result.lastInsertRowid;
 
-            // Audit log for primary member — construct from known insert data, no extra SELECT
-            await auditLog.insert({
-                tableName: 'members',
-                recordId: primaryId,
-                action: 'INSERT',
-                actor: {id: null, email: 'csv-import'},
-                oldValues: null,
-                newValues: {
-                    id: primaryId, member_number: memberNumber,
-                    first_name: firstName, last_name: lastName, email,
-                    phone: (row[C.phone] || '').trim() || null,
-                    address_street: (row[C.address] || '').trim() || null,
-                    address_city: (row[C.city] || '').trim() || null,
-                    address_state: (row[C.state] || '').trim() || null,
-                    address_zip: (row[C.zip] || '').trim() || null,
-                    membership_year: MEMBERSHIP_YEAR, membership_type: membershipType,
-                    join_date: joinDate ?? null, expiry_date: EXPIRY_DATE, status: 'active',
-                },
-            });
-
-            // Payment record
-            if (payment && payment.amount_cents) {
-                await paymentRepo.create({
-                    member_id: primaryId,
-                    amount_cents: payment.amount_cents,
-                    status: 'completed',
-                    payment_method: payment.payment_method,
-                    description: `${MEMBERSHIP_YEAR}-${MEMBERSHIP_YEAR + 1} membership`,
-                });
-                stats.payments++;
-            }
-
-            // Family sub-members (idempotent — upsertSubMembers checks before each insert)
-            if (membershipType === 'family') {
-                stats.subMembers += await upsertSubMembers(primaryId);
-            }
-
+            stats.payments += counts.payments;
+            stats.subMembers += counts.subMembers;
             console.log(`  [OK] ${memberNumber} ${firstName} ${lastName} <${email}> (${membershipType})`);
             stats.imported++;
         } catch (e) {
