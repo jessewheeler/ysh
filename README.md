@@ -1,6 +1,6 @@
 # Yellowstone Sea Hawkers
 
-Website and membership platform for the Yellowstone Sea Hawkers, a Seahawks booster club based in Billings, Montana. Built with Express 5, Pug, and SQLite.
+Website and membership platform for the Yellowstone Sea Hawkers, a Seahawks booster club based in Billings, Montana. Built with Express 5, Pug, and SQLite (or PostgreSQL for production).
 
 ## Quick Start
 
@@ -58,10 +58,14 @@ Configured in `.env`. See `.env.example` for the full list.
 | `PORT`                  | Server port (default `3000`)                         |
 | `BASE_URL`              | Full base URL for Stripe redirect URLs               |
 | `SESSION_SECRET`        | Secret for signing session cookies                   |
+| `DATABASE_URL`          | PostgreSQL connection string (optional — uses SQLite if unset) |
 | `STRIPE_SECRET_KEY`     | Stripe secret key (`sk_test_...`)                    |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (`whsec_...`)          |
 | `MAILERSEND_API_KEY`    | MailerSend API key (`mlsn...`)                       |
 | `FROM_EMAIL`            | Sender address for all outbound emails               |
+| `HCAPTCHA_SITE_KEY`     | hCaptcha site key (optional — captcha disabled if unset) |
+| `HCAPTCHA_SECRET_KEY`   | hCaptcha secret key (optional)                       |
+| `GA_MEASUREMENT_ID`     | Google Analytics measurement ID (optional)           |
 | `B2_ENDPOINT`           | Backblaze B2 S3 endpoint (optional)                  |
 | `B2_REGION`             | Backblaze B2 region (optional)                       |
 | `B2_BUCKET`             | Backblaze B2 bucket name (optional)                  |
@@ -69,7 +73,7 @@ Configured in `.env`. See `.env.example` for the full list.
 | `B2_APP_KEY`            | Backblaze B2 application key (optional)              |
 | `B2_PUBLIC_URL`         | Backblaze B2 public URL prefix (optional)            |
 
-> **Note:** The Stripe publishable key is configured in **Admin > Settings**, not as an environment variable. B2 storage vars are optional — the app falls back to local disk when they're not set.
+> **Note:** The Stripe publishable key is configured in **Admin > Settings**, not as an environment variable. `DATABASE_URL`, hCaptcha, GA, and B2 vars are all optional — the app falls back to SQLite, no captcha, no analytics, and local disk storage when they're not set.
 
 ## Features
 
@@ -84,12 +88,17 @@ Configured in `.env`. See `.env.example` for the full list.
 - **Two roles**: `super_admin` (full access including Settings and admin management) and `editor` (content management only)
 - **Dashboard** with member count, revenue, and recent activity
 - Full CRUD for **members**, **announcements**, **gallery images**, and **board bios**
+- **Family memberships** — upgrade individual members to family, attach/detach family members
+- **CSV export** for members and payments ledger
+- **Manual payment entry** — record offline payments against a member
 - **Site settings** editor (hero text, about text, dues amount, gallery album URL, contact email) — super admins only
 - **Admin management** — super admins can add/remove admin accounts
 - **Payments** ledger tied to Stripe
+- **Renewal reminders** — send bulk renewal emails to members due for renewal
 - **Email blast** composer that sends to all active members
 - **Email log** of every outbound message
 - **Membership card** generation (PDF + PNG) with download and email delivery
+- **Audit log** (super_admin only) — filterable, paginated log of all admin-initiated data changes with per-field diffs
 
 ### Stripe Integration
 1. User fills out `/membership` form
@@ -105,6 +114,7 @@ All emails use a branded HTML template (navy header, white body, gray footer). T
 - **Welcome** -- sent after payment with membership details
 - **Payment confirmation** -- receipt with amount, date, member number
 - **Card delivery** -- PDF and PNG attached
+- **Renewal reminder** -- sent to members due for renewal (bulk or individual)
 - **Blast** -- admin-composed, sent individually to each active member
 - **Contact form** -- forwarded to the contact email from site settings
 - **OTP** -- one-time login code for admin authentication
@@ -123,49 +133,52 @@ Every send is logged to the `emails_log` table.
 
 ## Tech Stack
 
-| Layer           | Technology                         |
-|-----------------|------------------------------------|
-| Runtime         | Node.js + Express 5                |
-| Templates       | Pug 3                              |
-| Database        | SQLite via better-sqlite3          |
-| Sessions        | express-session + connect-sqlite3  |
-| Payments        | Stripe Checkout                    |
-| Email           | MailerSend (REST API via fetch)    |
-| Card generation | pdfkit (PDF) + canvas (PNG)        |
-| Security        | helmet, express-rate-limit, bcrypt |
-| File uploads    | multer                             |
-| Dev tooling     | nodemon, dotenv                    |
+| Layer           | Technology                                              |
+|-----------------|---------------------------------------------------------|
+| Runtime         | Node.js + Express 5                                     |
+| Templates       | Pug 3                                                   |
+| Database        | SQLite (better-sqlite3) or PostgreSQL (pg) via env var  |
+| Sessions        | express-session + connect-sqlite3 / connect-pg-simple   |
+| Payments        | Stripe Checkout                                         |
+| Email           | MailerSend (REST API via fetch)                         |
+| Card generation | pdfkit (PDF) + canvas (PNG)                             |
+| Security        | helmet, express-rate-limit, bcrypt, hCaptcha            |
+| File uploads    | multer                                                  |
+| Logging         | Winston + Morgan                                        |
+| Dev tooling     | nodemon, dotenv                                         |
 
 ## Database Schema
 
-Nine tables managed by `db/migrate.js`. See [`db/README.md`](db/README.md) for the full schema.
+Ten tables defined in `db/schema.js`, applied by `db/migrate.js`. See [`db/README.md`](db/README.md) for the full schema.
 
-| Table              | Purpose                                  |
-|--------------------|------------------------------------------|
-| `members`          | Member profiles and status               |
-| `payments`         | Stripe payment records                   |
-| `announcements`    | Homepage news cards                      |
-| `gallery_images`   | Event gallery photos                     |
-| `bios`             | Board member bios                        |
-| `site_settings`    | Key-value config (hero text, dues, etc.) |
-| `emails_log`       | Log of every outbound email              |
-| `membership_cards` | Generated card file paths                |
-| `admins`           | Admin accounts, roles, and OTP state     |
+| Table              | Purpose                                                    |
+|--------------------|------------------------------------------------------------|
+| `members`          | Member profiles and status                                 |
+| `payments`         | Stripe and manual payment records                          |
+| `announcements`    | Homepage news cards                                        |
+| `gallery_images`   | Event gallery photos                                       |
+| `bios`             | Board member bios                                          |
+| `site_settings`    | Key-value config (hero text, dues, etc.)                   |
+| `emails_log`       | Log of every outbound email                                |
+| `membership_cards` | Generated card file paths                                  |
+| `admins`           | Admin accounts, roles, and OTP state                       |
+| `audit_log`        | Admin-initiated data changes with actor, old/new JSON diff |
 
 ## Route Map
 
 ### Public (`routes/index.js`)
 
-| Method | Path                  | Description                     |
-|--------|-----------------------|---------------------------------|
-| GET    | `/`                   | Homepage                        |
-| GET    | `/bios`               | Board bios                      |
-| GET    | `/membership`         | Signup form                     |
-| POST   | `/membership`         | Create member + Stripe Checkout |
-| GET    | `/membership/success` | Post-payment thank you          |
-| GET    | `/membership/cancel`  | Payment cancelled               |
-| POST   | `/contact`            | Send contact email              |
-| GET    | `/contact/success`    | Contact confirmation            |
+| Method   | Path                  | Description                     |
+|----------|-----------------------|---------------------------------|
+| GET      | `/`                   | Homepage                        |
+| GET      | `/bios`               | Board bios                      |
+| GET      | `/membership`         | Signup form                     |
+| POST     | `/membership`         | Create member + Stripe Checkout |
+| GET      | `/membership/success` | Post-payment thank you          |
+| GET      | `/membership/cancel`  | Payment cancelled               |
+| POST     | `/contact`            | Send contact email              |
+| GET      | `/contact/success`    | Contact confirmation            |
+| GET/POST | `/renew/:token`       | Member self-serve renewal       |
 
 ### Stripe (`routes/stripe.js`)
 
@@ -175,32 +188,44 @@ Nine tables managed by `db/migrate.js`. See [`db/README.md`](db/README.md) for t
 
 ### Admin (`routes/admin.js`) -- all require login except `/admin/login*`
 
-| Method   | Path                              | Description                         |
-|----------|-----------------------------------|-------------------------------------|
-| GET/POST | `/admin/login`                    | Email OTP login                     |
-| GET/POST | `/admin/login/verify`             | OTP code verification               |
-| POST     | `/admin/login/resend`             | Resend OTP code                     |
-| POST     | `/admin/logout`                   | Destroy session                     |
-| GET      | `/admin/dashboard`                | Stats + recent activity             |
-| GET/POST | `/admin/members`                  | List + create                       |
-| GET/POST | `/admin/members/:id`              | View + update                       |
-| POST     | `/admin/members/:id/delete`       | Delete member                       |
-| POST     | `/admin/members/:id/card`         | Generate card                       |
-| GET      | `/admin/members/:id/card/pdf`     | Download PDF                        |
-| GET      | `/admin/members/:id/card/png`     | Download PNG                        |
-| POST     | `/admin/members/:id/email-card`   | Email card to member                |
-| GET/POST | `/admin/announcements[/:id]`      | CRUD                                |
-| POST     | `/admin/announcements/:id/delete` | Delete                              |
-| GET/POST | `/admin/gallery[/:id]`            | CRUD                                |
-| POST     | `/admin/gallery/:id/delete`       | Delete                              |
-| GET/POST | `/admin/bios[/:id]`               | CRUD                                |
-| POST     | `/admin/bios/:id/delete`          | Delete                              |
-| GET/POST | `/admin/settings`                 | Site settings (super_admin only)    |
-| GET      | `/admin/payments`                 | Payment ledger                      |
-| GET      | `/admin/emails`                   | Email log                           |
-| GET/POST | `/admin/emails/blast`             | Compose + send blast                |
-| GET/POST | `/admin/admins`                   | Admin list + create (super_admin)   |
-| POST     | `/admin/admins/:id/delete`        | Remove admin (super_admin)          |
+| Method   | Path                                        | Description                              |
+|----------|---------------------------------------------|------------------------------------------|
+| GET/POST | `/admin/login`                              | Email OTP login                          |
+| GET/POST | `/admin/login/verify`                       | OTP code verification                    |
+| POST     | `/admin/login/resend`                       | Resend OTP code                          |
+| POST     | `/admin/logout`                             | Destroy session                          |
+| GET      | `/admin/dashboard`                          | Stats + recent activity                  |
+| GET      | `/admin/members`                            | Member list                              |
+| GET      | `/admin/members/export`                     | CSV export of members                    |
+| GET      | `/admin/members/new`                        | New member form                          |
+| POST     | `/admin/members`                            | Create member                            |
+| GET/POST | `/admin/members/:id`                        | View + update member                     |
+| POST     | `/admin/members/:id/delete`                 | Delete member                            |
+| POST     | `/admin/members/:id/card`                   | Generate card                            |
+| GET      | `/admin/members/:id/card/pdf`               | Download PDF                             |
+| GET      | `/admin/members/:id/card/png`               | Download PNG                             |
+| POST     | `/admin/members/:id/email-card`             | Email card to member                     |
+| POST     | `/admin/members/:id/send-renewal`           | Send renewal reminder to member          |
+| POST     | `/admin/members/:id/payments`               | Record manual payment                    |
+| POST     | `/admin/members/:id/upgrade-to-family`      | Upgrade member to family plan            |
+| POST     | `/admin/members/:id/attach-to-family`       | Attach member to existing family         |
+| POST     | `/admin/members/:id/family-members`         | Add a family member                      |
+| POST     | `/admin/members/:id/family-members/:fid/remove` | Remove a family member               |
+| GET/POST | `/admin/announcements[/:id]`                | CRUD                                     |
+| POST     | `/admin/announcements/:id/delete`           | Delete                                   |
+| GET/POST | `/admin/gallery[/:id]`                      | CRUD                                     |
+| POST     | `/admin/gallery/:id/delete`                 | Delete                                   |
+| GET/POST | `/admin/bios[/:id]`                         | CRUD                                     |
+| POST     | `/admin/bios/:id/delete`                    | Delete                                   |
+| GET/POST | `/admin/settings`                           | Site settings (super_admin only)         |
+| GET      | `/admin/payments`                           | Payment ledger                           |
+| GET      | `/admin/payments/export`                    | CSV export of payments                   |
+| GET      | `/admin/emails`                             | Email log                                |
+| GET/POST | `/admin/emails/renewal`                     | Bulk renewal reminder composer + send    |
+| GET/POST | `/admin/emails/blast`                       | Compose + send blast                     |
+| GET      | `/admin/audit`                              | Audit log (super_admin only)             |
+| GET/POST | `/admin/admins`                             | Admin list + create (super_admin)        |
+| POST     | `/admin/admins/:id/delete`                  | Remove admin (super_admin)               |
 
 ## License
 
