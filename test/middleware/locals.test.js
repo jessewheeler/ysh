@@ -114,3 +114,37 @@ describe('injectLocals middleware', () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('formatDate helper', () => {
+  let formatDate;
+
+  beforeEach(async () => {
+    const res = buildRes();
+    await injectLocals(buildReq(), res, jest.fn());
+    formatDate = res.locals.formatDate;
+  });
+
+  test('returns empty string for null', () => {
+    expect(formatDate(null)).toBe('');
+  });
+
+  test('returns empty string for undefined', () => {
+    expect(formatDate(undefined)).toBe('');
+  });
+
+  test('formats a Date object to YYYY-MM-DD', () => {
+    expect(formatDate(new Date('2024-01-15T12:00:00Z'))).toBe('2024-01-15');
+  });
+
+  test('formats an ISO datetime string to YYYY-MM-DD', () => {
+    expect(formatDate('2024-01-15T12:34:56Z')).toBe('2024-01-15');
+  });
+
+  test('formats a SQLite datetime string (space separator) to YYYY-MM-DD', () => {
+    expect(formatDate('2024-01-15 12:34:56')).toBe('2024-01-15');
+  });
+
+  test('returns a plain date string unchanged', () => {
+    expect(formatDate('2024-01-15')).toBe('2024-01-15');
+  });
+});

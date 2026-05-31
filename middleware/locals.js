@@ -30,7 +30,7 @@ async function injectLocals(req, res, next) {
         return date.toISOString().split('T')[0];
       }
       if (typeof date === 'string') {
-        return date.split('T')[0];
+          return date.split('T')[0].split(' ')[0];
       }
       return '';
     };

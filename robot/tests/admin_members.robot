@@ -58,3 +58,23 @@ Members Search
     Get Text    .admin-table    contains    Alice Findable
     ${page_text}=    Get Text    .admin-table
     Should Not Contain    ${page_text}    Bob Hidden
+
+Edit Member Form Loads Without Error
+    [Documentation]    Navigating to the edit form must render the form, not a 500.
+    ...    Regression for: edit on member profile throws 500 when join_date is a
+    ...    PostgreSQL Date object instead of a plain string.
+    ${id}=    Seed Member    first_name=Editable    last_name=Member    email=editable@example.com
+    Login As Admin
+    Navigate To    /admin/members/${id}?edit=1
+    Wait For Elements State    input[name="first_name"]    visible    timeout=10s
+    Get Text    h1.admin-page-title    contains    Edit Member
+
+Edit Member Updates Fields
+    ${id}=    Seed Member    first_name=Before    last_name=Edit    email=before.edit@example.com
+    Login As Admin
+    Navigate To    /admin/members/${id}?edit=1
+    Wait For Elements State    input[name="first_name"]    visible    timeout=10s
+    Fill Text    input[name="first_name"]    After
+    Submit Admin Form
+    Flash Success Should Be Visible    updated
+    Get Text    .detail-table    contains    After Edit
