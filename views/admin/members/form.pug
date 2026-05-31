@@ -49,7 +49,7 @@ block content
         input#membership_year(type="number" name="membership_year" value=(member ? member.membership_year : new Date().getFullYear()))
       .form-group
         label(for="join_date") Join Date
-        input#join_date(type="date" name="join_date" value=(member && member.join_date ? member.join_date.split(' ')[0] : ''))
+        input#join_date(type="date" name="join_date" value=(member && member.join_date ? formatDate(member.join_date) : ''))
       .form-group
         label(for="status") Status
         select#status(name="status")
