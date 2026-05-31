@@ -740,6 +740,7 @@ router.post('/settings', requireSuperAdmin, async (req, res) => {
     'gallery_album_url', 'dues_amount_cents',
     'contact_email', 'stripe_publishable_key',
     'membership_expiry_date', 'renewal_reminder_days_before',
+    'social_facebook_url', 'social_instagram_url',
   ];
   const keyValues = {};
   for (const key of keys) {
