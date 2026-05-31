@@ -110,6 +110,12 @@ async function seed() {
     hero_media_url: '', // Path to photo or video file
     about_quote: "Yellowstone Sea Hawkers are the most passionate, hardcore, devoted, cheer-crazy, raisin' the roof, no-life-during-football-season-havin' fans on earth.",
     about_text: 'Our primary purpose is to have fun while supporting the Seahawks football team, their coaches, staff, our local charities, and organizations in the city of Billings and its surrounding communities.',
+    about_pillar1_title: 'Community Giving',
+    about_pillar1_text: 'We root for the Hawks and give back to Billings. From watch-party fundraisers to partnering with local nonprofits, making a difference in our community is at the heart of everything we do.',
+    about_pillar2_title: 'Seahawks Pride',
+    about_pillar2_text: 'No matter how far from Lumen Field, we bleed blue and green. Yellowstone Sea Hawkers bring the noise, the energy, and the heart of the 12th Man to every game day in Billings.',
+    about_pillar3_title: 'A Chapter That Matters',
+    about_pillar3_text: 'We are a growing, official Seahawkers chapter built on camaraderie and purpose — expanding our reach, welcoming new members, and proving that Seahawks fans can make a real difference wherever they are planted.',
     gallery_album_url: 'https://1drv.ms/a/c/10fffe404656475d/EqrBFR6ebKtMhwnrQj-bm6wBRoAUuX5GI4Rp3EdNVW5kIw?e=l1rltU',
     individual_dues_amount_cents: '1600',
     family_dues_amount_cents: '2600',

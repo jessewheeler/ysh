@@ -44,8 +44,27 @@ block content
       label(for="about_quote") About Quote
       textarea#about_quote(name="about_quote" rows="2")= site.about_quote || ''
     .form-group
-      label(for="about_text") About Text
+      label(for="about_text") About Intro Text
       textarea#about_text(name="about_text" rows="3")= site.about_text || ''
+    h4 About Pillars
+    .form-group
+      label(for="about_pillar1_title") Pillar 1 — Title
+      input#about_pillar1_title(type="text" name="about_pillar1_title" value=(site.about_pillar1_title || ''))
+    .form-group
+      label(for="about_pillar1_text") Pillar 1 — Text
+      textarea#about_pillar1_text(name="about_pillar1_text" rows="3")= site.about_pillar1_text || ''
+    .form-group
+      label(for="about_pillar2_title") Pillar 2 — Title
+      input#about_pillar2_title(type="text" name="about_pillar2_title" value=(site.about_pillar2_title || ''))
+    .form-group
+      label(for="about_pillar2_text") Pillar 2 — Text
+      textarea#about_pillar2_text(name="about_pillar2_text" rows="3")= site.about_pillar2_text || ''
+    .form-group
+      label(for="about_pillar3_title") Pillar 3 — Title
+      input#about_pillar3_title(type="text" name="about_pillar3_title" value=(site.about_pillar3_title || ''))
+    .form-group
+      label(for="about_pillar3_text") Pillar 3 — Text
+      textarea#about_pillar3_text(name="about_pillar3_text" rows="3")= site.about_pillar3_text || ''
 
     h3 Gallery
     .form-group
