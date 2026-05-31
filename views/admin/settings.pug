@@ -77,5 +77,15 @@ block content
       input#renewal_reminder_days_before(type="number" name="renewal_reminder_days_before" value=(site.renewal_reminder_days_before || '30') min="1" max="365")
       p.text-muted Members with expiry dates within this many days will be included in renewal reminder sends.
 
+    h3 Social Media
+    .form-group
+      label(for="social_facebook_url") Facebook Page URL
+      input#social_facebook_url(type="url" name="social_facebook_url" value=(site.social_facebook_url || ''))
+      p.text-muted Leave blank to hide
+    .form-group
+      label(for="social_instagram_url") Instagram URL
+      input#social_instagram_url(type="url" name="social_instagram_url" value=(site.social_instagram_url || ''))
+      p.text-muted Leave blank to hide
+
     .form-actions
       button.btn(type="submit") Save Settings

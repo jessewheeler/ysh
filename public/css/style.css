@@ -507,6 +507,24 @@ footer {
   color: #69be28;
 }
 
+.social-links {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.social-link svg {
+    fill: #69be28;
+    width: 28px;
+    height: 28px;
+    transition: fill 0.2s;
+    display: block;
+}
+
+.social-link:hover svg {
+    fill: #fff;
+}
+
 /* === Flash Messages === */
 .flash {
   padding: 1rem 2rem;
