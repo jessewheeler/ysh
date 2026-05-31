@@ -733,7 +733,11 @@ router.post('/settings', requireSuperAdmin, async (req, res) => {
   const keys = [
     'hero_title', 'hero_subtitle', 'hero_button_text', 'hero_button_url',
     'hero_media_type',
-    'about_quote', 'about_text', 'gallery_album_url', 'dues_amount_cents',
+    'about_quote', 'about_text',
+    'about_pillar1_title', 'about_pillar1_text',
+    'about_pillar2_title', 'about_pillar2_text',
+    'about_pillar3_title', 'about_pillar3_text',
+    'gallery_album_url', 'dues_amount_cents',
     'contact_email', 'stripe_publishable_key',
     'membership_expiry_date', 'renewal_reminder_days_before',
   ];

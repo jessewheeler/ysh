@@ -40,6 +40,26 @@ block content
         blockquote= site.about_quote
       if site.about_text
         p= site.about_text
+        if site.about_pillar1_title || site.about_pillar2_title || site.about_pillar3_title
+          .cards.cards-three
+            if site.about_pillar1_title
+              .card
+                .card-body
+                  h3= site.about_pillar1_title
+                  if site.about_pillar1_text
+                    p= site.about_pillar1_text
+            if site.about_pillar2_title
+              .card
+                .card-body
+                  h3= site.about_pillar2_title
+                  if site.about_pillar2_text
+                    p= site.about_pillar2_text
+            if site.about_pillar3_title
+              .card
+                .card-body
+                  h3= site.about_pillar3_title
+                  if site.about_pillar3_text
+                    p= site.about_pillar3_text
 
   section#gallery.section
     .container
