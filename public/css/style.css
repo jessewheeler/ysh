@@ -34,6 +34,7 @@ img {
   position: sticky;
   top: 0;
   z-index: 1000;
+  transition: padding 0.3s ease;
 }
 
 .nav-brand a {
@@ -43,8 +44,14 @@ img {
 }
 
 .nav-logo {
-  height: 50px;
-  margin: 0.5rem 0;
+  height: 120px;
+  margin: 0.75rem 0;
+  transition: height 0.3s ease, margin 0.3s ease;
+}
+
+.navbar--scrolled .nav-logo {
+  height: 75px;
+  margin: 0.25rem 0;
 }
 
 .nav-toggle {
@@ -546,6 +553,16 @@ footer {
 
 /* === Responsive === */
 @media (max-width: 768px) {
+  .nav-logo {
+    height: 82px;
+    margin: 0.5rem 0;
+  }
+
+  .navbar--scrolled .nav-logo {
+    height: 68px;
+    margin: 0.25rem 0;
+  }
+
   .nav-toggle {
     display: flex;
     margin-left: auto;

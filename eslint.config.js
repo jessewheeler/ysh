@@ -33,6 +33,7 @@ module.exports = [
     languageOptions: {
       globals: {
         document: 'readonly',
+        window: 'readonly',
         alert: 'readonly',
         confirm: 'readonly',
         FileReader: 'readonly',
