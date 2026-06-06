@@ -38,6 +38,7 @@ module.exports = [
         confirm: 'readonly',
         FileReader: 'readonly',
         localStorage: 'readonly',
+        navigator: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
         JSON: 'readonly',
