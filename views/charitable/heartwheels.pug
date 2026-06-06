@@ -1,0 +1,85 @@
+extends ../layout
+
+block content
+  section#heartwheels.section
+    .container
+      h2 Heartwheels
+
+      p.
+        Taku Hanson was one of the most special members of our Sea Hawkers family — a prior
+        Seahawker of the Month who embodied everything this community stands for. Even while
+        fighting his own battle with stage 4 cancer, Taku created Heartwheels with a simple
+        goal: make sure every child being treated at Montana's only cancer center received a
+        Hot Wheels toy to play with during treatment and take home.
+
+      p.
+        In a single year he donated 2,500 cars, and had already collected over 5,000 more
+        when he passed away. The program grew into something even bigger — adult cancer patients
+        began bringing cars to give to the kids receiving chemo alongside them, lifting the
+        spirits of the entire cancer ward.
+
+      p.
+        Taku was also a veteran who spent his time visiting other veterans in the hospital,
+        especially those who had no one else. He volunteered across the community — supporting
+        adults with Down Syndrome, helping local animal shelters — all while undergoing his
+        own treatment.
+
+      p.
+        His legacy continues today, lovingly carried forward by Brenda. Rest easy, Taku.
+        You made the world a better place.
+
+  section.section.alt-bg
+    .container
+      h3 Photos
+
+      .gallery-grid.gallery-grid--3col
+        img(src="/img/heartwheels/7932613618454906383.jpeg" alt="Heartwheels donation" loading="lazy")
+        img(src="/img/heartwheels/IMG_0010.jpeg" alt="Heartwheels donation" loading="lazy")
+        img(src="/img/heartwheels/IMG_0011.jpeg" alt="Heartwheels donation" loading="lazy")
+        img(src="/img/heartwheels/IMG_9719.jpeg" alt="Heartwheels donation" loading="lazy")
+        img(src="/img/heartwheels/IMG_9720.jpeg" alt="Heartwheels donation" loading="lazy")
+        img(src="/img/heartwheels/IMG_9726.jpeg" alt="Heartwheels donation" loading="lazy")
+
+  section.section
+    .container
+      h3 Keep Heartwheels Going
+
+      p.
+        Want to honor Taku's legacy by helping put a Hot Wheels car in the hands of a child
+        going through cancer treatment? Send new, unopened toy cars to Brenda.
+
+      .cards.cards-three
+        .card
+          .card-body
+            h3 Send Cars
+            p Mail new, unopened Hot Wheels cars directly to Brenda. Every car makes a difference.
+            button.btn-outline(type="button" data-modal="address-modal") Mailing Address
+        .card
+          .card-body
+            h3 Spread the Word
+            p.
+              Share Heartwheels with friends, family, and your community. The more people
+              who know, the more cars we can deliver.
+            button.btn-outline#hw-share-btn(type="button" hidden) Share
+        .card
+          .card-body
+            h3 Questions?
+            p.
+              Reach out through our contact form if you'd like to get involved in another way.
+            a.btn-outline(href="/#contact") Get in Touch
+
+  section.section.alt-bg
+    .container
+      a.btn-outline(href="/#charitable") &larr; Back to Charitable Work
+
+  #address-modal.hw-modal(role="dialog" aria-modal="true" aria-labelledby="address-modal-title")
+    .hw-modal-backdrop
+    .hw-modal-dialog
+      button.hw-modal-close(type="button" aria-label="Close") &times;
+      h3#address-modal-title Mailing Address
+      address.
+        Brenda Rosler-Hanson
+        #[br] 278 2nd Ave W N
+        #[br] Kalispell, MT 59901
+
+  script(src="/js/heartwheels.js")

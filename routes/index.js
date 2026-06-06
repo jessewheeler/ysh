@@ -123,6 +123,11 @@ router.post('/membership', async (req, res) => {
   }
 });
 
+// Charitable sub-pages
+router.get('/charitable/battle-of-the-birds', (_req, res) => res.render('charitable/battle-of-the-birds'));
+router.get('/charitable/nonprofits', (_req, res) => res.render('charitable/nonprofits'));
+router.get('/charitable/heartwheels', (_req, res) => res.render('charitable/heartwheels'));
+
 // Membership success / cancel
 router.get('/membership/success', (req, res) => {
   res.render('membership-success');

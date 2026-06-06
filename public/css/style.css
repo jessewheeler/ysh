@@ -364,6 +364,15 @@ blockquote {
   transform: scale(1.02);
 }
 
+.gallery-grid--3col {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+#heartwheels p,
+#battle-of-the-birds p {
+  margin-bottom: 1.25rem;
+}
+
 /* === Contact Form === */
 .contact-form {
   max-width: 600px;
@@ -634,4 +643,65 @@ footer {
   .form-group textarea {
     font-size: 16px; /* Prevents iOS zoom on focus */
   }
+}
+
+/* Heartwheels address modal */
+.hw-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+
+.hw-modal.hw-modal--open {
+  display: flex;
+}
+
+.hw-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.hw-modal-dialog {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+  padding: 2rem;
+  max-width: 360px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.hw-modal-dialog h3 {
+  color: #002a5c;
+  margin-bottom: 1rem;
+}
+
+.hw-modal-dialog address {
+  font-style: normal;
+  line-height: 1.8;
+  color: #333;
+  font-size: 1rem;
+}
+
+.hw-modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #555;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.hw-modal-close:hover {
+  color: #002a5c;
 }
