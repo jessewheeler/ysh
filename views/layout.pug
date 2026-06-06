@@ -20,7 +20,13 @@ html(lang="en")
             li: a(href="/bios") Board Member Bios
         li: a(href="/#news") Team News
         li: a(href="/membership") Membership
-        li: a(href="/#charitable") Charitable Activity
+        li.dropdown
+          a.dropdown-toggle(href="/#charitable") Charitable Work
+          ul.dropdown-menu
+            li: a(href="/charitable/battle-of-the-birds") Battle of the Birds
+            li: a(href="/charitable/nonprofits") Annual Non-Profit Support
+            li: a(href="/charitable/heartwheels") Heartwheels
+            li: a(href="https://forms.office.com/r/0HGbiXg01L" target="_blank") Report Charitable Activity
         li: a(href="/#contact") Contact
         if isAdmin
           li: a(href="/admin/dashboard" style="color: #69be28") Admin
