@@ -106,8 +106,8 @@ async function seed() {
     hero_subtitle: 'Join your fellow Seahawks fans at the Red Door Lounge in Billings for our watch party! Enjoy the game day specials on food and drink, and lots of fun!',
     hero_button_text: 'Red Door Lounge — 3875 Grand Ave, Billings, MT',
     hero_button_url: 'https://maps.app.goo.gl/rSenva2n2pinhLRL7',
-    hero_media_type: 'none', // 'none', 'photo', or 'video'
-    hero_media_url: '', // Path to photo or video file
+      hero_media_type: 'none',
+      hero_media_url: '',
     about_quote: "Yellowstone Sea Hawkers are the most passionate, hardcore, devoted, cheer-crazy, raisin' the roof, no-life-during-football-season-havin' fans on earth.",
     about_text: 'Our primary purpose is to have fun while supporting the Seahawks football team, their coaches, staff, our local charities, and organizations in the city of Billings and its surrounding communities.',
     about_pillar1_title: 'Community Giving',
@@ -117,12 +117,9 @@ async function seed() {
     about_pillar3_title: 'A Chapter That Matters',
     about_pillar3_text: 'We are a growing, official Seahawkers chapter built on camaraderie and purpose — expanding our reach, welcoming new members, and proving that Seahawks fans can make a real difference wherever they are planted.',
     gallery_album_url: 'https://1drv.ms/a/c/10fffe404656475d/EqrBFR6ebKtMhwnrQj-bm6wBRoAUuX5GI4Rp3EdNVW5kIw?e=l1rltU',
-    individual_dues_amount_cents: '1600',
-    family_dues_amount_cents: '2600',
     max_family_members: '6',
     contact_email: 'info@yellowstoneseahawkers.com',
     stripe_publishable_key: '',
-    membership_expiry_date: `${new Date().getFullYear()}-08-01`,
     renewal_reminder_days_before: '30',
     social_facebook_url: '',
     social_instagram_url: '',
@@ -130,6 +127,18 @@ async function seed() {
   for (const [k, v] of Object.entries(settings)) {
     await db.run('INSERT OR IGNORE INTO site_settings (key, value) VALUES (?, ?)', k, v);
   }
+
+    // --- Membership period (supersedes individual_dues_amount_cents / family_dues_amount_cents / membership_expiry_date settings) ---
+    const year = new Date().getFullYear();
+    await db.run(
+        `INSERT OR IGNORE INTO membership_periods (label, start_date, end_date, individual_dues_cents,
+                                                   family_dues_cents, electronic_surcharge_cents)
+        VALUES (?, ?, ?, ?, ?, ?)`,
+        `${year}–${year + 1} Season`,
+        `${year}-04-01`,
+        `${year + 1}-07-31`,
+        1600, 2600, 150
+    );
 
   logger.info('Seed complete');
 }

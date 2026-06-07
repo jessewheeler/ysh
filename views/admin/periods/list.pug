@@ -1,0 +1,47 @@
+extends ../layout
+
+block page_title
+    | Membership Periods
+
+block content
+    .admin-actions(style="margin-bottom: 1rem;")
+        a.btn(href="/admin/periods/new") + New Period
+
+    if periods.length === 0
+        p.text-muted No membership periods defined yet.
+    else
+        table.admin-table
+            thead
+                tr
+                    th Label
+                    th Start Date
+                    th End Date
+                    th Individual Dues
+                    th Family Dues
+                    th Surcharge
+                    th Status
+                    th
+            tbody
+                each period in periods
+                    tr
+                        td= period.label || '—'
+                        td= period.start_date
+                        td= period.end_date
+                        td= '$' + (period.individual_dues_cents / 100).toFixed(2)
+                        td= '$' + (period.family_dues_cents / 100).toFixed(2)
+                        td= '$' + (period.electronic_surcharge_cents / 100).toFixed(2)
+                        td
+                            if currentPeriod && currentPeriod.id === period.id
+                                span.badge.badge-active Current
+                            else if today > period.end_date
+                                span.badge.badge-expired Expired
+                            else if today < period.start_date
+                                span.badge Future
+                            else
+                                span.badge Inactive
+                        td
+                            a(href=`/admin/periods/${period.id}/edit`) Edit
+
+    p.text-muted(style="margin-top: 1.5rem;")
+        | Periods become current automatically when today falls within their date range.
+        | Overlapping seasons are allowed — the one with the latest start date is used for new signups.

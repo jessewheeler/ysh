@@ -15,6 +15,9 @@ const emailLogRepo = require('../db/repos/emailLog');
 const cardsRepo = require('../db/repos/cards');
 const settingsRepo = require('../db/repos/settings');
 const auditLogRepo = require('../db/repos/auditLog');
+const periodsRepo = require('../db/repos/membershipPeriods');
+const membershipYearsRepo = require('../db/repos/membershipYears');
+const membershipPeriodsService = require('../services/membershipPeriods');
 const logger = require('../services/logger');
 const isDevOrTest = ['development', 'test', 'dev'].includes(process.env.NODE_ENV);
 
@@ -297,7 +300,23 @@ router.get('/members/:id', async (req, res, next) => {
       familyPrimaries = await memberRepo.listFamilyPrimaries();
     }
 
-    res.render('admin/members/view', {member, payments, cards, emails, familyMembers, primaryMember, familyPrimaries});
+    const currentPeriod = await periodsRepo.getCurrent();
+    const {duesForType, centsToDollars} = membershipPeriodsService;
+    const defaultPaymentDollars = currentPeriod
+        ? centsToDollars(duesForType(currentPeriod, member.membership_type))
+        : '';
+
+    res.render('admin/members/view', {
+      member,
+      payments,
+      cards,
+      emails,
+      familyMembers,
+      primaryMember,
+      familyPrimaries,
+      currentPeriod,
+      defaultPaymentDollars
+    });
   } catch (err) {
     next(err);
   }
@@ -458,22 +477,30 @@ router.post('/members/:id/payments', async (req, res) => {
   });
 
   if (isActivating) {
-    const expiryDate = await settingsRepo.get('membership_expiry_date');
-    if (expiryDate) {
-      await memberRepo.setExpiryDate(member.id, expiryDate);
-      // Also activate and set expiry on family members
+    const currentPeriod = await periodsRepo.getCurrent();
+    if (currentPeriod) {
+      const completedPayments = await paymentRepo.findByMemberId(member.id);
+      const latestPayment = completedPayments.find(p => p.status === 'completed') || null;
+      const paymentId = latestPayment ? latestPayment.id : null;
+
+      await memberRepo.setExpiryDate(member.id, currentPeriod.end_date);
+      await memberRepo.setMembershipYear(member.id, new Date(currentPeriod.start_date).getFullYear());
+      await membershipYearsRepo.enroll(member.id, currentPeriod.id, paymentId);
+
       if (member.membership_type === 'family') {
         const familyMembers = await memberRepo.findFamilyMembers(member.id);
         for (const fm of familyMembers) {
           await memberRepo.activate(fm.id);
-          await memberRepo.setExpiryDate(fm.id, expiryDate);
+          await memberRepo.setExpiryDate(fm.id, currentPeriod.end_date);
+          await memberRepo.setMembershipYear(fm.id, new Date(currentPeriod.start_date).getFullYear());
+          await membershipYearsRepo.enroll(fm.id, currentPeriod.id, paymentId);
         }
       }
     }
     (req.logger || logger).info('Member activated via offline payment', {
       memberId: member.id,
       memberNumber: member.member_number,
-      expiryDate: await settingsRepo.get('membership_expiry_date'),
+      periodId: (await periodsRepo.getCurrent())?.id,
     });
   }
 
@@ -724,6 +751,55 @@ router.post('/bios/:id/delete', async (req, res) => {
   res.redirect('/admin/bios');
 });
 
+// --- Membership Periods (super_admin only) ---
+router.get('/periods', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const periods = await periodsRepo.list();
+    const today = new Date().toISOString().slice(0, 10);
+    const currentPeriod = await periodsRepo.getCurrent();
+    res.render('admin/periods/list', {periods, currentPeriod, today});
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/periods/new', requireSuperAdmin, async (req, res) => {
+  res.render('admin/periods/form', {period: null, centsToDollars: membershipPeriodsService.centsToDollars});
+});
+
+router.post('/periods', requireSuperAdmin, async (req, res) => {
+  try {
+    const data = membershipPeriodsService.validatePeriod(req.body);
+    await periodsRepo.create(data);
+    req.session.flash_success = 'Membership period created.';
+    res.redirect('/admin/periods');
+  } catch (err) {
+    req.session.flash_error = err.message;
+    res.redirect('/admin/periods/new');
+  }
+});
+
+router.get('/periods/:id/edit', requireSuperAdmin, async (req, res) => {
+  const period = await periodsRepo.get(req.params.id);
+  if (!period) {
+    req.session.flash_error = 'Period not found.';
+    return res.redirect('/admin/periods');
+  }
+  res.render('admin/periods/form', {period, centsToDollars: membershipPeriodsService.centsToDollars});
+});
+
+router.post('/periods/:id/edit', requireSuperAdmin, async (req, res) => {
+  try {
+    const data = membershipPeriodsService.validatePeriod(req.body);
+    await periodsRepo.update(req.params.id, data);
+    req.session.flash_success = 'Membership period updated.';
+    res.redirect('/admin/periods');
+  } catch (err) {
+    req.session.flash_error = err.message;
+    res.redirect(`/admin/periods/${req.params.id}/edit`);
+  }
+});
+
 // --- Settings (super_admin only) ---
 router.get('/settings', requireSuperAdmin, (req, res) => {
   res.render('admin/settings');
@@ -737,9 +813,9 @@ router.post('/settings', requireSuperAdmin, async (req, res) => {
     'about_pillar1_title', 'about_pillar1_text',
     'about_pillar2_title', 'about_pillar2_text',
     'about_pillar3_title', 'about_pillar3_text',
-    'gallery_album_url', 'dues_amount_cents',
+    'gallery_album_url',
     'contact_email', 'stripe_publishable_key',
-    'membership_expiry_date', 'renewal_reminder_days_before',
+    'renewal_reminder_days_before',
     'social_facebook_url', 'social_instagram_url',
   ];
   const keyValues = {};
@@ -812,8 +888,9 @@ router.get('/emails/renewal', async (req, res, next) => {
   try {
     const renewalService = require('../services/renewal');
     const members = await renewalService.findMembersNeedingRenewal();
-    const expiryDate = await settingsRepo.get('membership_expiry_date') || '';
     const daysBefore = await settingsRepo.get('renewal_reminder_days_before') || '30';
+    const currentPeriod = await periodsRepo.getCurrent();
+    const expiryDate = currentPeriod ? currentPeriod.end_date : '';
     res.render('admin/emails/renewal', {count: members.length, expiryDate, daysBefore});
   } catch (err) {
     next(err);

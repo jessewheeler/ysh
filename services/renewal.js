@@ -14,8 +14,10 @@ async function generateRenewalToken(memberId) {
 async function findMembersNeedingRenewal() {
     const daysStr = await settingsRepo.get('renewal_reminder_days_before') || '30';
     const days = parseInt(daysStr);
-    const currentYear = new Date().getFullYear();
-    return membersRepo.findNeedingRenewal(currentYear, days);
+    const periodsRepo = require('../db/repos/membershipPeriods');
+    const currentPeriod = await periodsRepo.getCurrent();
+    if (!currentPeriod) return [];
+    return membersRepo.findNeedingRenewal(currentPeriod.id, days);
 }
 
 async function sendBulkRenewalReminders(baseUrl) {

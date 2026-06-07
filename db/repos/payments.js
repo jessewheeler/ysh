@@ -87,6 +87,10 @@ async function countAll() {
   return row ? row.c : 0;
 }
 
+async function findByStripeSession(sessionId) {
+    return db.get('SELECT * FROM payments WHERE stripe_session_id = ?', sessionId);
+}
+
 module.exports = {
   create,
   completeBySessionId,
@@ -96,4 +100,5 @@ module.exports = {
   listRecent,
   sumCompletedCents,
   countAll,
+    findByStripeSession,
 };

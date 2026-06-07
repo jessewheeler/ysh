@@ -64,6 +64,39 @@ async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_audit_log_changed_at ON audit_log (changed_at);
     `);
 
+    // Backfill membership_periods from settings if the table is empty (PG)
+    const pgPeriodCount = await db.get('SELECT COUNT(*) as c FROM membership_periods');
+    if (pgPeriodCount && pgPeriodCount.c === 0) {
+      const pgIndividualDues = await db.get("SELECT value FROM site_settings WHERE key='individual_dues_amount_cents'");
+      const pgFamilyDues = await db.get("SELECT value FROM site_settings WHERE key='family_dues_amount_cents'");
+      const pgExpiryDate = await db.get("SELECT value FROM site_settings WHERE key='membership_expiry_date'");
+
+      const pgEndDate = pgExpiryDate?.value || `${new Date().getFullYear()}-07-31`;
+      const pgEndYear = parseInt(pgEndDate.slice(0, 4));
+      const pgStartDate = `${pgEndYear - 1}-04-01`;
+      const pgIndCents = parseInt(pgIndividualDues?.value) || 1600;
+      const pgFamCents = parseInt(pgFamilyDues?.value) || 2600;
+
+      const pgResult = await db.run(
+          `INSERT INTO membership_periods (label, start_date, end_date, individual_dues_cents, family_dues_cents, electronic_surcharge_cents)
+         VALUES ($1, $2, $3, $4, $5, 0) RETURNING id`,
+          `${pgEndYear - 1}–${pgEndYear} Season`, pgStartDate, pgEndDate, pgIndCents, pgFamCents
+      );
+      const pgPeriodId = pgResult.lastInsertRowid;
+
+      const pgActiveMembers = await db.all("SELECT id FROM members WHERE status='active' AND primary_member_id IS NULL");
+      for (const m of pgActiveMembers) {
+        await db.run(
+            'INSERT INTO membership_years (member_id, membership_period_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            m.id, pgPeriodId
+        );
+      }
+      logger.info('Backfilled membership_periods from settings (PG)', {
+        pgPeriodId,
+        activeMembers: pgActiveMembers.length
+      });
+    }
+
     logger.info('PostgreSQL schema creation complete');
     return;
   }
@@ -287,6 +320,36 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_audit_log_table_record ON audit_log(table_name, record_id);
     CREATE INDEX IF NOT EXISTS idx_audit_log_changed_at ON audit_log(changed_at);
   `);
+
+  // Backfill membership_periods from settings if the table is empty
+  const periodCount = await db.get('SELECT COUNT(*) as c FROM membership_periods');
+  if (periodCount && periodCount.c === 0) {
+    const individualDues = await db.get("SELECT value FROM site_settings WHERE key='individual_dues_amount_cents'");
+    const familyDues = await db.get("SELECT value FROM site_settings WHERE key='family_dues_amount_cents'");
+    const expiryDate = await db.get("SELECT value FROM site_settings WHERE key='membership_expiry_date'");
+
+    const endDate = expiryDate?.value || `${new Date().getFullYear()}-07-31`;
+    const endYear = parseInt(endDate.slice(0, 4));
+    const startDate = `${endYear - 1}-04-01`;
+    const indCents = parseInt(individualDues?.value) || 1600;
+    const famCents = parseInt(familyDues?.value) || 2600;
+
+    const result = await db.run(
+        `INSERT INTO membership_periods (label, start_date, end_date, individual_dues_cents, family_dues_cents, electronic_surcharge_cents)
+       VALUES (?, ?, ?, ?, ?, 0)`,
+        `${endYear - 1}–${endYear} Season`, startDate, endDate, indCents, famCents
+    );
+    const periodId = result.lastInsertRowid;
+
+    const activeMembers = await db.all("SELECT id FROM members WHERE status='active' AND primary_member_id IS NULL");
+    for (const m of activeMembers) {
+      await db.run(
+          'INSERT OR IGNORE INTO membership_years (member_id, membership_period_id) VALUES (?, ?)',
+          m.id, periodId
+      );
+    }
+    logger.info('Backfilled membership_periods from settings', {periodId, activeMembers: activeMembers.length});
+  }
 
   logger.info('Database migration complete');
 }

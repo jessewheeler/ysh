@@ -4,59 +4,70 @@ block content
   section.section.alt-bg
     .container
       h2 Become a Member
-      p.text-center Join the Yellowstone Sea Hawkers and receive your official membership card!
 
-      form.contact-form(method="POST" action="/membership")
-        input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+        if closed
+            p.text-center Membership is not currently open. Please check back soon!
 
-        //- Membership Type Selection
-        .form-group
-          label Membership Type
-          .radio-group(style="margin-bottom: 1rem;")
-            label(style="display: block; margin-bottom: 0.5rem;")
-              input(type="radio" name="membership_type" value="individual" checked)
-              |  Individual - $#{(individualDues / 100).toFixed(2)}
-            label(style="display: block;")
-              input(type="radio" name="membership_type" value="family")
-              |  Family (up to #{maxFamilyMembers} members) - $#{(familyDues / 100).toFixed(2)}
+        else
+            p.text-center Join the Yellowstone Sea Hawkers and receive your official membership card!
 
-        //- Primary Member Information
-        h3(style="margin-top: 1.5rem;") Primary Member Information
-        .form-group
-          label(for="first_name") First Name
-          input#first_name(type="text" name="first_name" required)
-        .form-group
-          label(for="last_name") Last Name
-          input#last_name(type="text" name="last_name" required)
-        .form-group
-          label(for="email") Email
-          input#email(type="email" name="email" required)
-        .form-group
-          label(for="phone") Phone (optional)
-          input#phone(type="tel" name="phone")
-        .form-group
-          label(for="address_street") Street Address (optional)
-          input#address_street(type="text" name="address_street")
-        .form-group
-          label(for="address_city") City
-          input#address_city(type="text" name="address_city")
-        .form-group
-          label(for="address_state") State
-          input#address_state(type="text" name="address_state" value="MT")
-        .form-group
-          label(for="address_zip") ZIP Code
-          input#address_zip(type="text" name="address_zip")
+            form.contact-form(method="POST" action="/membership")
+                input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
 
-        //- Family Members Section (hidden by default)
-          #family-members-section(data-max=maxFamilyMembers style="display: none; margin-top: 2rem;")
-          h3 Additional Family Members
-          p.text-muted You may add up to #{maxFamilyMembers - 1} additional family members. Each will receive their own membership card.
+                //- Membership Type Selection
+                .form-group
+                    label Membership Type
+                    .radio-group(style="margin-bottom: 1rem;")
+                        - const indTotal = individualDues + surchargeCents
+                        - const famTotal = familyDues + surchargeCents
+                        label(style="display: block; margin-bottom: 0.5rem;")
+                            input(type="radio" name="membership_type" value="individual" checked)
+                            |  Individual — $#{(individualDues / 100).toFixed(2)}
+                            if surchargeCents > 0
+                                |  + $#{(surchargeCents / 100).toFixed(2)} electronic payment fee = $#{(indTotal / 100).toFixed(2)}
+                        label(style="display: block;")
+                            input(type="radio" name="membership_type" value="family")
+                            |  Family (up to #{maxFamilyMembers} members) — $#{(familyDues / 100).toFixed(2)}
+                            if surchargeCents > 0
+                                |  + $#{(surchargeCents / 100).toFixed(2)} electronic payment fee = $#{(famTotal / 100).toFixed(2)}
 
-          #family-members-container
-            //- Dynamic family member rows added by JS
+                //- Primary Member Information
+                h3(style="margin-top: 1.5rem;") Primary Member Information
+                .form-group
+                    label(for="first_name") First Name
+                    input#first_name(type="text" name="first_name" required)
+                .form-group
+                    label(for="last_name") Last Name
+                    input#last_name(type="text" name="last_name" required)
+                .form-group
+                    label(for="email") Email
+                    input#email(type="email" name="email" required)
+                .form-group
+                    label(for="phone") Phone (optional)
+                    input#phone(type="tel" name="phone")
+                .form-group
+                    label(for="address_street") Street Address (optional)
+                    input#address_street(type="text" name="address_street")
+                .form-group
+                    label(for="address_city") City
+                    input#address_city(type="text" name="address_city")
+                .form-group
+                    label(for="address_state") State
+                    input#address_state(type="text" name="address_state" value="MT")
+                .form-group
+                    label(for="address_zip") ZIP Code
+                    input#address_zip(type="text" name="address_zip")
 
-          button.btn-outline(type="button" id="add-family-member") + Add Family Member
+                //- Family Members Section (hidden by default)
+                  #family-members-section(data-max=maxFamilyMembers style="display: none; margin-top: 2rem;")
+                  h3 Additional Family Members
+                  p.text-muted You may add up to #{maxFamilyMembers - 1} additional family members. Each will receive their own membership card.
 
-        button.btn(type="submit" style="margin-top: 2rem;") Continue to Payment
+                  #family-members-container
+                    //- Dynamic family member rows added by JS
+
+                  button.btn-outline(type="button" id="add-family-member") + Add Family Member
+
+                button.btn(type="submit" style="margin-top: 2rem;") Continue to Payment
 
     script(src="/js/membership.js")

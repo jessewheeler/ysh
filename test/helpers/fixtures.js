@@ -125,4 +125,41 @@ function insertFamilyMembership(db, overrides = {}) {
   return { primary, familyMembers };
 }
 
-module.exports = { buildMember, insertMember, insertSetting, insertCard, buildStripeSession, buildAdmin, insertAdmin, insertPayment, buildFamilyMembership, insertFamilyMembership };
+function insertPeriod(db, overrides = {}) {
+    const p = {
+        label: overrides.label || '2025-26 Season',
+        start_date: overrides.start_date || '2025-04-01',
+        end_date: overrides.end_date || '2026-07-31',
+        individual_dues_cents: overrides.individual_dues_cents ?? 1600,
+        family_dues_cents: overrides.family_dues_cents ?? 2600,
+        electronic_surcharge_cents: overrides.electronic_surcharge_cents ?? 0,
+    };
+    const info = db.prepare(
+        `INSERT INTO membership_periods (label, start_date, end_date, individual_dues_cents, family_dues_cents, electronic_surcharge_cents)
+     VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(p.label, p.start_date, p.end_date, p.individual_dues_cents, p.family_dues_cents, p.electronic_surcharge_cents);
+    return {...p, id: info.lastInsertRowid};
+}
+
+function enrollMember(db, memberId, periodId, paymentId = null) {
+    const info = db.prepare(
+        `INSERT OR IGNORE INTO membership_years (member_id, membership_period_id, payment_id)
+     VALUES (?, ?, ?)`
+    ).run(memberId, periodId, paymentId);
+    return {id: info.lastInsertRowid, member_id: memberId, membership_period_id: periodId, payment_id: paymentId};
+}
+
+module.exports = {
+    buildMember,
+    insertMember,
+    insertSetting,
+    insertCard,
+    buildStripeSession,
+    buildAdmin,
+    insertAdmin,
+    insertPayment,
+    buildFamilyMembership,
+    insertFamilyMembership,
+    insertPeriod,
+    enrollMember
+};

@@ -276,6 +276,32 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_audit_log_table_record ON audit_log(table_name, record_id);
   CREATE INDEX IF NOT EXISTS idx_audit_log_changed_at ON audit_log(changed_at);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_members_email_primary ON members(email) WHERE primary_member_id IS NULL;
+
+  CREATE TABLE IF NOT EXISTS membership_periods
+  (
+    id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+    label                      TEXT,
+    start_date                 TEXT    NOT NULL,
+    end_date                   TEXT    NOT NULL,
+    individual_dues_cents      INTEGER NOT NULL,
+    family_dues_cents          INTEGER NOT NULL,
+    electronic_surcharge_cents INTEGER NOT NULL DEFAULT 0,
+    created_at                 TEXT             DEFAULT (datetime('now')),
+    updated_at                 TEXT             DEFAULT (datetime('now')),
+    created_by                 INTEGER REFERENCES members (id) ON DELETE SET NULL,
+    updated_by                 INTEGER REFERENCES members (id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS membership_years
+  (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id            INTEGER NOT NULL REFERENCES members (id) ON DELETE CASCADE,
+    membership_period_id INTEGER NOT NULL REFERENCES membership_periods (id),
+    payment_id           INTEGER REFERENCES payments (id),
+    created_at           TEXT DEFAULT (datetime('now')),
+    created_by           INTEGER REFERENCES members (id) ON DELETE SET NULL,
+    UNIQUE (member_id, membership_period_id)
+  );
 `;
 
 /**

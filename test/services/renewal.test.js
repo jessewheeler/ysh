@@ -1,7 +1,7 @@
 jest.mock('../../db/database', () => require('../helpers/setupDb'));
 
 const db = require('../../db/database');
-const {insertMember, insertSetting} = require('../helpers/fixtures');
+const {insertMember, insertSetting, insertPeriod, enrollMember} = require('../helpers/fixtures');
 
 let renewalService;
 
@@ -52,36 +52,47 @@ describe('generateRenewalToken', () => {
 });
 
 describe('findMembersNeedingRenewal', () => {
-    test('returns primary members with expiry within threshold', async () => {
+    function insertCurrentPeriod(testDb) {
+        const today = new Date();
+        const start = new Date(today);
+        start.setMonth(start.getMonth() - 1);
+        const end = new Date(today);
+        end.setMonth(end.getMonth() + 12);
+        return insertPeriod(testDb, {
+            start_date: start.toISOString().slice(0, 10),
+            end_date: end.toISOString().slice(0, 10),
+        });
+    }
+
+    test('returns primary members with expiry within threshold and no current-period enrollment', async () => {
         const testDb = getTestDb();
         insertSetting(testDb, 'renewal_reminder_days_before', '30');
+        insertCurrentPeriod(testDb);
 
-        const currentYear = new Date().getFullYear();
-        const expiryDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // 15 days from now
+        const expiryDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-        // Insert member from previous year with upcoming expiry
         testDb.prepare(
-            `INSERT INTO members (first_name, last_name, email, status, membership_year, expiry_date)
-             VALUES ('Alice', 'Hawk', 'alice@test.com', 'active', ?, ?)`
-        ).run(currentYear - 1, expiryDate);
+            `INSERT INTO members (first_name, last_name, email, status, expiry_date)
+             VALUES ('Alice', 'Hawk', 'alice@test.com', 'active', ?)`
+        ).run(expiryDate);
 
         const members = await renewalService.findMembersNeedingRenewal();
         expect(members.length).toBe(1);
         expect(members[0].email).toBe('alice@test.com');
     });
 
-    test('excludes members who already renewed this year', async () => {
+    test('excludes members already enrolled in the current period', async () => {
         const testDb = getTestDb();
         insertSetting(testDb, 'renewal_reminder_days_before', '30');
+        const period = insertCurrentPeriod(testDb);
 
-        const currentYear = new Date().getFullYear();
         const expiryDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-        // Member already renewed this year
-        testDb.prepare(
-            `INSERT INTO members (first_name, last_name, email, status, membership_year, expiry_date)
-             VALUES ('Bob', 'Hawk', 'bob@test.com', 'active', ?, ?)`
-        ).run(currentYear, expiryDate);
+        const result = testDb.prepare(
+            `INSERT INTO members (first_name, last_name, email, status, expiry_date)
+             VALUES ('Bob', 'Hawk', 'bob@test.com', 'active', ?) RETURNING id`
+        ).get(expiryDate);
+        enrollMember(testDb, result.id, period.id);
 
         const members = await renewalService.findMembersNeedingRenewal();
         expect(members.length).toBe(0);
@@ -90,13 +101,12 @@ describe('findMembersNeedingRenewal', () => {
     test('excludes members without expiry_date', async () => {
         const testDb = getTestDb();
         insertSetting(testDb, 'renewal_reminder_days_before', '30');
-
-        const currentYear = new Date().getFullYear();
+        insertCurrentPeriod(testDb);
 
         testDb.prepare(
-            `INSERT INTO members (first_name, last_name, email, status, membership_year)
-             VALUES ('Carol', 'Hawk', 'carol@test.com', 'active', ?)`
-        ).run(currentYear - 1);
+            `INSERT INTO members (first_name, last_name, email, status)
+             VALUES ('Carol', 'Hawk', 'carol@test.com', 'active')`
+        ).run();
 
         const members = await renewalService.findMembersNeedingRenewal();
         expect(members.length).toBe(0);
@@ -105,22 +115,19 @@ describe('findMembersNeedingRenewal', () => {
     test('excludes family members (primary_member_id IS NOT NULL)', async () => {
         const testDb = getTestDb();
         insertSetting(testDb, 'renewal_reminder_days_before', '30');
+        insertCurrentPeriod(testDb);
 
-        const currentYear = new Date().getFullYear();
         const expiryDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-        // Insert primary
         const primary = testDb.prepare(
-            `INSERT INTO members (first_name, last_name, email, status, membership_year, expiry_date, membership_type)
-             VALUES ('Dan', 'Hawk', 'dan@test.com', 'active', ?, ?, 'family') RETURNING id`
-        ).get(currentYear - 1, expiryDate);
+            `INSERT INTO members (first_name, last_name, email, status, expiry_date, membership_type)
+             VALUES ('Dan', 'Hawk', 'dan@test.com', 'active', ?, 'family') RETURNING id`
+        ).get(expiryDate);
 
-        // Insert family member
         testDb.prepare(
-            `INSERT INTO members (first_name, last_name, email, status, membership_year, expiry_date, membership_type,
-                                  primary_member_id)
-             VALUES ('Eve', 'Hawk', 'eve@test.com', 'active', ?, ?, 'family', ?)`
-        ).run(currentYear - 1, expiryDate, primary.id);
+            `INSERT INTO members (first_name, last_name, email, status, expiry_date, membership_type, primary_member_id)
+             VALUES ('Eve', 'Hawk', 'eve@test.com', 'active', ?, 'family', ?)`
+        ).run(expiryDate, primary.id);
 
         const members = await renewalService.findMembersNeedingRenewal();
         expect(members.length).toBe(1);
@@ -130,14 +137,29 @@ describe('findMembersNeedingRenewal', () => {
     test('excludes members with expiry beyond threshold', async () => {
         const testDb = getTestDb();
         insertSetting(testDb, 'renewal_reminder_days_before', '30');
+        insertCurrentPeriod(testDb);
 
-        const currentYear = new Date().getFullYear();
-        const farExpiry = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // 60 days
+        const farExpiry = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
         testDb.prepare(
-            `INSERT INTO members (first_name, last_name, email, status, membership_year, expiry_date)
-             VALUES ('Frank', 'Hawk', 'frank@test.com', 'active', ?, ?)`
-        ).run(currentYear - 1, farExpiry);
+            `INSERT INTO members (first_name, last_name, email, status, expiry_date)
+             VALUES ('Frank', 'Hawk', 'frank@test.com', 'active', ?)`
+        ).run(farExpiry);
+
+        const members = await renewalService.findMembersNeedingRenewal();
+        expect(members.length).toBe(0);
+    });
+
+    test('returns empty list when no current period is open', async () => {
+        const testDb = getTestDb();
+        insertSetting(testDb, 'renewal_reminder_days_before', '30');
+        // No period inserted — getCurrent() returns null
+
+        const expiryDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        testDb.prepare(
+            `INSERT INTO members (first_name, last_name, email, status, expiry_date)
+             VALUES ('Grace', 'Hawk', 'grace@test.com', 'active', ?)`
+        ).run(expiryDate);
 
         const members = await renewalService.findMembersNeedingRenewal();
         expect(members.length).toBe(0);
@@ -145,21 +167,33 @@ describe('findMembersNeedingRenewal', () => {
 });
 
 describe('sendBulkRenewalReminders', () => {
+    function insertCurrentPeriod(testDb) {
+        const today = new Date();
+        const start = new Date(today);
+        start.setMonth(start.getMonth() - 1);
+        const end = new Date(today);
+        end.setMonth(end.getMonth() + 12);
+        return insertPeriod(testDb, {
+            start_date: start.toISOString().slice(0, 10),
+            end_date: end.toISOString().slice(0, 10),
+        });
+    }
+
     test('sends email for each eligible member and returns counts', async () => {
         const testDb = getTestDb();
         insertSetting(testDb, 'renewal_reminder_days_before', '30');
+        insertCurrentPeriod(testDb);
 
-        const currentYear = new Date().getFullYear();
         const expiryDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
         testDb.prepare(
-            `INSERT INTO members (first_name, last_name, email, status, membership_year, expiry_date)
-             VALUES ('Alice', 'Hawk', 'alice2@test.com', 'active', ?, ?)`
-        ).run(currentYear - 1, expiryDate);
+            `INSERT INTO members (first_name, last_name, email, status, expiry_date)
+             VALUES ('Alice', 'Hawk', 'alice2@test.com', 'active', ?)`
+        ).run(expiryDate);
         testDb.prepare(
-            `INSERT INTO members (first_name, last_name, email, status, membership_year, expiry_date)
-             VALUES ('Bob', 'Hawk', 'bob2@test.com', 'active', ?, ?)`
-        ).run(currentYear - 1, expiryDate);
+            `INSERT INTO members (first_name, last_name, email, status, expiry_date)
+             VALUES ('Bob', 'Hawk', 'bob2@test.com', 'active', ?)`
+        ).run(expiryDate);
 
         const result = await renewalService.sendBulkRenewalReminders('http://localhost:3000');
 
@@ -172,14 +206,14 @@ describe('sendBulkRenewalReminders', () => {
     test('counts failures and does not throw', async () => {
         const testDb = getTestDb();
         insertSetting(testDb, 'renewal_reminder_days_before', '30');
+        insertCurrentPeriod(testDb);
 
-        const currentYear = new Date().getFullYear();
         const expiryDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
         testDb.prepare(
-            `INSERT INTO members (first_name, last_name, email, status, membership_year, expiry_date)
-             VALUES ('Grace', 'Hawk', 'grace@test.com', 'active', ?, ?)`
-        ).run(currentYear - 1, expiryDate);
+            `INSERT INTO members (first_name, last_name, email, status, expiry_date)
+             VALUES ('Grace', 'Hawk', 'grace@test.com', 'active', ?)`
+        ).run(expiryDate);
 
         global.fetch.mockRejectedValueOnce(new Error('Network error'));
 
@@ -193,6 +227,7 @@ describe('sendBulkRenewalReminders', () => {
     test('returns zero counts when no eligible members', async () => {
         const testDb = getTestDb();
         insertSetting(testDb, 'renewal_reminder_days_before', '30');
+        insertCurrentPeriod(testDb);
 
         const result = await renewalService.sendBulkRenewalReminders('http://localhost:3000');
 
