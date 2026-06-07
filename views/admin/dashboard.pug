@@ -17,6 +17,9 @@ block content
     .stat-card
       .stat-number= stats.emailsSent
       .stat-label Emails Sent
+      .stat-card
+          .stat-number $#{(stats.totalDonations / 100).toFixed(2)}
+          .stat-label Total Donations
 
   .admin-grid
     .admin-panel

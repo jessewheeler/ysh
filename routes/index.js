@@ -325,4 +325,45 @@ router.post('/renew/:token', async (req, res) => {
   }
 });
 
+// Donate page
+router.get('/donate', (_req, res) => {
+    res.render('donate');
+});
+
+router.post('/donate', async (req, res) => {
+    try {
+        const {validateDonation} = require('../services/donations');
+        const {error, amountCents} = validateDonation(req.body);
+        if (error) {
+            req.session.flash_error = error;
+            return res.redirect('/donate');
+        }
+
+        const {donor_name, donor_email} = req.body;
+        const {createDonationCheckoutSession} = require('../services/stripe');
+        const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+        const session = await createDonationCheckoutSession({
+            donorName: donor_name.trim(),
+            donorEmail: donor_email.trim().toLowerCase(),
+            amountCents,
+            baseUrl,
+        });
+
+        res.redirect(303, session.url);
+    } catch (err) {
+        const log = req.logger || logger;
+        log.error('Donate POST error', {error: err.message, stack: err.stack});
+        req.session.flash_error = 'Something went wrong. Please try again.';
+        res.redirect('/donate');
+    }
+});
+
+router.get('/donate/success', (_req, res) => {
+    res.render('donate-success');
+});
+
+router.get('/donate/cancel', (_req, res) => {
+    res.render('donate-cancel');
+});
+
 module.exports = router;

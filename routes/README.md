@@ -16,6 +16,10 @@ Mounted at `/`. Handles all public-facing pages.
 | POST   | `/membership`         | Validates form, creates pending member, generates member number, creates Stripe Checkout Session, redirects to Stripe |
 | GET    | `/membership/success` | Thank-you page shown after Stripe payment                                                                             |
 | GET    | `/membership/cancel`  | Shown when user cancels Stripe Checkout                                                                               |
+| GET    | `/donate`             | Donation form (preset or custom amount)                                                                               |
+| POST   | `/donate`             | Validates input, records a pending donation, creates a Stripe Checkout Session, redirects to Stripe                   |
+| GET    | `/donate/success`     | Thank-you page shown after a successful donation                                                                      |
+| GET    | `/donate/cancel`      | Shown when user cancels the donation checkout                                                                         |
 | POST   | `/contact`            | Sends contact form submission via SendGrid to the site's contact email                                                |
 | GET    | `/contact/success`    | Contact confirmation page                                                                                             |
 
@@ -39,13 +43,15 @@ Multer (`upload.single('image')`) is applied as middleware on the entire `/admin
 - `POST /admin/logout` -- Destroys session, redirects to `/`
 
 **Dashboard:**
-- `GET /admin/dashboard` -- Shows total members, active members, total revenue, emails sent, recent members, and recent payments
+
+- `GET /admin/dashboard` -- Shows total members, active members, total revenue, total donations, emails sent, recent
+  members, and recent payments
 
 **Members CRUD:**
 - `GET /admin/members` -- Paginated list with search
 - `GET /admin/members/new` -- New member form
 - `POST /admin/members` -- Create member
-- `GET /admin/members/:id` -- View member details, payments, cards, emails
+- `GET /admin/members/:id` -- View member details, payments, cards, emails, donations
 - `POST /admin/members/:id` -- Update member
 - `POST /admin/members/:id/delete` -- Delete member
 - `POST /admin/members/:id/card` -- Generate PDF + PNG card
@@ -62,6 +68,7 @@ Multer (`upload.single('image')`) is applied as middleware on the entire `/admin
 
 **Payments & Emails:**
 - `GET /admin/payments` -- Paginated payment ledger
+- `GET /admin/donations` -- Paginated donations ledger
 - `GET /admin/emails` -- Paginated email log
 - `GET/POST /admin/emails/blast` -- Compose and send to all active members
 
@@ -80,5 +87,9 @@ The webhook handler:
 4. Activates the member (`status = 'active'`)
 5. Generates a PDF + PNG membership card
 6. Sends welcome, payment confirmation, and card delivery emails
+
+When the session carries `metadata.donation` instead of a `member_id`, the handler takes the donation branch: it marks
+the donation `completed` (idempotently), soft-links it to a member when the donor email matches, and sends a donation
+confirmation email.
 
 The raw body middleware for this route is registered in `server.js` **before** `express.json()` to preserve the raw request body for Stripe signature verification.

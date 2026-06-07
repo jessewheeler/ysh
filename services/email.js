@@ -294,6 +294,29 @@ async function sendRenewalReminderEmail(member, renewalLink) {
   });
 }
 
+async function sendDonationConfirmation(donorName, donorEmail, amountCents) {
+    const amountDollars = (amountCents / 100).toFixed(2);
+    const html = `
+    <h2 style="color:#002a5c;">Thank You for Your Donation!</h2>
+    <p>Hi ${escapeHtml(donorName)},</p>
+    <p>We've received your generous donation to the Yellowstone Sea Hawkers. Thank you for your support!</p>
+    <table style="margin:20px 0; font-size:14px; border-collapse:collapse;">
+      <tr><td style="padding:8px 15px 8px 0; font-weight:bold; border-bottom:1px solid #eee;">Amount:</td><td style="padding:8px 0; border-bottom:1px solid #eee;">$${escapeHtml(amountDollars)}</td></tr>
+      <tr><td style="padding:8px 15px 8px 0; font-weight:bold;">Date:</td><td style="padding:8px 0;">${new Date().toLocaleDateString()}</td></tr>
+    </table>
+    <p>Your contribution helps support our community and the Seahawks fan experience in the Yellowstone area.</p>
+    <p style="color:#69be28; font-weight:bold; font-size:18px;">Go Hawks!</p>
+  `;
+    await sendEmail({
+        to: donorEmail,
+        toName: donorName,
+        subject: 'Thank You for Your Donation — Yellowstone Sea Hawkers',
+        html,
+        email_type: 'donation_confirmation',
+        member_id: null,
+    });
+}
+
 async function sendContactEmail({ name, email, message }) {
   const contactTo = await getContactEmail();
   const html = `
@@ -321,4 +344,5 @@ module.exports = {
   sendOtpEmail,
   sendContactEmail,
   sendRenewalReminderEmail,
+    sendDonationConfirmation,
 };

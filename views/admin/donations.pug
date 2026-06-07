@@ -1,0 +1,34 @@
+extends layout
+
+block page_title
+    | Donations
+
+block content
+    if donations.length
+        table.admin-table
+            thead
+                tr
+                    th Donor
+                    th Email
+                    th Amount
+                    th Status
+                    th Date
+            tbody
+                each d in donations
+                    tr
+                        td= d.donor_name
+                        td= d.donor_email
+                        td $#{(d.amount_cents / 100).toFixed(2)}
+                        td
+                            span(class=`badge badge-${d.status}`)= d.status
+                        td= formatDate(d.created_at)
+
+        if totalPages > 1
+            .pagination
+                if page > 1
+                    a(href=`/admin/donations?page=${page - 1}`) &laquo; Prev
+                span Page #{page} of #{totalPages} (#{total} total)
+                if page < totalPages
+                    a(href=`/admin/donations?page=${page + 1}`) Next &raquo;
+    else
+        p.text-muted No donations yet.

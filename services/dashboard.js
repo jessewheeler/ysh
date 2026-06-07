@@ -1,13 +1,15 @@
 const memberRepo = require('../db/repos/members');
 const paymentRepo = require('../db/repos/payments');
+const donationRepo = require('../db/repos/donations');
 const emailLogRepo = require('../db/repos/emailLog');
 
 async function getStats() {
-  const [totalMembers, activeMembers, totalRevenue, emailsSent] = await Promise.all([
+    const [totalMembers, activeMembers, totalRevenue, emailsSent, totalDonations] = await Promise.all([
     memberRepo.countAll(),
     memberRepo.countActive(),
     paymentRepo.sumCompletedCents(),
-    emailLogRepo.countAll()
+        emailLogRepo.countAll(),
+        donationRepo.sumCompletedCents(),
   ]);
 
   return {
@@ -15,6 +17,7 @@ async function getStats() {
     activeMembers,
     totalRevenue,
     emailsSent,
+      totalDonations,
   };
 }
 

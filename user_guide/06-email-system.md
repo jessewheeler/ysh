@@ -10,13 +10,14 @@ Every email is logged to the database regardless of whether it succeeded or fail
 
 The following emails are sent automatically:
 
-| Email | Trigger | Recipient | Contents |
-|-------|---------|-----------|----------|
-| Welcome | Stripe payment | New member | Membership details and a welcome message |
-| Payment Confirmation | Stripe payment | New member | Receipt with amount, date, and member number |
-| Card Delivery | Stripe payment | New member | PDF and PNG membership card attachments |
-| OTP Login Code | Admin login | Admin | 6-digit one-time login code (expires in 10 min) |
-| Contact Form | Form submission | Site contact | Visitor's name, email, and message |
+| Email                 | Trigger         | Recipient    | Contents                                            |
+|-----------------------|-----------------|--------------|-----------------------------------------------------|
+| Welcome               | Stripe payment  | New member   | Membership details and a welcome message            |
+| Payment Confirmation  | Stripe payment  | New member   | Receipt with amount, date, and member number        |
+| Card Delivery         | Stripe payment  | New member   | PDF and PNG membership card attachments             |
+| Donation Confirmation | Stripe donation | Donor        | Thank-you receipt with the donation amount and date |
+| OTP Login Code        | Admin login     | Admin        | 6-digit one-time login code (expires in 10 min)     |
+| Contact Form          | Form submission | Site contact | Visitor's name, email, and message                  |
 
 ## Sending an Email Blast
 

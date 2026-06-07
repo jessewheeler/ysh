@@ -7,9 +7,10 @@ Member-management web app: Express 5, Pug templates, better-sqlite3, Stripe paym
 ```bash
 npm run dev          # Start dev server (nodemon)
 npm run lint         # ESLint
-npm test             # Jest (~320 tests, --forceExit)
+npm test             # Jest (~360 tests, --forceExit)
 ./scripts/dev.sh     # Install deps + start dev server
 ./scripts/check.sh   # Lint + test
+./robot/run_tests.sh # Robot Framework E2E (Playwright); installs deps, runs all suites
 ```
 
 ## Project structure
@@ -62,12 +63,40 @@ test/                        # Jest tests mirroring source structure
 - Prefix unused params with `_` (e.g. `_next`, `_e`)
 - No TypeScript, no semicolons-optional — semicolons are used throughout
 
+## Frontend (Pug + CSP)
+
+- **No inline `<script>` in views.** `server.js` sets a strict Helmet CSP — `scriptSrc` is `'self'` + Stripe/hCaptcha
+  only (NO `'unsafe-inline'`). Inline scripts are silently blocked in prod. Put client JS in `public/js/<page>.js` and
+  reference it with `script(src="/js/<page>.js")` (see `membership.js`, `nav.js`, `donate.js`). `styleSrc` does allow
+  `'unsafe-inline'`.
+- Forms POST through global CSRF middleware (`server.js`): include
+  `input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))`. The Stripe webhook (
+  `/stripe/*`) is the only CSRF-exempt POST (verified by signature instead).
+- Flash messages: set `req.session.flash_error` / `flash_success` then redirect; `middleware/locals.js` exposes + clears
+  them.
+
 ## Testing patterns
 
 - Tests live in `test/` mirroring source paths (e.g. `test/services/members.test.js`)
 - DB mocking: `jest.mock('../../db/database', () => require('../helpers/setupDb'))` — provides an in-memory SQLite proxy that resets between tests via `db.__resetTestDb()`
 - External services (Stripe, MailerSend) are mocked with `jest.fn()` at the module level
 - Fixtures: use `insertMember(db, overrides)` from `test/helpers/fixtures.js` to create test data
+- Keep route validation in a service (e.g. `services/donations.js#validateDonation`) so unit tests exercise the real
+  logic instead of re-implementing it
+
+### E2E tests (Robot Framework)
+
+- Suites in `robot/tests/*.robot`; shared keywords in `robot/resources/`; `robot/libraries/ServerManager.py` (spawns
+  `node server.js` on a random port with fake Stripe/Mailer keys + `data/ysh-robot.db`) and `DatabaseManager.py` (
+  `Get Row Count`, `Query Sql`, `Reset Database`).
+- Run via `./robot/run_tests.sh`; results in `robot/results/` (`output.xml`, `report.html`). `Reset Test State` resets
+  DB + browser per test.
+- **Gotchas:** a cell starting with `#` is parsed as a Robot comment — use the `id=foo` selector strategy, not `#foo`.
+  Multi-match CSS trips Browser-library strict mode — assert with `Get Element Count` instead of
+  `Wait For Elements State`. UI assertions that count elements are brittle: adding a dashboard `.stat-card` broke
+  `admin_auth.robot` (it asserts the exact count).
+- A crashed run can leave a stray `node server.js` holding `data/ysh-robot.db` open → lock contention/flaky cascades on
+  the next run. Kill leftover plain `node server.js` (NOT the dev `nodemon`) before re-running.
 
 ## Database
 

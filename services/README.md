@@ -17,10 +17,11 @@ Service modules encapsulate domain logic and third-party integrations. They are 
 
 Requires `STRIPE_SECRET_KEY` in the environment.
 
-| Function                | Signature                                                | Description                                                                                                                                                                             |
-|-------------------------|----------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `createCheckoutSession` | `({ memberId, email, amountCents, baseUrl }) => Session` | Creates a Stripe Checkout Session in `payment` mode with the member ID in metadata. Also inserts a pending `payments` row. Returns the session object (use `session.url` for redirect). |
-| `constructWebhookEvent` | `(rawBody, signature) => Event`                          | Verifies a Stripe webhook signature using `STRIPE_WEBHOOK_SECRET` and returns the parsed event. Throws on invalid signature.                                                            |
+| Function                        | Signature                                                      | Description                                                                                                                                                                                                                 |
+|---------------------------------|----------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `createCheckoutSession`         | `({ memberId, email, amountCents, baseUrl }) => Session`       | Creates a Stripe Checkout Session in `payment` mode with the member ID in metadata. Also inserts a pending `payments` row. Returns the session object (use `session.url` for redirect).                                     |
+| `createDonationCheckoutSession` | `({ donorName, donorEmail, amountCents, baseUrl }) => Session` | Inserts a pending `donations` row **first** (so a DB failure never leaves an orphaned charge), then creates a Checkout Session tagged with `metadata.donation` + `donation_id` and attaches the session id back to the row. |
+| `constructWebhookEvent`         | `(rawBody, signature) => Event`                                | Verifies a Stripe webhook signature using `STRIPE_WEBHOOK_SECRET` and returns the parsed event. Throws on invalid signature.                                                                                                |
 
 ### card.js -- Membership Card Generation
 
@@ -42,15 +43,22 @@ Both functions upsert a `membership_cards` row (one row per member per year).
 
 Requires `MAILERSEND_API_KEY` and `FROM_EMAIL` in the environment. All emails are wrapped in a branded HTML template (navy header, white body, gray footer). Every send is logged to the `emails_log` table regardless of success or failure.
 
-| Function                  | Signature                                | Description                                                                            |
-|---------------------------|------------------------------------------|----------------------------------------------------------------------------------------|
-| `sendWelcomeEmail`        | `(member) => Promise`                    | Sent after payment. Includes membership details.                                       |
-| `sendPaymentConfirmation` | `(member, stripeSession) => Promise`     | Receipt with amount, date, member number.                                              |
-| `sendCardEmail`           | `(member) => Promise`                    | Looks up the latest card for the member and attaches both the PDF and PNG.             |
-| `sendBlastEmail`          | `(member, subject, bodyHtml) => Promise` | Sends an admin-composed email to a single member. Called in a loop by the blast route. |
-| `sendContactEmail`        | `({ name, email, message }) => Promise`  | Forwards a contact form submission to the site's contact email (from `site_settings`). |
+| Function                   | Signature                                         | Description                                                                            |
+|----------------------------|---------------------------------------------------|----------------------------------------------------------------------------------------|
+| `sendWelcomeEmail`         | `(member) => Promise`                             | Sent after payment. Includes membership details.                                       |
+| `sendPaymentConfirmation`  | `(member, stripeSession) => Promise`              | Receipt with amount, date, member number.                                              |
+| `sendDonationConfirmation` | `(donorName, donorEmail, amountCents) => Promise` | Thank-you receipt sent to a donor after a successful donation.                         |
+| `sendCardEmail`            | `(member) => Promise`                             | Looks up the latest card for the member and attaches both the PDF and PNG.             |
+| `sendBlastEmail`           | `(member, subject, bodyHtml) => Promise`          | Sends an admin-composed email to a single member. Called in a loop by the blast route. |
+| `sendContactEmail`         | `({ name, email, message }) => Promise`           | Forwards a contact form submission to the site's contact email (from `site_settings`). |
 
 Internal helpers:
 - `emailWrapper(bodyHtml)` -- Wraps content in the branded HTML template.
 - `logEmail(...)` -- Inserts a row into `emails_log`.
 - `getContactEmail()` -- Reads the `contact_email` setting from the DB.
+
+### donations.js -- Donation Form Validation
+
+| Function           | Signature                                                                                     | Description                                                                                                                                                                                          |
+|--------------------|-----------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `validateDonation` | `({ donor_name, donor_email, amount_preset, amount_custom }) => { amountCents } \| { error }` | Validates the donate form. Checks required name/email, email format, and that the amount is a known preset or a custom value ≥ $1. Shared by the `/donate` route and its tests so they cannot drift. |

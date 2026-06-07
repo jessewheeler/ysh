@@ -99,6 +99,69 @@ img {
   text-decoration: none;
 }
 
+/* Donate CTA pill in nav */
+.nav-menu .btn-donate {
+    display: inline-flex;
+    align-items: center;
+    background: #69be28;
+    color: #fff;
+    border-radius: 999px;
+    font-weight: 700;
+    padding: 0.4rem 1.1rem;
+    min-height: 36px;
+    margin: 0 0.5rem;
+    align-self: center;
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+
+.nav-menu .btn-donate:hover {
+    background: #5aa622;
+    text-decoration: none;
+    color: #fff;
+}
+
+/* Donate preset radio buttons */
+.donate-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.donate-preset {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.donate-preset input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.donate-preset span {
+    display: inline-block;
+    padding: 0.5rem 1.25rem;
+    border: 2px solid #002a5c;
+    border-radius: 4px;
+    font-weight: 600;
+    color: #002a5c;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.donate-preset input[type="radio"]:checked + span {
+    background: #002a5c;
+    color: #fff;
+}
+
+.donate-preset span:hover {
+    background: #e8f0fb;
+}
+
 /* Dropdown */
 .dropdown-menu {
   display: none;
@@ -604,6 +667,11 @@ footer {
   .dropdown:hover .dropdown-menu {
     display: block;
   }
+
+    .nav-menu .btn-donate {
+        margin: 0.5rem 1.5rem;
+        align-self: flex-start;
+    }
 
   .hero {
     padding: 4rem 1.5rem;

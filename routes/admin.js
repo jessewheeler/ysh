@@ -15,6 +15,7 @@ const emailLogRepo = require('../db/repos/emailLog');
 const cardsRepo = require('../db/repos/cards');
 const settingsRepo = require('../db/repos/settings');
 const auditLogRepo = require('../db/repos/auditLog');
+const donationRepo = require('../db/repos/donations');
 const logger = require('../services/logger');
 const isDevOrTest = ['development', 'test', 'dev'].includes(process.env.NODE_ENV);
 
@@ -266,10 +267,11 @@ router.get('/members/:id', async (req, res, next) => {
       return res.render('admin/members/form', { member });
     }
 
-    const [payments, cards, emails] = await Promise.all([
+      const [payments, cards, emails, donations] = await Promise.all([
       paymentRepo.findByMemberId(member.id),
       cardsRepo.findByMemberId(member.id),
-      emailLogRepo.listByMemberId(member.id, 10)
+          emailLogRepo.listByMemberId(member.id, 10),
+          donationRepo.findByMemberId(member.id),
     ]);
 
     // Get family relationships
@@ -297,7 +299,16 @@ router.get('/members/:id', async (req, res, next) => {
       familyPrimaries = await memberRepo.listFamilyPrimaries();
     }
 
-    res.render('admin/members/view', {member, payments, cards, emails, familyMembers, primaryMember, familyPrimaries});
+      res.render('admin/members/view', {
+          member,
+          payments,
+          cards,
+          emails,
+          donations,
+          familyMembers,
+          primaryMember,
+          familyPrimaries
+      });
   } catch (err) {
     next(err);
   }
@@ -791,6 +802,20 @@ router.get('/payments/export', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// --- Donations list ---
+router.get('/donations', async (req, res, next) => {
+    try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = 25;
+        const offset = (page - 1) * limit;
+        const {donations, total} = await donationRepo.listWithDonors({limit, offset});
+        const totalPages = Math.ceil(total / limit);
+        res.render('admin/donations', {donations, page, totalPages, total});
+    } catch (err) {
+        next(err);
+    }
 });
 
 // --- Email log ---

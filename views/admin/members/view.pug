@@ -147,7 +147,26 @@ block content
     else
       p.text-muted No payments yet.
 
-  .admin-panel
+    .admin-panel
+        h3 Donations
+        if donations && donations.length
+            table.admin-table
+                thead
+                    tr
+                        th Amount
+                        th Status
+                        th Date
+                tbody
+                    each d in donations
+                        tr
+                            td $#{(d.amount_cents / 100).toFixed(2)}
+                            td
+                                span(class=`badge badge-${d.status}`)= d.status
+                            td= formatDate(d.created_at)
+        else
+            p.text-muted No donations linked to this member.
+
+    .admin-panel
     h3 Record Offline Payment
     form(method="POST" action=`/admin/members/${member.id}/payments`)
       .form-group

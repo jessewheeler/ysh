@@ -14,6 +14,9 @@ All public templates extend `layout.pug`.
 | `membership.pug`         | `/membership`         | Membership signup form. POSTs to `/membership` which starts the Stripe Checkout flow. Displays dues amount from `site.dues_amount_cents`.                                                                         |
 | `membership-success.pug` | `/membership/success` | Thank-you page after payment.                                                                                                                                                                                     |
 | `membership-cancel.pug`  | `/membership/cancel`  | Shown when Stripe Checkout is cancelled.                                                                                                                                                                          |
+| `donate.pug`             | `/donate`             | Donation form with preset/custom amount radios. POSTs to `/donate` to start Stripe Checkout. Toggle logic lives in `public/js/donate.js` (no inline scripts — CSP forbids them).                                  |
+| `donate-success.pug`     | `/donate/success`     | Thank-you page after a successful donation.                                                                                                                                                                       |
+| `donate-cancel.pug`      | `/donate/cancel`      | Shown when the donation checkout is cancelled.                                                                                                                                                                    |
 | `contact-success.pug`    | `/contact/success`    | Confirmation after contact form submission.                                                                                                                                                                       |
 | `error.pug`              | 404, 500              | Generic error page. Receives `status` and `message`.                                                                                                                                                              |
 
@@ -39,11 +42,11 @@ Stats grid (total members, active members, total revenue, emails sent) plus tabl
 
 ### admin/members/
 
-| File       | Description                                                                                                                              |
-|------------|------------------------------------------------------------------------------------------------------------------------------------------|
-| `list.pug` | Paginated, searchable member table. Shows member number, name, email, status badge, year.                                                |
-| `form.pug` | Create/edit form. Used for both new members (`member = null`) and editing. Fields: name, email, phone, address, year, status, notes.     |
-| `view.pug` | Detailed member view. Shows all fields, action buttons (edit, generate card, delete), and tables of related cards, payments, and emails. |
+| File       | Description                                                                                                                                         |
+|------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| `list.pug` | Paginated, searchable member table. Shows member number, name, email, status badge, year.                                                           |
+| `form.pug` | Create/edit form. Used for both new members (`member = null`) and editing. Fields: name, email, phone, address, year, status, notes.                |
+| `view.pug` | Detailed member view. Shows all fields, action buttons (edit, generate card, delete), and tables of related cards, payments, emails, and donations. |
 
 ### admin/announcements/
 
@@ -73,6 +76,10 @@ Single form to edit all `site_settings` rows: hero section (title, subtitle, but
 ### admin/payments.pug
 
 Paginated table of all payments. Shows member name, member number, amount, status badge, date.
+
+### admin/donations.pug
+
+Paginated table of all donations. Shows donor name, email, amount, status badge, date.
 
 ### admin/emails/
 

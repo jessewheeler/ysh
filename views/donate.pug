@@ -1,0 +1,46 @@
+extends layout
+
+block content
+    section.section.alt-bg
+        .container
+            h2.text-center Donate to the Yellowstone Sea Hawkers
+            p.text-center.text-muted Your donation supports our community and the Seahawks fan experience in the Yellowstone area.
+
+            form.contact-form(method="POST" action="/donate")
+                input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+
+                .form-group
+                    label(for="donor_name") Your Name
+                    input#donor_name.form-control(type="text" name="donor_name" required placeholder="Jane Doe")
+
+                .form-group
+                    label(for="donor_email") Email Address
+                    input#donor_email.form-control(type="email" name="donor_email" required placeholder="jane@example.com")
+
+                .form-group
+                    label Donation Amount
+                    .donate-presets
+                        label.donate-preset
+                            input(type="radio" name="amount_preset" value="2500" checked)
+                            span $25
+                        label.donate-preset
+                            input(type="radio" name="amount_preset" value="5000")
+                            span $50
+                        label.donate-preset
+                            input(type="radio" name="amount_preset" value="10000")
+                            span $100
+                        label.donate-preset
+                            input(type="radio" name="amount_preset" value="25000")
+                            span $250
+                        label.donate-preset
+                            input(type="radio" name="amount_preset" value="custom")
+                            span Custom
+
+                #custom-amount-group.form-group(style="display:none")
+                    label(for="amount_custom") Custom Amount ($)
+                    input#amount_custom.form-control(type="number" name="amount_custom" min="1" step="0.01" placeholder="0.00")
+
+                .form-actions
+                    button.btn(type="submit") Donate Now
+
+        script(src="/js/donate.js")

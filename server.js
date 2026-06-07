@@ -193,6 +193,7 @@ app.use('/admin/login', loginLimiter);
 app.use('/admin/login/verify', loginLimiter);
 app.use('/admin/login/resend', loginLimiter);
 app.use('/membership', formLimiter);
+app.use('/donate', formLimiter);
 app.use('/contact', formLimiter);
 
 // Routes

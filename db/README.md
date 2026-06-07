@@ -7,7 +7,7 @@ SQLite database layer using [better-sqlite3](https://github.com/WiseLibs/better-
 | File          | Purpose                                                                                                                                                                                                                 |
 |---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `database.js` | Singleton database connection. Configures WAL journal mode and enables foreign keys. Every other module that needs the DB imports this file.                                                                            |
-| `migrate.js`  | Creates all 8 tables with `CREATE TABLE IF NOT EXISTS`. Safe to run repeatedly. Can be run standalone with `npm run migrate`.                                                                                           |
+| `migrate.js`  | Creates all tables with `CREATE TABLE IF NOT EXISTS`, then runs incremental `ALTER TABLE`/rebuild migrations for older databases. Safe to run repeatedly. Can be run standalone with `npm run migrate`.                 |
 | `seed.js`     | Runs migrations first, then populates empty tables with the original hardcoded site content (7 board bios, 2 announcements, 4 gallery images, 10 site settings). Skips if data already exists. Run with `npm run seed`. |
 
 ## Schema
@@ -44,6 +44,22 @@ SQLite database layer using [better-sqlite3](https://github.com/WiseLibs/better-
 | description           | TEXT    |                                                 |
 | created_at            | TEXT    |                                                 |
 | updated_at            | TEXT    |                                                 |
+
+### donations
+
+| Column                | Type    | Notes                                             |
+|-----------------------|---------|---------------------------------------------------|
+| id                    | INTEGER | Primary key                                       |
+| donor_name            | TEXT    | Required                                          |
+| donor_email           | TEXT    | Required                                          |
+| stripe_session_id     | TEXT    | Stripe Checkout Session ID (indexed)              |
+| stripe_payment_intent | TEXT    | Stripe PaymentIntent ID                           |
+| amount_cents          | INTEGER | Required                                          |
+| currency              | TEXT    | Default `usd`                                     |
+| status                | TEXT    | `pending`, `completed`, `failed`, or `refunded`   |
+| member_id             | INTEGER | FK to `members.id` (set null); soft-link by email |
+| created_at            | TEXT    |                                                   |
+| updated_at            | TEXT    |                                                   |
 
 ### announcements
 | Column       | Type    | Notes                                       |

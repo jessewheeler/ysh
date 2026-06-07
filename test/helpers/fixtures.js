@@ -86,6 +86,25 @@ function insertPayment(db, overrides = {}) {
   return { ...p, id: info.lastInsertRowid };
 }
 
+function insertDonation(db, overrides = {}) {
+    const d = {
+        donor_name: overrides.donor_name || 'John Donor',
+        donor_email: overrides.donor_email || 'donor@example.com',
+        stripe_session_id: overrides.stripe_session_id || null,
+        stripe_payment_intent: overrides.stripe_payment_intent || null,
+        amount_cents: overrides.amount_cents || 5000,
+        currency: overrides.currency || 'usd',
+        status: overrides.status || 'completed',
+        member_id: overrides.member_id || null,
+    };
+    const info = db.prepare(
+        `INSERT INTO donations (donor_name, donor_email, stripe_session_id, stripe_payment_intent, amount_cents,
+                                currency, status, member_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(d.donor_name, d.donor_email, d.stripe_session_id, d.stripe_payment_intent, d.amount_cents, d.currency, d.status, d.member_id);
+    return {...d, id: info.lastInsertRowid};
+}
+
 function buildFamilyMembership(overrides = {}) {
   return {
     primaryMember: buildMember({
@@ -125,4 +144,16 @@ function insertFamilyMembership(db, overrides = {}) {
   return { primary, familyMembers };
 }
 
-module.exports = { buildMember, insertMember, insertSetting, insertCard, buildStripeSession, buildAdmin, insertAdmin, insertPayment, buildFamilyMembership, insertFamilyMembership };
+module.exports = {
+    buildMember,
+    insertMember,
+    insertSetting,
+    insertCard,
+    buildStripeSession,
+    buildAdmin,
+    insertAdmin,
+    insertPayment,
+    insertDonation,
+    buildFamilyMembership,
+    insertFamilyMembership
+};

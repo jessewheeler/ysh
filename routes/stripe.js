@@ -87,6 +87,28 @@ router.post('/webhook', async (req, res) => {
       } catch (e) {
         logger.error('Email send error', { error: e.message, stack: e.stack });
       }
+    } else if (session.metadata?.donation === 'true') {
+        try {
+            const donationRepo = require('../db/repos/donations');
+            const memberRepo = require('../db/repos/members');
+            const donorName = session.metadata.donor_name || 'Donor';
+            const donorEmail = session.customer_email || session.metadata.donor_email;
+            const member = donorEmail ? await memberRepo.findByEmail(donorEmail) : null;
+            const donationId = session.metadata.donation_id
+                ? parseInt(session.metadata.donation_id)
+                : null;
+            const firstCompletion = await donationRepo.complete(session.id, {
+                paymentIntent: session.payment_intent,
+                memberId: member ? member.id : null,
+                donationId,
+            });
+            if (firstCompletion) {
+                const emailService = require('../services/email');
+                await emailService.sendDonationConfirmation(donorName, donorEmail, session.amount_total);
+            }
+        } catch (e) {
+            logger.error('Donation webhook error', {error: e.message, stack: e.stack});
+        }
     }
   }
 

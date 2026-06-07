@@ -76,6 +76,23 @@ const SCHEMA = `
                                                       ON DELETE SET NULL
   );
 
+  CREATE TABLE IF NOT EXISTS donations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    donor_name TEXT NOT NULL,
+    donor_email TEXT NOT NULL,
+    stripe_session_id TEXT,
+    stripe_payment_intent TEXT,
+    amount_cents INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'usd',
+    status TEXT NOT NULL DEFAULT 'pending'
+      CHECK(status IN ('pending','completed','failed','refunded')),
+    member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_donations_stripe_session ON donations(stripe_session_id);
+  CREATE INDEX IF NOT EXISTS idx_donations_member ON donations(member_id);
+
   CREATE TABLE IF NOT EXISTS announcements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -194,7 +211,8 @@ const SCHEMA = `
     'blast',
     'contact',
     'otp',
-    'renewal_reminder'
+    'renewal_reminder',
+    'donation_confirmation'
   )),
     status TEXT NOT NULL DEFAULT 'sent',
     error TEXT,

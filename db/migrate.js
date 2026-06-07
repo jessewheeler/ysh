@@ -41,6 +41,11 @@ async function migrate() {
       "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
       "ALTER TABLE emails_log ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
       "ALTER TABLE membership_cards ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      // emails_log CHECK constraint: add 'donation_confirmation'
+      "ALTER TABLE emails_log DROP CONSTRAINT IF EXISTS emails_log_email_type_check",
+      "ALTER TABLE emails_log ADD CONSTRAINT emails_log_email_type_check CHECK (email_type IN ('welcome','payment_confirmation','card_delivery','blast','contact','otp','renewal_reminder','donation_confirmation'))",
+      // donations: ensure member_id column exists on pre-existing tables
+      "ALTER TABLE donations ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL",
     ];
     for (const sql of pgAlters) {
       await db.exec(sql);
@@ -269,6 +274,36 @@ async function migrate() {
       await db.exec(sql);
     } catch (_e) { /* Column already exists */
     }
+  }
+
+  // Migrate emails_log CHECK constraint to include 'donation_confirmation' type.
+  // Runs after the audit-column ALTERs above so created_by is guaranteed to exist
+  // on the table being copied.
+  const emailsLogSchema2 = await db.get(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
+  );
+  if (emailsLogSchema2 && !emailsLogSchema2.sql.includes("'donation_confirmation'")) {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS emails_log_new2 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        to_email TEXT NOT NULL,
+        to_name TEXT,
+        subject TEXT,
+        body_html TEXT,
+        email_type TEXT CHECK (email_type IN
+                               ('welcome', 'payment_confirmation', 'card_delivery', 'blast', 'contact', 'otp',
+                                'renewal_reminder', 'donation_confirmation')),
+        status TEXT NOT NULL DEFAULT 'sent',
+        error TEXT,
+        member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        created_by INTEGER REFERENCES members(id) ON DELETE SET NULL
+      );
+      INSERT INTO emails_log_new2 (id, to_email, to_name, subject, body_html, email_type, status, error, member_id, created_at, created_by)
+      SELECT id, to_email, to_name, subject, body_html, email_type, status, error, member_id, created_at, created_by FROM emails_log;
+      DROP TABLE emails_log;
+      ALTER TABLE emails_log_new2 RENAME TO emails_log;
+    `);
   }
 
   // Create audit_log table and indexes (idempotent)
