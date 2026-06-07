@@ -1,7 +1,7 @@
 // Donation form validation, shared by the POST /donate route and its tests so the
 // two never drift apart.
 
-const PRESET_AMOUNTS = new Set([2500, 5000, 10000, 25000]);
+const PRESET_AMOUNTS = new Set([500, 1000, 2500, 5000, 10000]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Validates a donate form submission. Returns { amountCents } on success or

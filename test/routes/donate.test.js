@@ -45,10 +45,11 @@ describe('validateDonation: amount', () => {
     });
 
     test('accepts valid preset amounts', () => {
+        expect(validateDonation({...VALID, amount_preset: '500'}).amountCents).toBe(500);
+        expect(validateDonation({...VALID, amount_preset: '1000'}).amountCents).toBe(1000);
         expect(validateDonation({...VALID, amount_preset: '2500'}).amountCents).toBe(2500);
         expect(validateDonation({...VALID, amount_preset: '5000'}).amountCents).toBe(5000);
         expect(validateDonation({...VALID, amount_preset: '10000'}).amountCents).toBe(10000);
-        expect(validateDonation({...VALID, amount_preset: '25000'}).amountCents).toBe(25000);
     });
 
     test('accepts custom amount >= $1', () => {

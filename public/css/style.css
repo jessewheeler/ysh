@@ -81,6 +81,8 @@ img {
 
 .nav-menu li {
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .nav-menu a {
@@ -119,6 +121,11 @@ img {
     background: #5aa622;
     text-decoration: none;
     color: #fff;
+}
+
+/* Donate intro lead text */
+.donate-intro {
+  padding-bottom: 1.5rem;
 }
 
 /* Donate preset radio buttons */

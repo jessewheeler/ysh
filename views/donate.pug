@@ -4,7 +4,7 @@ block content
     section.section.alt-bg
         .container
             h2.text-center Donate to the Yellowstone Sea Hawkers
-            p.text-center.text-muted Your donation supports our community and the Seahawks fan experience in the Yellowstone area.
+            p.text-center.text-muted.donate-intro Your donation supports our community and the Seahawks fan experience in the Yellowstone County area.
 
             form.contact-form(method="POST" action="/donate")
                 input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
@@ -21,7 +21,13 @@ block content
                     label Donation Amount
                     .donate-presets
                         label.donate-preset
-                            input(type="radio" name="amount_preset" value="2500" checked)
+                            input(type="radio" name="amount_preset" value="500" checked)
+                            span $5
+                        label.donate-preset
+                            input(type="radio" name="amount_preset" value="1000")
+                            span $10
+                        label.donate-preset
+                            input(type="radio" name="amount_preset" value="2500")
                             span $25
                         label.donate-preset
                             input(type="radio" name="amount_preset" value="5000")
@@ -29,9 +35,6 @@ block content
                         label.donate-preset
                             input(type="radio" name="amount_preset" value="10000")
                             span $100
-                        label.donate-preset
-                            input(type="radio" name="amount_preset" value="25000")
-                            span $250
                         label.donate-preset
                             input(type="radio" name="amount_preset" value="custom")
                             span Custom
