@@ -3,10 +3,16 @@ document.querySelector('.nav-toggle').addEventListener('click', function () {
 });
 
 const navbar = document.querySelector('.navbar');
-const SCROLL_THRESHOLD = 60;
+const SCROLL_ADD = 70;
+const SCROLL_REMOVE = 50;
 
 function onScroll() {
-    navbar.classList.toggle('navbar--scrolled', window.scrollY > SCROLL_THRESHOLD);
+    const y = window.scrollY;
+    if (y > SCROLL_ADD) {
+        navbar.classList.add('navbar--scrolled');
+    } else if (y < SCROLL_REMOVE) {
+        navbar.classList.remove('navbar--scrolled');
+    }
 }
 
 window.addEventListener('scroll', onScroll, {passive: true});

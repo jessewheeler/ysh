@@ -93,12 +93,14 @@ const upload = multer({
     // Allow images and videos
     const allowedImages = /\.(jpg|jpeg|png|gif|webp)$/i;
     const allowedVideos = /\.(mp4|webm|mov)$/i;
+    const allowedDocs = /\.(pdf)$/i;
 
     if (allowedImages.test(path.extname(file.originalname)) ||
-        allowedVideos.test(path.extname(file.originalname))) {
+        allowedVideos.test(path.extname(file.originalname)) ||
+        allowedDocs.test(path.extname(file.originalname))) {
       return cb(null, true);
     }
-    cb(new Error('Only image files (jpg, png, gif, webp) and video files (mp4, webm, mov) are allowed.'));
+    cb(new Error('Only image files (jpg, png, gif, webp), video files (mp4, webm, mov), and PDFs are allowed.'));
   },
 });
 

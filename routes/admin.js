@@ -269,10 +269,11 @@ router.get('/members/:id', async (req, res, next) => {
       return res.render('admin/members/form', { member });
     }
 
-    const [payments, cards, emails] = await Promise.all([
+    const [payments, cards, emails, membershipYears] = await Promise.all([
       paymentRepo.findByMemberId(member.id),
       cardsRepo.findByMemberId(member.id),
-      emailLogRepo.listByMemberId(member.id, 10)
+      emailLogRepo.listByMemberId(member.id, 10),
+      membershipYearsRepo.findByMember(member.id)
     ]);
 
     // Get family relationships
@@ -311,6 +312,7 @@ router.get('/members/:id', async (req, res, next) => {
       payments,
       cards,
       emails,
+      membershipYears,
       familyMembers,
       primaryMember,
       familyPrimaries,
@@ -339,6 +341,10 @@ router.post('/members/:id', async (req, res) => {
 });
 
 router.post('/members/:id/delete', async (req, res) => {
+  if (parseInt(req.params.id) === req.session.adminId) {
+    req.session.flash_error = 'You cannot delete your own account while logged in.';
+    return res.redirect(`/admin/members/${req.params.id}`);
+  }
   await memberRepo.deleteById(req.params.id);
   req.session.flash_success = 'Member deleted.';
   res.redirect('/admin/members');
@@ -382,7 +388,12 @@ router.get('/members/:id/card/pdf', async (req, res) => {
   if (!resolved.startsWith(cardsDir + path.sep) && resolved !== cardsDir) {
     return res.status(403).send('Invalid file path');
   }
-  res.download(resolved, filename);
+  res.download(resolved, filename, (err) => {
+    if (err && err.code === 'ENOENT') {
+      req.session.flash_error = 'Card file not found on disk — please regenerate the card.';
+      res.redirect(`/admin/members/${req.params.id}`);
+    }
+  });
 });
 
 router.get('/members/:id/card/png', async (req, res) => {
@@ -406,7 +417,12 @@ router.get('/members/:id/card/png', async (req, res) => {
   if (!resolved.startsWith(cardsDir + path.sep) && resolved !== cardsDir) {
     return res.status(403).send('Invalid file path');
   }
-  res.download(resolved, filename);
+  res.download(resolved, filename, (err) => {
+    if (err && err.code === 'ENOENT') {
+      req.session.flash_error = 'Card file not found on disk — please regenerate the card.';
+      res.redirect(`/admin/members/${req.params.id}`);
+    }
+  });
 });
 
 router.post('/members/:id/email-card', async (req, res) => {
@@ -751,6 +767,35 @@ router.post('/bios/:id/delete', async (req, res) => {
   res.redirect('/admin/bios');
 });
 
+// Convert an uploaded card template file (PNG or PDF) to a trimmed PNG
+// saved in public/img/ under the given filename. Returns the filename.
+async function processCardTemplate(file, filename) {
+  const {execFile} = require('child_process');
+  const {promisify} = require('util');
+  const execFileAsync = promisify(execFile);
+
+  const outPath = path.join(__dirname, '..', 'public', 'img', filename);
+  const tmpInput = path.join(__dirname, '..', 'data', `tmp-card-${Date.now()}`);
+
+  fs.writeFileSync(tmpInput, file.buffer);
+  try {
+    if (file.mimetype === 'application/pdf') {
+      const tmpPng = `${tmpInput}.png`;
+      await execFileAsync('gs', [
+        '-dNOPAUSE', '-dBATCH', '-sDEVICE=png16m', '-r300',
+        `-sOutputFile=${tmpPng}`, tmpInput,
+      ]);
+      await execFileAsync('magick', [tmpPng, '-trim', '-bordercolor', 'white', '-border', '20', outPath]);
+      fs.unlinkSync(tmpPng);
+    } else {
+      fs.copyFileSync(tmpInput, outPath);
+    }
+  } finally {
+    if (fs.existsSync(tmpInput)) fs.unlinkSync(tmpInput);
+  }
+  return filename;
+}
+
 // --- Membership Periods (super_admin only) ---
 router.get('/periods', requireSuperAdmin, async (req, res, next) => {
   try {
@@ -770,7 +815,12 @@ router.get('/periods/new', requireSuperAdmin, async (req, res) => {
 router.post('/periods', requireSuperAdmin, async (req, res) => {
   try {
     const data = membershipPeriodsService.validatePeriod(req.body);
-    await periodsRepo.create(data);
+    const period = await periodsRepo.create(data);
+    if (req.file) {
+      const filename = `card-template-${period.id}.png`;
+      await processCardTemplate(req.file, filename);
+      await periodsRepo.setCardTemplate(period.id, filename);
+    }
     req.session.flash_success = 'Membership period created.';
     res.redirect('/admin/periods');
   } catch (err) {
@@ -789,14 +839,22 @@ router.get('/periods/:id/edit', requireSuperAdmin, async (req, res) => {
 });
 
 router.post('/periods/:id/edit', requireSuperAdmin, async (req, res) => {
+  const id = req.params.id;
   try {
+    const existing = await periodsRepo.get(id);
     const data = membershipPeriodsService.validatePeriod(req.body);
-    await periodsRepo.update(req.params.id, data);
+    let card_template_path = existing?.card_template_path || null;
+    if (req.file) {
+      const filename = `card-template-${id}.png`;
+      await processCardTemplate(req.file, filename);
+      card_template_path = filename;
+    }
+    await periodsRepo.update(id, {...data, card_template_path});
     req.session.flash_success = 'Membership period updated.';
     res.redirect('/admin/periods');
   } catch (err) {
     req.session.flash_error = err.message;
-    res.redirect(`/admin/periods/${req.params.id}/edit`);
+    res.redirect(`/admin/periods/${id}/edit`);
   }
 });
 

@@ -41,6 +41,7 @@ async function migrate() {
       "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
       "ALTER TABLE emails_log ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
       "ALTER TABLE membership_cards ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+      "ALTER TABLE membership_periods ADD COLUMN IF NOT EXISTS card_template_path TEXT",
     ];
     for (const sql of pgAlters) {
       await db.exec(sql);
@@ -296,6 +297,7 @@ async function migrate() {
     "ALTER TABLE site_settings ADD COLUMN updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
     "ALTER TABLE emails_log ADD COLUMN created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
     "ALTER TABLE membership_cards ADD COLUMN created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
+    "ALTER TABLE membership_periods ADD COLUMN card_template_path TEXT",
   ];
   for (const sql of auditAlters) {
     try {

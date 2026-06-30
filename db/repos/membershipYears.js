@@ -37,7 +37,14 @@ async function isEnrolled(memberId, periodId) {
 
 async function findByMember(memberId) {
     return db.all(
-        'SELECT my.*, mp.label, mp.start_date, mp.end_date FROM membership_years my JOIN membership_periods mp ON mp.id = my.membership_period_id WHERE my.member_id = ? ORDER BY mp.start_date DESC',
+        `SELECT my.*, mp.label, mp.start_date, mp.end_date,
+                p.amount_cents, p.status AS payment_status, p.payment_method,
+                p.created_at AS payment_date
+         FROM membership_years my
+         JOIN membership_periods mp ON mp.id = my.membership_period_id
+         LEFT JOIN payments p ON p.id = my.payment_id
+         WHERE my.member_id = ?
+         ORDER BY mp.start_date DESC`,
         memberId
     );
 }

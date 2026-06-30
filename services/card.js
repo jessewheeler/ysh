@@ -5,6 +5,7 @@ const {PassThrough} = require('stream');
 const path = require('path');
 const cardsRepo = require('../db/repos/cards');
 const storage = require('./storage');
+const db = require('../db/database');
 
 // Template-based card design — the background PNG is the official Sea Hawkers
 // membership card for the current season.  Only the member's name is stamped
@@ -32,6 +33,24 @@ const PDF_SCALE = 0.5;
 const PDF_WIDTH = Math.round(CARD_WIDTH * PDF_SCALE);   // 504
 const PDF_HEIGHT = Math.round(CARD_HEIGHT * PDF_SCALE); // 279
 
+const CARD_TEMPLATE_DIR = path.join(__dirname, '..', 'public', 'img');
+
+async function resolveTemplate(memberId) {
+  const row = await db.get(
+    `SELECT mp.card_template_path
+     FROM membership_years my
+     JOIN membership_periods mp ON mp.id = my.membership_period_id
+     WHERE my.member_id = ?
+     ORDER BY mp.start_date DESC
+     LIMIT 1`,
+    memberId
+  );
+  if (row?.card_template_path) {
+    return path.join(CARD_TEMPLATE_DIR, row.card_template_path);
+  }
+  return TEMPLATE_PNG;
+}
+
 const cardsDir = path.join(__dirname, '..', 'data', 'cards');
 
 function ensureCardsDir() {
@@ -42,8 +61,8 @@ async function generatePNG(member) {
   const canvas = createCanvas(CARD_WIDTH, CARD_HEIGHT);
   const ctx = canvas.getContext('2d');
 
-    // Draw official template as background
-    const template = await loadImage(TEMPLATE_PNG);
+    const templatePath = await resolveTemplate(member.id);
+    const template = await loadImage(templatePath);
     ctx.drawImage(template, 0, 0, CARD_WIDTH, CARD_HEIGHT);
 
     // Stamp member name on the blank "Member Name:" field
@@ -70,6 +89,7 @@ async function generatePNG(member) {
 
 async function generatePDF(member) {
   const filename = `card-${member.id}-${member.membership_year}.pdf`;
+  const templatePath = await resolveTemplate(member.id);
 
     const buffer = await new Promise((resolve, reject) => {
     const doc = new PDFDocument({
@@ -85,7 +105,7 @@ async function generatePDF(member) {
         pass.on('error', reject);
 
         // Draw official template as background
-        doc.image(TEMPLATE_PNG, 0, 0, {width: PDF_WIDTH, height: PDF_HEIGHT});
+        doc.image(templatePath, 0, 0, {width: PDF_WIDTH, height: PDF_HEIGHT});
 
         // Stamp member name — PDFKit y is top-of-text, so subtract font ascent
         const pdfFontSize = NAME_FONT_SIZE * PDF_SCALE;

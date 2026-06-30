@@ -16,6 +16,7 @@ block content
           th Amount
           th Status
           th Method
+          th Period
           th Date
       tbody
         each p in payments
@@ -26,6 +27,7 @@ block content
             td
               span(class=`badge badge-${p.status}`)= p.status
             td= p.payment_method || 'stripe'
+            td= p.period_label || '—'
             td= formatDate(p.created_at)
 
     if totalPages > 1

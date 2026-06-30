@@ -25,7 +25,7 @@ Bios Page Renders Board Members
 
 Membership Form Renders
     Navigate To    /membership
-    Get Text    h2    contains    Become a Member
+    Get Text    .membership-form-panel h2    contains    Become a Member
     Wait For Elements State    input[name="first_name"]    visible
     Wait For Elements State    input[name="last_name"]    visible
     Wait For Elements State    input[name="email"]    visible
@@ -40,7 +40,7 @@ Membership Form Renders
 Membership Validates Required Fields
     Navigate To    /membership
     Fill Text    input[name="first_name"]    OnlyFirst
-    Evaluate JavaScript    .contact-form
+    Evaluate JavaScript    .membership-form
     ...    (form) => {
     ...        form.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
     ...    }
@@ -90,3 +90,25 @@ Membership Success Page Renders
 Membership Cancel Page Renders
     Navigate To    /membership/cancel
     Get Text    h2    contains    Payment Cancelled
+
+Family Membership Shows Add Family Member Section
+    Navigate To    /membership
+    Wait For Elements State    \#family-members-section    hidden
+    Click    .membership-type-card:has(input[value="family"])
+    Wait For Elements State    \#family-members-section    visible    timeout=3s
+    Wait For Elements State    \#add-family-member    visible    timeout=3s
+
+Family Membership Can Add A Family Member Row
+    Navigate To    /membership
+    Click    .membership-type-card:has(input[value="family"])
+    Wait For Elements State    \#add-family-member    visible    timeout=3s
+    Click    \#add-family-member
+    Wait For Elements State    .family-member-row    visible    timeout=3s
+    Wait For Elements State    .family-member-row input[name*="first_name"]    visible
+
+Family Membership Switching Back To Individual Hides Section
+    Navigate To    /membership
+    Click    .membership-type-card:has(input[value="family"])
+    Wait For Elements State    \#family-members-section    visible    timeout=3s
+    Click    .membership-type-card:has(input[value="individual"])
+    Wait For Elements State    \#family-members-section    hidden    timeout=3s

@@ -4,7 +4,7 @@ block page_title
     | #{period ? 'Edit' : 'New'} Membership Period
 
 block content
-    form(method="POST" action=(period ? `/admin/periods/${period.id}/edit` : '/admin/periods'))
+    form(method="POST" action=(period ? `/admin/periods/${period.id}/edit` : '/admin/periods') enctype="multipart/form-data")
         .form-group
             label(for="label") Season Label
             input#label(type="text" name="label" value=(period ? period.label : '') required placeholder="e.g. 2026–27 Season")
@@ -39,6 +39,18 @@ block content
                 span $
                 input#electronic_surcharge(type="number" name="electronic_surcharge" step="0.01" min="0" value=(period ? centsToDollars(period.electronic_surcharge_cents) : '0.00') placeholder="1.50")
             p.text-muted Flat fee added to Stripe checkouts only. Cash/check payments are not affected.
+
+        h3(style="margin-top: 1.5rem;") Membership Card Template
+
+        .form-group
+            label(for="image") Card Template (PNG or PDF)
+            input#image(type="file" name="image" accept="image/png,application/pdf")
+            if period && period.card_template_path
+                p.text-muted(style="margin-top: 0.5rem;")
+                    | Current: #{period.card_template_path} &mdash;
+                    a(href=`/img/${period.card_template_path}` target="_blank") preview
+            else
+                p.text-muted Upload a PNG or PDF. PDFs are converted automatically. Leave blank to use the default template.
 
         .form-actions
             button.btn(type="submit")= period ? 'Save Changes' : 'Create Period'

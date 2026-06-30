@@ -43,7 +43,7 @@ router.get('/membership', async (req, res) => {
 });
 
 // Membership POST — create pending member + redirect to Stripe
-router.post('/membership', async (req, res) => {
+router.post('/membership', requireCaptcha('/membership'), async (req, res) => {
   try {
     const {
       membership_type = 'individual',
@@ -57,10 +57,33 @@ router.post('/membership', async (req, res) => {
       return res.redirect('/membership');
     }
 
-    // Check duplicate email for primary member
+    // Detect existing members and route them into the renewal flow
     const existing = await memberRepo.findByEmail(email);
     if (existing) {
-      req.session.flash_error = 'An account with that email already exists.';
+      if (existing.primary_member_id != null) {
+        req.session.flash_error = 'That email is associated with a family membership. Please contact us for help.';
+        return res.redirect('/membership');
+      }
+      if (existing.status === 'cancelled') {
+        req.session.flash_error = 'Your membership has been cancelled. Please contact us to reinstate it.';
+        return res.redirect('/membership');
+      }
+      const currentPeriod = await periodsRepo.getCurrent();
+      if (currentPeriod) {
+        const membershipYearsRepo = require('../db/repos/membershipYears');
+        const enrolled = await membershipYearsRepo.isEnrolled(existing.id, currentPeriod.id);
+        if (enrolled) {
+          req.session.flash_success = `You're already a member for this season! Check your email for your membership card.`;
+          return res.redirect('/membership');
+        }
+      }
+      const renewalService = require('../services/renewal');
+      const emailService = require('../services/email');
+      const token = await renewalService.generateRenewalToken(existing.id);
+      const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+      const renewalLink = `${baseUrl}/renew/${token}`;
+      await emailService.sendRenewalReminderEmail(existing, renewalLink);
+      req.session.flash_success = `We found your existing membership. A renewal link has been sent to ${existing.email}.`;
       return res.redirect('/membership');
     }
 

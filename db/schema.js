@@ -286,6 +286,7 @@ const SCHEMA = `
     individual_dues_cents      INTEGER NOT NULL,
     family_dues_cents          INTEGER NOT NULL,
     electronic_surcharge_cents INTEGER NOT NULL DEFAULT 0,
+    card_template_path         TEXT,
     created_at                 TEXT             DEFAULT (datetime('now')),
     updated_at                 TEXT             DEFAULT (datetime('now')),
     created_by                 INTEGER REFERENCES members (id) ON DELETE SET NULL,

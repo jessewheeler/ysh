@@ -16,14 +16,15 @@ async function create({
                           end_date,
                           individual_dues_cents,
                           family_dues_cents,
-                          electronic_surcharge_cents = 0
+                          electronic_surcharge_cents = 0,
+                          card_template_path = null
                       }) {
     const actor = getActor();
     const result = await db.run(
-        `INSERT INTO membership_periods (label, start_date, end_date, individual_dues_cents, family_dues_cents, electronic_surcharge_cents, created_by, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO membership_periods (label, start_date, end_date, individual_dues_cents, family_dues_cents, electronic_surcharge_cents, card_template_path, created_by, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         label, start_date, end_date, individual_dues_cents, family_dues_cents, electronic_surcharge_cents,
-        actor.id || null, actor.id || null
+        card_template_path, actor.id || null, actor.id || null
     );
     const row = await db.get('SELECT * FROM membership_periods WHERE id = ?', result.lastInsertRowid);
     await auditLog.insert({
@@ -43,13 +44,15 @@ async function update(id, {
     end_date,
     individual_dues_cents,
     family_dues_cents,
-    electronic_surcharge_cents = 0
+    electronic_surcharge_cents = 0,
+    card_template_path = null
 }) {
     const actor = getActor();
     const old = await db.get('SELECT * FROM membership_periods WHERE id = ?', id);
     await db.run(
-        `UPDATE membership_periods SET label=?, start_date=?, end_date=?, individual_dues_cents=?, family_dues_cents=?, electronic_surcharge_cents=?, updated_at=datetime('now'), updated_by=? WHERE id=?`,
-        label, start_date, end_date, individual_dues_cents, family_dues_cents, electronic_surcharge_cents, actor.id || null, id
+        `UPDATE membership_periods SET label=?, start_date=?, end_date=?, individual_dues_cents=?, family_dues_cents=?, electronic_surcharge_cents=?, card_template_path=?, updated_at=datetime('now'), updated_by=? WHERE id=?`,
+        label, start_date, end_date, individual_dues_cents, family_dues_cents, electronic_surcharge_cents,
+        card_template_path, actor.id || null, id
     );
     const row = await db.get('SELECT * FROM membership_periods WHERE id = ?', id);
     await auditLog.insert({
@@ -74,4 +77,11 @@ async function getCurrent(asOf = new Date().toISOString().slice(0, 10)) {
     return row || null;
 }
 
-module.exports = {list, get, create, update, getCurrent};
+async function setCardTemplate(id, filename) {
+    await db.run(
+        `UPDATE membership_periods SET card_template_path=?, updated_at=datetime('now') WHERE id=?`,
+        filename, id
+    );
+}
+
+module.exports = {list, get, create, update, getCurrent, setCardTemplate};

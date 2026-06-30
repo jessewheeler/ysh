@@ -63,7 +63,9 @@ The admin sidebar links to every section. Settings and Admins are only visible t
 | Board Bios    | `/admin/bios`          | Board member profiles              | Any           |
 | Payments      | `/admin/payments`      | Payment ledger                     | Any           |
 | Emails        | `/admin/emails`        | Compose blasts and view log        | Any           |
+| Periods       | `/admin/periods`       | Membership seasons and pricing     | Super Admin   |
 | Settings      | `/admin/settings`      | Site-wide configuration            | Super Admin   |
+| Audit Log     | `/admin/audit`         | Filterable log of all data changes | Super Admin   |
 | Admins        | `/admin/admins`        | Manage admin accounts              | Super Admin   |
 
 ## Managing Admin Accounts

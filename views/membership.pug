@@ -1,73 +1,118 @@
 extends layout
 
 block content
-  section.section.alt-bg
-    .container
-      h2 Become a Member
+  section.section.alt-bg.membership-page
+    if closed
+      .container
+        .text-center(style="padding: 3rem 0;")
+          h2 Membership Closed
+          p Membership is not currently open. Please check back soon!
+    else
+      .container
+        .membership-layout
+          .membership-benefits
+            h2 Join the 12s
+            p.benefits-tagline Montana's home for Seahawks fans. Here's what membership gets you:
 
-        if closed
-            p.text-center Membership is not currently open. Please check back soon!
+            ul.benefits-list
+              li.benefit-item
+                .benefit-icon ✓
+                .benefit-content
+                  strong Watch Parties
+                  p Join fellow 12s for every game — home and away — at our chapter watch parties.
+              li.benefit-item
+                .benefit-icon ✓
+                .benefit-content
+                  strong Official Membership Card
+                  p Receive your personalized YSH membership card, your badge of 12 pride.
+              li.benefit-item
+                .benefit-icon ✓
+                .benefit-content
+                  strong Member Discounts
+                  p Exclusive discounts including reduced tickets for our annual pilgrimage to Lumen Field.
 
-        else
-            p.text-center Join the Yellowstone Sea Hawkers and receive your official membership card!
+            .membership-badge
+              p "Montana's proudest and most dedicated Seahawks fan club — a non-profit supporting the Seahawks and the NFL."
 
-            form.contact-form(method="POST" action="/membership")
-                input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+          .membership-form-panel
+            h2 Become a Member
 
-                //- Membership Type Selection
-                .form-group
-                    label Membership Type
-                    .radio-group(style="margin-bottom: 1rem;")
-                        - const indTotal = individualDues + surchargeCents
-                        - const famTotal = familyDues + surchargeCents
-                        label(style="display: block; margin-bottom: 0.5rem;")
-                            input(type="radio" name="membership_type" value="individual" checked)
-                            |  Individual — $#{(individualDues / 100).toFixed(2)}
-                            if surchargeCents > 0
-                                |  + $#{(surchargeCents / 100).toFixed(2)} electronic payment fee = $#{(indTotal / 100).toFixed(2)}
-                        label(style="display: block;")
-                            input(type="radio" name="membership_type" value="family")
-                            |  Family (up to #{maxFamilyMembers} members) — $#{(familyDues / 100).toFixed(2)}
-                            if surchargeCents > 0
-                                |  + $#{(surchargeCents / 100).toFixed(2)} electronic payment fee = $#{(famTotal / 100).toFixed(2)}
+            form.membership-form(method="POST" action="/membership")
+              input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
 
-                //- Primary Member Information
-                h3(style="margin-top: 1.5rem;") Primary Member Information
-                .form-group
+              //- Step 1: Membership Type (always visible)
+              p.form-section-heading Choose your plan
+              - const indTotal = individualDues + surchargeCents
+              - const famTotal = familyDues + surchargeCents
+              .membership-type-cards
+                label.membership-type-card
+                  input(type="radio" name="membership_type" value="individual")
+                  .card-check
+                  .card-type-name Individual
+                  .card-type-price $#{(indTotal / 100).toFixed(2)}
+                  .card-type-detail
+                    | $#{(individualDues / 100).toFixed(2)} dues
+                    if surchargeCents > 0
+                      |  + $#{(surchargeCents / 100).toFixed(2)} fee
+                label.membership-type-card
+                  input(type="radio" name="membership_type" value="family")
+                  .card-check
+                  .card-type-name Family
+                  .card-type-price $#{(famTotal / 100).toFixed(2)}
+                  .card-type-detail
+                    | $#{(familyDues / 100).toFixed(2)} dues · up to #{maxFamilyMembers} members
+                    if surchargeCents > 0
+                      |  + $#{(surchargeCents / 100).toFixed(2)} fee
+
+              //- Step 2: Captcha (revealed after a card is selected)
+              #membership-captcha-step(style="display: none;")
+                if hcaptchaSiteKey
+                  p.form-section-heading(style="margin-top: 1.5rem;") Verify you're human
+                  .h-captcha(data-sitekey=hcaptchaSiteKey data-callback="onMembershipCaptchaComplete")
+
+              //- Step 3: PII (revealed after captcha is completed, or immediately in dev)
+              #membership-pii-section(style="display: none;")
+                p.form-section-heading Your information
+                .form-grid-2
+                  .form-group
                     label(for="first_name") First Name
                     input#first_name(type="text" name="first_name" required)
-                .form-group
+                  .form-group
                     label(for="last_name") Last Name
                     input#last_name(type="text" name="last_name" required)
                 .form-group
-                    label(for="email") Email
-                    input#email(type="email" name="email" required)
+                  label(for="email") Email
+                  input#email(type="email" name="email" required)
                 .form-group
-                    label(for="phone") Phone (optional)
-                    input#phone(type="tel" name="phone")
+                  label(for="phone")
+                    | Phone&nbsp;
+                    span.label-optional (optional)
+                  input#phone(type="tel" name="phone")
+
+                p.form-section-heading
+                  | Mailing address&nbsp;
+                  span.label-optional (optional)
                 .form-group
-                    label(for="address_street") Street Address (optional)
-                    input#address_street(type="text" name="address_street")
-                .form-group
+                  label(for="address_street") Street Address
+                  input#address_street(type="text" name="address_street")
+                .form-grid-2
+                  .form-group
                     label(for="address_city") City
                     input#address_city(type="text" name="address_city")
-                .form-group
+                  .form-group
                     label(for="address_state") State
                     input#address_state(type="text" name="address_state" value="MT")
                 .form-group
-                    label(for="address_zip") ZIP Code
-                    input#address_zip(type="text" name="address_zip")
+                  label(for="address_zip") ZIP Code
+                  input#address_zip(type="text" name="address_zip")
 
-                //- Family Members Section (hidden by default)
-                  #family-members-section(data-max=maxFamilyMembers style="display: none; margin-top: 2rem;")
-                  h3 Additional Family Members
-                  p.text-muted You may add up to #{maxFamilyMembers - 1} additional family members. Each will receive their own membership card.
-
+                //- Family Members Section (shown by JS when Family card is selected)
+                #family-members-section(data-max=maxFamilyMembers style="display: none; margin-top: 1.5rem;")
+                  p.form-section-heading Additional Family Members
+                  p.text-muted(style="margin-bottom: 1rem; font-size: 0.9rem; color: #555;") You may add up to #{maxFamilyMembers - 1} additional family members. Each will receive their own membership card.
                   #family-members-container
-                    //- Dynamic family member rows added by JS
-
                   button.btn-outline(type="button" id="add-family-member") + Add Family Member
 
-                button.btn(type="submit" style="margin-top: 2rem;") Continue to Payment
+                button.btn.btn-full(type="submit") Continue to Payment →
 
-    script(src="/js/membership.js")
+  script(src="/js/membership.js")

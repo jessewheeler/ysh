@@ -13,9 +13,11 @@ Navigate to **Settings** in the sidebar to configure site-wide values. Changes t
 | About Quote | Short quote displayed in the about section | `Go Hawks!` |
 | About Text | Full about section content | (paragraph of text) |
 | Gallery Album URL | External link to a full photo album | `https://photos.example.com/album` |
-| Dues Amount | Membership fee in cents | `2500` (= $25.00) |
 | Contact Email | Email address that receives contact form submissions | `info@ysh.org` |
 | Stripe Publishable Key | Public Stripe key used on the membership form | `pk_live_...` |
+
+> **Note:** Membership dues are no longer configured here. They are managed per season in **Periods** (super admin
+> only). See [Membership Periods](08a-membership-periods.md).
 
 ## Editing Settings
 
@@ -25,6 +27,5 @@ Navigate to **Settings** in the sidebar to configure site-wide values. Changes t
 
 ## Notes
 
-- **Dues Amount** is stored in cents. Enter `2500` for $25.00, `5000` for $50.00, etc. This value is passed to Stripe when creating checkout sessions, so changes affect all future signups.
 - **Stripe Publishable Key** is the public key only. The secret key and webhook secret are configured as environment variables and are not editable through the admin interface.
 - **Contact Email** determines where contact form submissions are delivered. Make sure this is a monitored inbox.
