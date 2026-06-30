@@ -40,6 +40,12 @@ class ServerManager:
         # dotenv (loaded by server.js) won't override an already-set env var, and an
         # empty string is falsy in JS so db/database.js will choose the SQLite path.
         env['DATABASE_URL'] = ''
+        # Disable hCaptcha so the membership form's progressive-disclosure flow
+        # reveals the personal-info / family sections without a captcha step that a
+        # headless browser can't complete. Same override trick as DATABASE_URL: an
+        # empty string is falsy in JS, and dotenv won't clobber an already-set var.
+        env['HCAPTCHA_SITE_KEY'] = ''
+        env['HCAPTCHA_SECRET_KEY'] = ''
 
         self.process = subprocess.Popen(
             ['node', 'server.js'],

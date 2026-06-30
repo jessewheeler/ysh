@@ -25,38 +25,45 @@ Bios Page Renders Board Members
 
 Membership Form Renders
     Navigate To    /membership
-    Get Text    .membership-form-panel h2    contains    Become a Member
-    Wait For Elements State    input[name="first_name"]    visible
+    Get Text    .membership-tab-active    contains    Become a Member
+    Page Should Contain Text    $16.00
+    Page Should Contain Text    $26.00
+    # Personal-info fields are revealed only after a plan is chosen.
+    Click    .membership-type-card:has(input[value="individual"])
+    Wait For Elements State    input[name="first_name"]    visible    timeout=3s
     Wait For Elements State    input[name="last_name"]    visible
-    Wait For Elements State    input[name="email"]    visible
+    # name="email" appears in both the new-member and renew forms; scope to this form.
+    Wait For Elements State    .membership-form input[name="email"]    visible
     Wait For Elements State    input[name="phone"]    visible
     Wait For Elements State    input[name="address_street"]    visible
     Wait For Elements State    input[name="address_city"]    visible
     Wait For Elements State    input[name="address_state"]    visible
     Wait For Elements State    input[name="address_zip"]    visible
-    Page Should Contain Text    $16.00
-    Page Should Contain Text    $26.00
 
 Membership Validates Required Fields
     Navigate To    /membership
+    Click    .membership-type-card:has(input[value="individual"])
+    Wait For Elements State    input[name="first_name"]    visible    timeout=3s
     Fill Text    input[name="first_name"]    OnlyFirst
     Evaluate JavaScript    .membership-form
     ...    (form) => {
     ...        form.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
     ...    }
-    Click    button[type="submit"]
+    Click    .membership-form button[type="submit"]
     Flash Error Should Be Visible    required
 
 Membership Signup Attempts Stripe
     Navigate To    /membership
+    Click    .membership-type-card:has(input[value="individual"])
+    Wait For Elements State    input[name="first_name"]    visible    timeout=3s
     Fill Text    input[name="first_name"]    Robot
     Fill Text    input[name="last_name"]    Tester
-    Fill Text    input[name="email"]    robot_stripe@example.com
+    Fill Text    .membership-form input[name="email"]    robot_stripe@example.com
     Fill Text    input[name="phone"]    4065551234
     Fill Text    input[name="address_city"]    Billings
     Fill Text    input[name="address_state"]    MT
     Fill Text    input[name="address_zip"]    59101
-    Click    button[type="submit"]
+    Click    .membership-form button[type="submit"]
     Sleep    2s
     ${count}=    Get Row Count    members
     Should Be True    ${count} >= 1
