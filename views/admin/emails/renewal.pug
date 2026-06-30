@@ -12,8 +12,8 @@ block content
         tbody
             tr
                 td
-                    strong Membership Expiry Date
-                td= expiryDate || '(not set)'
+                    strong Current Season Ends
+                td= expiryDate || '(no active membership period)'
             tr
                 td
                     strong Send Reminders
@@ -36,6 +36,8 @@ block content
 
     hr(style="margin:2rem 0;")
     p.text-muted
-        | To configure expiry date and reminder timing, visit
+        | Season dates are managed in
+        a(href="/admin/periods")  Membership Periods
+        | . Reminder timing is configured in
         a(href="/admin/settings")  Site Settings
         | .
