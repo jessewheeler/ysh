@@ -79,7 +79,7 @@ describe('POST /membership — new member (happy path)', () => {
 
 describe('POST /membership — existing primary member, not enrolled', () => {
   test('generates renewal token and redirects to /membership with success flash', async () => {
-    const period = insertPeriod(db, {start_date: '2025-01-01', end_date: '2099-12-31'});
+    insertPeriod(db, {start_date: '2025-01-01', end_date: '2099-12-31'});
     const member = insertMember(db, { email: 'existing@example.com', status: 'active' });
     // member exists but is NOT enrolled in the current period
 
