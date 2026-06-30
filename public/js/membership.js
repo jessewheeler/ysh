@@ -1,16 +1,44 @@
 (function () {
+  // ── Tab switching ──────────────────────────────────────────────────────────
+  const tabBtns = document.querySelectorAll('.membership-tab');
+  const tabNew = document.getElementById('tab-new');
+  const tabRenew = document.getElementById('tab-renew');
+
+  function switchTab(name) {
+    tabBtns.forEach(b => b.classList.toggle('membership-tab-active', b.dataset.tab === name));
+    if (tabNew) tabNew.style.display = name === 'new' ? 'block' : 'none';
+    if (tabRenew) tabRenew.style.display = name === 'renew' ? 'block' : 'none';
+
+    if (name === 'renew') {
+      const captchaStep = document.getElementById('renewal-captcha-step');
+      const emailSection = document.getElementById('renewal-email-section');
+      const hasCaptcha = captchaStep && captchaStep.querySelector('.h-captcha');
+      if (captchaStep && captchaStep.style.display === 'none') {
+        if (hasCaptcha) {
+          reveal(captchaStep);
+        } else {
+          if (emailSection) reveal(emailSection);
+        }
+      }
+    }
+  }
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
+  // ── Shared reveal helper ───────────────────────────────────────────────────
+  function reveal(el) {
+    el.style.display = 'block';
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('membership-reveal')));
+  }
+
+  // ── New Member tab — card picker ──────────────────────────────────────────
   const typeCards = document.querySelectorAll('.membership-type-card');
   const captchaStep = document.getElementById('membership-captcha-step');
   const piiSection = document.getElementById('membership-pii-section');
   const hasCaptcha = captchaStep && captchaStep.querySelector('.h-captcha');
 
-  function reveal(el) {
-    el.style.display = 'block';
-    // Double rAF ensures the browser has painted display:block before animating
-    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('membership-reveal')));
-  }
-
-  // Card picker — Step 1 → Step 2 (or Step 3 in dev)
   typeCards.forEach(card => {
     card.addEventListener('click', () => {
       typeCards.forEach(c => c.classList.remove('selected'));
@@ -21,25 +49,30 @@
         radio.dispatchEvent(new Event('change'));
       }
 
-      // Only trigger reveal on the first card pick
       if (captchaStep && captchaStep.style.display === 'none') {
         if (hasCaptcha) {
           reveal(captchaStep);
         } else {
-          // Dev: no captcha configured — reveal PII immediately
           if (piiSection) reveal(piiSection);
         }
       }
     });
   });
 
-  // hCaptcha callback — Step 2 → Step 3
+  // hCaptcha callbacks
   window.onMembershipCaptchaComplete = function () {
     if (captchaStep) captchaStep.style.display = 'none';
     if (piiSection) reveal(piiSection);
   };
 
-  // Family members section (lives inside PII, toggled by card type)
+  window.onRenewalCaptchaComplete = function () {
+    const renewalCaptchaStep = document.getElementById('renewal-captcha-step');
+    const renewalEmailSection = document.getElementById('renewal-email-section');
+    if (renewalCaptchaStep) renewalCaptchaStep.style.display = 'none';
+    if (renewalEmailSection) reveal(renewalEmailSection);
+  };
+
+  // ── Family members section ─────────────────────────────────────────────────
   const familySection = document.getElementById('family-members-section');
   if (!familySection) return;
 

@@ -165,6 +165,54 @@ router.get('/charitable/battle-of-the-birds', (_req, res) => res.render('charita
 router.get('/charitable/nonprofits', (_req, res) => res.render('charitable/nonprofits'));
 router.get('/charitable/heartwheels', (_req, res) => res.render('charitable/heartwheels'));
 
+// Renewal request — self-service from the Renew tab
+router.post('/membership/renew-request', requireCaptcha('/membership'), async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    req.session.flash_error = 'Email address is required.';
+    return res.redirect('/membership');
+  }
+  try {
+    const existing = await memberRepo.findByEmail(email);
+    if (!existing) {
+      req.session.flash_success = `If that email is in our system, a renewal link has been sent.`;
+      return res.redirect('/membership');
+    }
+    if (existing.primary_member_id != null) {
+      req.session.flash_error = 'That email is associated with a family membership. Please contact us for help.';
+      return res.redirect('/membership');
+    }
+    if (existing.is_lifetime) {
+      req.session.flash_success = 'You have a lifetime membership — no renewal needed!';
+      return res.redirect('/membership');
+    }
+    if (existing.status === 'cancelled') {
+      req.session.flash_error = 'Your membership has been cancelled. Please contact us to reinstate it.';
+      return res.redirect('/membership');
+    }
+    const currentPeriod = await periodsRepo.getCurrent();
+    if (currentPeriod) {
+      const membershipYearsRepo = require('../db/repos/membershipYears');
+      const enrolled = await membershipYearsRepo.isEnrolled(existing.id, currentPeriod.id);
+      if (enrolled) {
+        req.session.flash_success = `You're already a member for this season! Check your email for your membership card.`;
+        return res.redirect('/membership');
+      }
+    }
+    const renewalService = require('../services/renewal');
+    const emailService = require('../services/email');
+    const token = await renewalService.generateRenewalToken(existing.id);
+    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const renewalLink = `${baseUrl}/renew/${token}`;
+    await emailService.sendRenewalReminderEmail(existing, renewalLink);
+    req.session.flash_success = `A renewal link has been sent to ${existing.email}.`;
+    return res.redirect('/membership');
+  } catch (e) {
+    req.session.flash_error = e.message;
+    return res.redirect('/membership');
+  }
+});
+
 // Membership success / cancel
 router.get('/membership/success', (req, res) => {
   res.render('membership-success');

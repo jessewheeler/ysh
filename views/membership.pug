@@ -35,84 +35,107 @@ block content
               p "Montana's proudest and most dedicated Seahawks fan club — a non-profit supporting the Seahawks and the NFL."
 
           .membership-form-panel
-            h2 Become a Member
+            .membership-tabs
+              button.membership-tab.membership-tab-active(type="button" data-tab="new") Become a Member
+              button.membership-tab(type="button" data-tab="renew") Renew Membership
 
-            form.membership-form(method="POST" action="/membership")
-              input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+            //- ── Tab: New Member ──────────────────────────────────────
+            #tab-new
+              form.membership-form(method="POST" action="/membership")
+                input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
 
-              //- Step 1: Membership Type (always visible)
-              p.form-section-heading Choose your plan
-              - const indTotal = individualDues + surchargeCents
-              - const famTotal = familyDues + surchargeCents
-              .membership-type-cards
-                label.membership-type-card
-                  input(type="radio" name="membership_type" value="individual")
-                  .card-check
-                  .card-type-name Individual
-                  .card-type-price $#{(indTotal / 100).toFixed(2)}
-                  .card-type-detail
-                    | $#{(individualDues / 100).toFixed(2)} dues
-                    if surchargeCents > 0
-                      |  + $#{(surchargeCents / 100).toFixed(2)} fee
-                label.membership-type-card
-                  input(type="radio" name="membership_type" value="family")
-                  .card-check
-                  .card-type-name Family
-                  .card-type-price $#{(famTotal / 100).toFixed(2)}
-                  .card-type-detail
-                    | $#{(familyDues / 100).toFixed(2)} dues · up to #{maxFamilyMembers} members
-                    if surchargeCents > 0
-                      |  + $#{(surchargeCents / 100).toFixed(2)} fee
+                //- Step 1: Membership Type (always visible)
+                p.form-section-heading Choose your plan
+                - const indTotal = individualDues + surchargeCents
+                - const famTotal = familyDues + surchargeCents
+                .membership-type-cards
+                  label.membership-type-card
+                    input(type="radio" name="membership_type" value="individual")
+                    .card-check
+                    .card-type-name Individual
+                    .card-type-price $#{(indTotal / 100).toFixed(2)}
+                    .card-type-detail
+                      | $#{(individualDues / 100).toFixed(2)} dues
+                      if surchargeCents > 0
+                        |  + $#{(surchargeCents / 100).toFixed(2)} fee
+                  label.membership-type-card
+                    input(type="radio" name="membership_type" value="family")
+                    .card-check
+                    .card-type-name Family
+                    .card-type-price $#{(famTotal / 100).toFixed(2)}
+                    .card-type-detail
+                      | $#{(familyDues / 100).toFixed(2)} dues · up to #{maxFamilyMembers} members
+                      if surchargeCents > 0
+                        |  + $#{(surchargeCents / 100).toFixed(2)} fee
 
-              //- Step 2: Captcha (revealed after a card is selected)
-              #membership-captcha-step(style="display: none;")
-                if hcaptchaSiteKey
-                  p.form-section-heading(style="margin-top: 1.5rem;") Verify you're human
-                  .h-captcha(data-sitekey=hcaptchaSiteKey data-callback="onMembershipCaptchaComplete")
+                //- Step 2: Captcha (revealed after a card is selected)
+                #membership-captcha-step(style="display: none;")
+                  if hcaptchaSiteKey
+                    p.form-section-heading(style="margin-top: 1.5rem;") Verify you're human
+                    .h-captcha(data-sitekey=hcaptchaSiteKey data-callback="onMembershipCaptchaComplete")
 
-              //- Step 3: PII (revealed after captcha is completed, or immediately in dev)
-              #membership-pii-section(style="display: none;")
-                p.form-section-heading Your information
-                .form-grid-2
+                //- Step 3: PII (revealed after captcha, or immediately in dev)
+                #membership-pii-section(style="display: none;")
+                  p.form-section-heading Your information
+                  .form-grid-2
+                    .form-group
+                      label(for="first_name") First Name
+                      input#first_name(type="text" name="first_name" required)
+                    .form-group
+                      label(for="last_name") Last Name
+                      input#last_name(type="text" name="last_name" required)
                   .form-group
-                    label(for="first_name") First Name
-                    input#first_name(type="text" name="first_name" required)
+                    label(for="email") Email
+                    input#email(type="email" name="email" required)
                   .form-group
-                    label(for="last_name") Last Name
-                    input#last_name(type="text" name="last_name" required)
-                .form-group
-                  label(for="email") Email
-                  input#email(type="email" name="email" required)
-                .form-group
-                  label(for="phone")
-                    | Phone&nbsp;
+                    label(for="phone")
+                      | Phone&nbsp;
+                      span.label-optional (optional)
+                    input#phone(type="tel" name="phone")
+
+                  p.form-section-heading
+                    | Mailing address&nbsp;
                     span.label-optional (optional)
-                  input#phone(type="tel" name="phone")
-
-                p.form-section-heading
-                  | Mailing address&nbsp;
-                  span.label-optional (optional)
-                .form-group
-                  label(for="address_street") Street Address
-                  input#address_street(type="text" name="address_street")
-                .form-grid-2
                   .form-group
-                    label(for="address_city") City
-                    input#address_city(type="text" name="address_city")
+                    label(for="address_street") Street Address
+                    input#address_street(type="text" name="address_street")
+                  .form-grid-2
+                    .form-group
+                      label(for="address_city") City
+                      input#address_city(type="text" name="address_city")
+                    .form-group
+                      label(for="address_state") State
+                      input#address_state(type="text" name="address_state" value="MT")
                   .form-group
-                    label(for="address_state") State
-                    input#address_state(type="text" name="address_state" value="MT")
-                .form-group
-                  label(for="address_zip") ZIP Code
-                  input#address_zip(type="text" name="address_zip")
+                    label(for="address_zip") ZIP Code
+                    input#address_zip(type="text" name="address_zip")
 
-                //- Family Members Section (shown by JS when Family card is selected)
-                #family-members-section(data-max=maxFamilyMembers style="display: none; margin-top: 1.5rem;")
-                  p.form-section-heading Additional Family Members
-                  p.text-muted(style="margin-bottom: 1rem; font-size: 0.9rem; color: #555;") You may add up to #{maxFamilyMembers - 1} additional family members. Each will receive their own membership card.
-                  #family-members-container
-                  button.btn-outline(type="button" id="add-family-member") + Add Family Member
+                  //- Family Members Section (shown by JS when Family card is selected)
+                  #family-members-section(data-max=maxFamilyMembers style="display: none; margin-top: 1.5rem;")
+                    p.form-section-heading Additional Family Members
+                    p.text-muted(style="margin-bottom: 1rem; font-size: 0.9rem; color: #555;") You may add up to #{maxFamilyMembers - 1} additional family members. Each will receive their own membership card.
+                    #family-members-container
+                    button.btn-outline(type="button" id="add-family-member") + Add Family Member
 
-                button.btn.btn-full(type="submit") Continue to Payment →
+                  button.btn.btn-full(type="submit") Continue to Payment →
+
+            //- ── Tab: Renew Membership ────────────────────────────────
+            #tab-renew(style="display: none;")
+              //- Step 1: Captcha (revealed when tab is clicked)
+              #renewal-captcha-step(style="display: none;")
+                if hcaptchaSiteKey
+                  p.form-section-heading(style="margin-top: 0.5rem;") Verify you're human
+                  .h-captcha(data-sitekey=hcaptchaSiteKey data-callback="onRenewalCaptchaComplete")
+
+              //- Step 2: Email form (revealed after captcha, or immediately in dev)
+              #renewal-email-section(style="display: none;")
+                form(method="POST" action="/membership/renew-request")
+                  input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+                  p.form-section-heading(style="margin-top: 0.5rem;") Enter your email address
+                  p(style="font-size: 0.9rem; color: #555; margin-bottom: 1.25rem;") We'll send a renewal link to the email address on your account.
+                  .form-group
+                    label(for="renew_email") Email Address
+                    input#renew_email(type="email" name="email" required autocomplete="email")
+                  button.btn.btn-full(type="submit") Send Renewal Link →
 
   script(src="/js/membership.js")

@@ -660,6 +660,37 @@ footer {
   text-align: left;
 }
 
+/* Membership tab switcher */
+.membership-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.75rem;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.membership-tab {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  padding: 0.6rem 1.1rem 0.7rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #888;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.membership-tab:hover {
+  color: #002a5c;
+}
+
+.membership-tab-active {
+  color: #002a5c;
+  border-bottom-color: #002a5c;
+}
+
 /* Form section heading */
 .form-section-heading {
   font-size: 0.72rem;
