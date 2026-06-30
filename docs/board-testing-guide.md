@@ -6,7 +6,7 @@ Thank you for helping us test the membership system before launch. This guide wa
 
 ---
 
-## 1. New Individual Membership
+## 1. New Individual Membership (may not be testable in production for members who already exist in the system)
 
 **What we're testing:** A brand-new member signs up and pays online.
 
@@ -15,7 +15,7 @@ Thank you for helping us test the membership system before launch. This guide wa
 3. Click **Individual** — a "Verify you're human" captcha should appear below the cards
 4. Complete the captcha — the name/email/address form should animate in below it
 5. Fill in your details and click **Continue to Payment**
-6. On the Stripe checkout page, use the test card `4242 4242 4242 4242`, any future expiry, any CVC
+6. Complete checkout via Stripe.
 7. After payment you should land on a success page
 8. Check your email — you should receive a welcome email and a membership card delivery email with your card attached
 
@@ -23,7 +23,7 @@ Thank you for helping us test the membership system before launch. This guide wa
 
 ---
 
-## 2. New Family Membership
+## 2. New Family Membership (may not be testable in production for members who already exist in the system)
 
 **What we're testing:** A family signs up with additional members.
 
