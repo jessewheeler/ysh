@@ -260,8 +260,9 @@ async function setRenewalToken(id, token, expiresAt) {
 
 async function findByRenewalToken(token) {
     return await db.get(
-        "SELECT * FROM members WHERE renewal_token = ? AND renewal_token_expires_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
-        token
+        "SELECT * FROM members WHERE renewal_token = ? AND renewal_token_expires_at > ?",
+        token,
+        new Date().toISOString()
     );
 }
 
