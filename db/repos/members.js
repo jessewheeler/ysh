@@ -113,8 +113,8 @@ async function search({ search, limit, offset }) {
   let where = '';
   let params = [];
   if (search) {
-    where = 'WHERE first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR member_number LIKE ?';
-    const s = `%${search}%`;
+    where = 'WHERE LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(member_number) LIKE ?';
+    const s = `%${search.toLowerCase()}%`;
     params = [s, s, s, s];
   }
   const totalRow = await db.get(`SELECT COUNT(*) as c FROM members ${where}`, ...params);
