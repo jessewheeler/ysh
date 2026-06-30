@@ -281,7 +281,7 @@ async function sendRenewalReminderEmail(member, renewalLink) {
     <p style="text-align:center; margin:30px 0;">
       <a href="${renewalLink}" style="background:#002a5c; color:#fff; padding:14px 28px; text-decoration:none; border-radius:4px; font-size:16px; font-weight:bold; display:inline-block;">Renew My Membership</a>
     </p>
-    <p style="font-size:13px; color:#666;">This link is unique to your account and expires in 30 days. If you have questions, reply to this email or contact us at info@yellowstoneseahawkers.com.</p>
+    <p style="font-size:13px; color:#666;">This link is unique to your account and expires in 30 days. If you have questions, contact us at yellowstoneseahawkers@outlook.com.</p>
     <p style="color:#69be28; font-weight:bold; font-size:18px;">Go Hawks!</p>
   `;
   await sendEmail({
