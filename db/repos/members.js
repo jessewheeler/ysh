@@ -46,7 +46,7 @@ async function update(id, { first_name, last_name, email, phone, address_street,
     const result = await db.run(
         `UPDATE members SET first_name=?, last_name=?, email=?, phone=?, address_street=?, address_city=?, address_state=?, address_zip=?, membership_year=?, join_date=?, status=?, is_lifetime=?, notes=?, updated_at=datetime('now'), updated_by=?
      WHERE id=?`,
-        first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, join_date || null, status, is_lifetime ? 1 : 0, notes || null, actor.id || null, id
+        first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, join_date || null, status, is_lifetime !== undefined ? (is_lifetime ? 1 : 0) : (old.is_lifetime ?? 0), notes || null, actor.id || null, id
   );
     const row = await db.get('SELECT * FROM members WHERE id = ?', id);
     await auditLog.insert({

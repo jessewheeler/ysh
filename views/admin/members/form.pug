@@ -59,7 +59,7 @@ block content
           option(value="cancelled" selected=(member && member.status === 'cancelled')) Cancelled
       .form-group
         label.checkbox-label
-          input(type="checkbox" name="is_lifetime" checked=(member && member.is_lifetime))
+          input(type="checkbox" name="is_lifetime" checked=(member && member.is_lifetime === 1))
           |  Lifetime Member
         p.form-hint Lifetime members are never included in renewal reminders.
     .form-group
