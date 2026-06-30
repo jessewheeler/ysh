@@ -10,3 +10,7 @@ coverage/
 robot/results/
 /.output.txt
 backups/
+
+# Python bytecode (Robot Framework libraries)
+__pycache__/
+*.pyc

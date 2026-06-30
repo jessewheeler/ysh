@@ -133,6 +133,23 @@ describe('search', () => {
     const result = await memberRepo.search({ search: '', limit: 25, offset: 0 });
     expect(result.total).toBe(2);
   });
+
+  test('matches regardless of case (name, email, member number)', async () => {
+    const testDb = db.__getCurrentDb();
+    insertMember(testDb, {
+      email: 'Alice@Example.COM', first_name: 'Alice', last_name: 'Anderson', member_number: 'YSH-0042',
+    });
+    insertMember(testDb, { email: 'bob@test.com', first_name: 'Bob' });
+
+    // Lowercase query against mixed-case stored data.
+    expect((await memberRepo.search({ search: 'alice', limit: 25, offset: 0 })).total).toBe(1);
+    // Uppercase query against the stored value.
+    expect((await memberRepo.search({ search: 'ANDERSON', limit: 25, offset: 0 })).total).toBe(1);
+    // Email match ignoring case.
+    expect((await memberRepo.search({ search: 'alice@example.com', limit: 25, offset: 0 })).total).toBe(1);
+    // Member number match ignoring case.
+    expect((await memberRepo.search({ search: 'ysh-0042', limit: 25, offset: 0 })).total).toBe(1);
+  });
 });
 
 describe('listRecent / listAll / listActiveMembers', () => {
