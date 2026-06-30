@@ -121,16 +121,18 @@ block content
 
             //- ── Tab: Renew Membership ────────────────────────────────
             #tab-renew(style="display: none;")
-              //- Step 1: Captcha (revealed when tab is clicked)
-              #renewal-captcha-step(style="display: none;")
-                if hcaptchaSiteKey
-                  p.form-section-heading(style="margin-top: 0.5rem;") Verify you're human
-                  .h-captcha(data-sitekey=hcaptchaSiteKey data-callback="onRenewalCaptchaComplete")
+              form(method="POST" action="/membership/renew-request")
+                input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
 
-              //- Step 2: Email form (revealed after captcha, or immediately in dev)
-              #renewal-email-section(style="display: none;")
-                form(method="POST" action="/membership/renew-request")
-                  input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+                //- Step 1: Captcha (revealed when tab is clicked; inside form so
+                //-         hCaptcha injects h-captcha-response into the POST body)
+                #renewal-captcha-step(style="display: none;")
+                  if hcaptchaSiteKey
+                    p.form-section-heading(style="margin-top: 0.5rem;") Verify you're human
+                    .h-captcha(data-sitekey=hcaptchaSiteKey data-callback="onRenewalCaptchaComplete")
+
+                //- Step 2: Email input (revealed after captcha, or immediately in dev)
+                #renewal-email-section(style="display: none;")
                   p.form-section-heading(style="margin-top: 0.5rem;") Enter your email address
                   p(style="font-size: 0.9rem; color: #555; margin-bottom: 1.25rem;") We'll send a renewal link to the email address on your account.
                   .form-group
