@@ -218,7 +218,7 @@ async function findFamilyMembers(primaryMemberId) {
   );
 }
 
-async function findNeedingRenewal(currentYear, daysUntilExpiry) {
+async function findNeedingRenewal(currentPeriodId, daysUntilExpiry) {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() + daysUntilExpiry);
     const cutoffDate = cutoff.toISOString().split('T')[0];
@@ -228,10 +228,13 @@ async function findNeedingRenewal(currentYear, daysUntilExpiry) {
          WHERE primary_member_id IS NULL
            AND status IN ('active', 'expired')
            AND expiry_date IS NOT NULL
-           AND (membership_year IS NULL OR membership_year < ?)
+           AND NOT EXISTS (
+             SELECT 1 FROM membership_years
+             WHERE member_id = members.id AND membership_period_id = ?
+           )
            AND expiry_date <= ?
          ORDER BY expiry_date ASC`,
-        currentYear, cutoffDate
+        currentPeriodId, cutoffDate
     );
 }
 

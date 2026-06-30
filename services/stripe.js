@@ -1,7 +1,16 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const paymentRepo = require('../db/repos/payments');
 
-async function createCheckoutSession({ memberId, email, amountCents, baseUrl, membershipType = 'individual', familyMemberIds = [] }) {
+async function createCheckoutSession({
+                                         memberId,
+                                         email,
+                                         amountCents,
+                                         baseUrl,
+                                         membershipType = 'individual',
+                                         familyMemberIds = [],
+                                         surchargeCents = 0,
+                                         periodId = null
+                                     }) {
   const year = new Date().getFullYear();
   const description = membershipType === 'family'
     ? `${year} Family Membership`
@@ -12,38 +21,53 @@ async function createCheckoutSession({ memberId, email, amountCents, baseUrl, me
     membership_type: membershipType
   };
 
-  // Store family member IDs in metadata
   if (membershipType === 'family' && familyMemberIds.length) {
     metadata.family_member_ids = JSON.stringify(familyMemberIds);
   }
+    if (periodId) {
+        metadata.period_id = String(periodId);
+    }
 
-  const session = await stripe.checkout.sessions.create({
-    payment_method_types: ['card'],
-    customer_email: email,
-    metadata,
-    line_items: [
-      {
-        price_data: {
-          currency: 'usd',
-          unit_amount: amountCents,
-          product_data: {
-            name: 'Yellowstone Sea Hawkers Membership Dues',
-            description
-          },
+    const lineItems = [
+        {
+            price_data: {
+                currency: 'usd',
+                unit_amount: amountCents,
+                product_data: {
+                    name: 'Yellowstone Sea Hawkers Membership Dues',
+                    description
+                },
+            },
+            quantity: 1,
         },
-        quantity: 1,
-      },
-    ],
+    ];
+
+    if (surchargeCents > 0) {
+        lineItems.push({
+            price_data: {
+                currency: 'usd',
+                unit_amount: surchargeCents,
+                product_data: {name: 'Electronic payment fee'},
+            },
+            quantity: 1,
+        });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        customer_email: email,
+        metadata,
+        line_items: lineItems,
     mode: 'payment',
     success_url: `${baseUrl}/membership/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/membership/cancel`,
   });
 
-  // Record the payment as pending
-  paymentRepo.create({
+    const totalCents = amountCents + surchargeCents;
+    await paymentRepo.create({
     member_id: memberId,
     stripe_session_id: session.id,
-    amount_cents: amountCents,
+        amount_cents: totalCents,
     currency: 'usd',
     status: 'pending',
     description: `${new Date().getFullYear()} Membership Dues`,

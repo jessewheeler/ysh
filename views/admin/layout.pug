@@ -23,6 +23,7 @@ html(lang="en")
           a(href="/admin/payments" class=(currentPath && currentPath.startsWith('/admin/payments') ? 'active' : '')) Payments
           a(href="/admin/emails" class=(currentPath && currentPath.startsWith('/admin/emails') ? 'active' : '')) Emails
           if adminRole === 'super_admin'
+            a(href="/admin/periods" class=(currentPath && currentPath.startsWith('/admin/periods') ? 'active' : '')) Membership Periods
             a(href="/admin/settings" class=(currentPath === '/admin/settings' ? 'active' : '')) Settings
             a(href="/admin/admins" class=(currentPath && currentPath.startsWith('/admin/admins') ? 'active' : '')) Admins
             a(href="/admin/audit" class=(currentPath && currentPath.startsWith('/admin/audit') ? 'active' : '')) Audit Log

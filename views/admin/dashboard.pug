@@ -39,7 +39,7 @@ block content
                 td= formatDate(m.created_at)
       else
         p.text-muted No members yet.
-      p: a(href="/admin/members") View all members &rarr;
+      p(style="margin-top: 1rem;"): a(href="/admin/members") View all members &rarr;
 
     .admin-panel
       h3 Recent Payments
@@ -61,4 +61,4 @@ block content
                 td= formatDate(p.created_at)
       else
         p.text-muted No payments yet.
-      p: a(href="/admin/payments") View all payments &rarr;
+      p(style="margin-top: 1rem;"): a(href="/admin/payments") View all payments &rarr;

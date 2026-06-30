@@ -72,9 +72,10 @@ block content
       input#gallery_album_url(type="text" name="gallery_album_url" value=(site.gallery_album_url || ''))
 
     h3 Membership
-    .form-group
-      label(for="dues_amount_cents") Annual Dues (cents, e.g. 2500 = $25.00)
-      input#dues_amount_cents(type="number" name="dues_amount_cents" value=(site.dues_amount_cents || '2500'))
+      p.text-muted
+          | Dues amounts and membership dates are now managed in
+          a(href="/admin/periods")  Membership Periods
+          | .
 
     h3 Contact
     .form-group
@@ -87,10 +88,6 @@ block content
       input#stripe_publishable_key(type="text" name="stripe_publishable_key" value=(site.stripe_publishable_key || ''))
 
     h3 Renewal Reminders
-    .form-group
-      label(for="membership_expiry_date") Membership Expiry Date
-      input#membership_expiry_date(type="date" name="membership_expiry_date" value=(site.membership_expiry_date || ''))
-      p.text-muted The date when memberships expire. Used to set expiry on activation and to target renewal reminder emails.
     .form-group
       label(for="renewal_reminder_days_before") Send Reminders (days before expiry)
       input#renewal_reminder_days_before(type="number" name="renewal_reminder_days_before" value=(site.renewal_reminder_days_before || '30') min="1" max="365")

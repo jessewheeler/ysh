@@ -52,8 +52,11 @@ async function listWithMembers({ limit, offset }) {
   const totalRow = await db.get('SELECT COUNT(*) as c FROM payments');
   const total = totalRow ? totalRow.c : 0;
   const payments = await db.all(
-    `SELECT p.*, m.first_name, m.last_name, m.member_number
-     FROM payments p LEFT JOIN members m ON p.member_id = m.id
+    `SELECT p.*, m.first_name, m.last_name, m.member_number, mp.label AS period_label
+     FROM payments p
+     LEFT JOIN members m ON p.member_id = m.id
+     LEFT JOIN membership_years my ON my.payment_id = p.id AND my.member_id = p.member_id
+     LEFT JOIN membership_periods mp ON mp.id = my.membership_period_id
      ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
     limit, offset
   );
@@ -62,16 +65,22 @@ async function listWithMembers({ limit, offset }) {
 
 async function listAllWithMembers() {
   return await db.all(
-    `SELECT p.*, m.first_name, m.last_name, m.member_number
-     FROM payments p LEFT JOIN members m ON p.member_id = m.id
+    `SELECT p.*, m.first_name, m.last_name, m.member_number, mp.label AS period_label
+     FROM payments p
+     LEFT JOIN members m ON p.member_id = m.id
+     LEFT JOIN membership_years my ON my.payment_id = p.id AND my.member_id = p.member_id
+     LEFT JOIN membership_periods mp ON mp.id = my.membership_period_id
      ORDER BY p.created_at DESC`
   );
 }
 
 async function listRecent(limit) {
   return await db.all(
-    `SELECT p.*, m.first_name, m.last_name, m.member_number
-     FROM payments p LEFT JOIN members m ON p.member_id = m.id
+    `SELECT p.*, m.first_name, m.last_name, m.member_number, mp.label AS period_label
+     FROM payments p
+     LEFT JOIN members m ON p.member_id = m.id
+     LEFT JOIN membership_years my ON my.payment_id = p.id AND my.member_id = p.member_id
+     LEFT JOIN membership_periods mp ON mp.id = my.membership_period_id
      ORDER BY p.created_at DESC LIMIT ?`,
     limit
   );
@@ -87,6 +96,10 @@ async function countAll() {
   return row ? row.c : 0;
 }
 
+async function findByStripeSession(sessionId) {
+    return db.get('SELECT * FROM payments WHERE stripe_session_id = ?', sessionId);
+}
+
 module.exports = {
   create,
   completeBySessionId,
@@ -96,4 +109,5 @@ module.exports = {
   listRecent,
   sumCompletedCents,
   countAll,
+    findByStripeSession,
 };

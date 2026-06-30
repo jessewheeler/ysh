@@ -1,3 +1,61 @@
+jest.mock('../../db/database', () => require('../helpers/setupDb'));
+
+const db = require('../../db/database');
+const { insertAdmin, insertMember } = require('../helpers/fixtures');
+
+const mockHandlers = {};
+jest.mock('express', () => {
+  const realExpress = jest.requireActual('express');
+  const fakeRouter = {
+    get(path, ...fns) { mockHandlers['GET ' + path] = fns[fns.length - 1]; },
+    post(path, ...fns) { mockHandlers['POST ' + path] = fns[fns.length - 1]; },
+    use() {},
+  };
+  return { ...realExpress, Router: () => fakeRouter };
+});
+
+jest.mock('../../services/storage', () => ({ isConfigured: () => false, uploadFile: jest.fn() }));
+
+function mockReq(overrides = {}) {
+  return { body: {}, params: {}, session: {}, get: () => null, ...overrides };
+}
+
+function mockRes() {
+  const res = { _redirectUrl: null, redirect(url) { res._redirectUrl = url; }, render: jest.fn() };
+  return res;
+}
+
+beforeEach(() => {
+  db.__resetTestDb();
+  Object.keys(mockHandlers).forEach(k => delete mockHandlers[k]);
+  jest.isolateModules(() => { require('../../routes/admin'); });
+});
+
+describe('POST /members/:id/delete', () => {
+  test('blocks an admin from deleting their own record', async () => {
+    const admin = insertAdmin(db);
+    const req = mockReq({ params: { id: String(admin.id) }, session: { adminId: admin.id, adminRole: 'super_admin' } });
+    const res = mockRes();
+    await mockHandlers['POST /members/:id/delete'](req, res);
+    expect(req.session.flash_error).toMatch(/cannot delete your own account/i);
+    expect(res._redirectUrl).toBe(`/admin/members/${admin.id}`);
+    const still = db.__getCurrentDb().prepare('SELECT id FROM members WHERE id = ?').get(admin.id);
+    expect(still).toBeDefined();
+  });
+
+  test('allows deleting another member', async () => {
+    const admin = insertAdmin(db);
+    const other = insertMember(db, { email: 'other@example.com' });
+    const req = mockReq({ params: { id: String(other.id) }, session: { adminId: admin.id, adminRole: 'super_admin' } });
+    const res = mockRes();
+    await mockHandlers['POST /members/:id/delete'](req, res);
+    expect(req.session.flash_error).toBeUndefined();
+    expect(res._redirectUrl).toBe('/admin/members');
+    const gone = db.__getCurrentDb().prepare('SELECT id FROM members WHERE id = ?').get(other.id);
+    expect(gone).toBeUndefined();
+  });
+});
+
 const pug = require('pug');
 const path = require('path');
 

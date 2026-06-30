@@ -37,7 +37,7 @@
 
 ## Card Generation Fails
 
-**Problem:** Clicking "Generate Card" produces an error.
+**Problem:** Clicking "Generate Card" produces an error or downloads an error page instead of a PDF.
 
 - The `data/cards/` directory must exist and be writable by the server process. Verify with:
   ```
@@ -48,14 +48,43 @@
   ```
   sudo apt-get install build-essential libcairo2-dev libjpeg-dev libpango1.0-dev libgif-dev librsvg2-dev
   ```
+- If the card file is missing from disk (e.g., after a deploy or directory wipe), click **Generate Card** on the
+  member's detail page to recreate it before downloading.
+
+## Card Template Upload Fails (PDF Conversion)
+
+**Problem:** Uploading a PDF card template produces an error or the template does not appear.
+
+- PDF-to-PNG conversion requires **Ghostscript** (`gs`) and **ImageMagick** (`magick`). Verify they are installed:
+  ```
+  gs --version
+  magick --version
+  ```
+- If either tool is missing, install it:
+  ```
+  # Ghostscript
+  sudo apt-get install ghostscript
+  # ImageMagick
+  sudo apt-get install imagemagick
+  ```
+- Check that the `data/` directory is writable; the conversion uses a temporary file there.
 
 ## Images Not Uploading
 
 **Problem:** Image uploads fail or produce an error.
 
-- Only JPG, PNG, GIF, and WebP files are accepted.
-- Maximum file size is 5 MB. Resize or compress larger images before uploading.
+- For gallery, bios, and general content: only JPG, PNG, GIF, and WebP files are accepted.
+- For card templates (Periods): PNG and PDF files are accepted.
+- Maximum file size is 5 MB. Resize or compress larger files before uploading.
 - The `uploads/` directory must exist and be writable.
+
+## Membership Signup Shows "Memberships Closed"
+
+**Problem:** The `/membership` page shows that memberships are not currently available.
+
+- The system requires an active membership period whose date range includes today. Navigate to **Periods** (super admin)
+  and verify that a period exists with a start date on or before today and an end date on or after today.
+- If no such period exists, create one. The signup form and Stripe Checkout will become available immediately.
 
 ## Stripe Payments Not Processing
 

@@ -4,7 +4,7 @@ Library    ../libraries/ServerManager.py    ${PROJECT_ROOT}
 Library    ../libraries/DatabaseManager.py    ${PROJECT_ROOT}
 
 *** Variables ***
-${PROJECT_ROOT}    ${CURDIR}/..
+${PROJECT_ROOT}    ${CURDIR}/../..
 ${BASE_URL}        ${EMPTY}
 ${ADMIN_EMAIL}     ${EMPTY}
 ${OTP_CODE}        ${EMPTY}

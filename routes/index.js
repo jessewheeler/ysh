@@ -3,6 +3,8 @@ const router = express.Router();
 const contentService = require('../services/content');
 const memberRepo = require('../db/repos/members');
 const settingsRepo = require('../db/repos/settings');
+const periodsRepo = require('../db/repos/membershipPeriods');
+const {duesForType, surchargeFor} = require('../services/membershipPeriods');
 const logger = require('../services/logger');
 const { requireCaptcha } = require('../middleware/captcha');
 
@@ -29,15 +31,19 @@ router.get('/bios', async (req, res, next) => {
 
 // Membership signup form
 router.get('/membership', async (req, res) => {
-  const individualDues = parseInt(await settingsRepo.get('individual_dues_amount_cents')) || 1600;
-  const familyDues = parseInt(await settingsRepo.get('family_dues_amount_cents')) || 2600;
   const maxFamilyMembers = parseInt(await settingsRepo.get('max_family_members')) || 6;
-
-  res.render('membership', { individualDues, familyDues, maxFamilyMembers });
+  const currentPeriod = await periodsRepo.getCurrent();
+  if (!currentPeriod) {
+    return res.render('membership', {closed: true, maxFamilyMembers});
+  }
+  const individualDues = currentPeriod.individual_dues_cents;
+  const familyDues = currentPeriod.family_dues_cents;
+  const surchargeCents = currentPeriod.electronic_surcharge_cents;
+  res.render('membership', {individualDues, familyDues, surchargeCents, maxFamilyMembers, currentPeriod});
 });
 
 // Membership POST — create pending member + redirect to Stripe
-router.post('/membership', async (req, res) => {
+router.post('/membership', requireCaptcha('/membership'), async (req, res) => {
   try {
     const {
       membership_type = 'individual',
@@ -51,10 +57,33 @@ router.post('/membership', async (req, res) => {
       return res.redirect('/membership');
     }
 
-    // Check duplicate email for primary member
+    // Detect existing members and route them into the renewal flow
     const existing = await memberRepo.findByEmail(email);
     if (existing) {
-      req.session.flash_error = 'An account with that email already exists.';
+      if (existing.primary_member_id != null) {
+        req.session.flash_error = 'That email is associated with a family membership. Please contact us for help.';
+        return res.redirect('/membership');
+      }
+      if (existing.status === 'cancelled') {
+        req.session.flash_error = 'Your membership has been cancelled. Please contact us to reinstate it.';
+        return res.redirect('/membership');
+      }
+      const currentPeriod = await periodsRepo.getCurrent();
+      if (currentPeriod) {
+        const membershipYearsRepo = require('../db/repos/membershipYears');
+        const enrolled = await membershipYearsRepo.isEnrolled(existing.id, currentPeriod.id);
+        if (enrolled) {
+          req.session.flash_success = `You're already a member for this season! Check your email for your membership card.`;
+          return res.redirect('/membership');
+        }
+      }
+      const renewalService = require('../services/renewal');
+      const emailService = require('../services/email');
+      const token = await renewalService.generateRenewalToken(existing.id);
+      const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+      const renewalLink = `${baseUrl}/renew/${token}`;
+      await emailService.sendRenewalReminderEmail(existing, renewalLink);
+      req.session.flash_success = `We found your existing membership. A renewal link has been sent to ${existing.email}.`;
       return res.redirect('/membership');
     }
 
@@ -91,12 +120,14 @@ router.post('/membership', async (req, res) => {
       membershipType: membership_type
     });
 
-    // Get dues amount
-    const settingKey = membership_type === 'family'
-      ? 'family_dues_amount_cents'
-      : 'individual_dues_amount_cents';
-    const duesValue = await settingsRepo.get(settingKey);
-    const amountCents = parseInt(duesValue) || (membership_type === 'family' ? 2600 : 1600);
+    // Get dues + surcharge from current period
+    const currentPeriod = await periodsRepo.getCurrent();
+    if (!currentPeriod) {
+      req.session.flash_error = 'Membership is not currently open. Please check back later.';
+      return res.redirect('/membership');
+    }
+    const amountCents = duesForType(currentPeriod, membership_type);
+    const surchargeCents = surchargeFor(currentPeriod, 'stripe');
 
     // Create Stripe checkout session
     const { createCheckoutSession } = require('../services/stripe');
@@ -107,7 +138,9 @@ router.post('/membership', async (req, res) => {
       amountCents,
       baseUrl,
       membershipType: membership_type,
-      familyMemberIds
+      familyMemberIds,
+      surchargeCents,
+      periodId: currentPeriod.id,
     });
 
     res.redirect(303, session.url);
@@ -185,11 +218,22 @@ router.get('/renew/:token', async (req, res) => {
         ? await memberRepo.findFamilyMembers(member.id)
         : [];
 
-    const individualDues = parseInt(await settingsRepo.get('individual_dues_amount_cents')) || 1600;
-    const familyDues = parseInt(await settingsRepo.get('family_dues_amount_cents')) || 2600;
     const maxFamilyMembers = parseInt(await settingsRepo.get('max_family_members')) || 6;
+    const currentPeriod = await periodsRepo.getCurrent();
+    const individualDues = currentPeriod ? currentPeriod.individual_dues_cents : 1600;
+    const familyDues = currentPeriod ? currentPeriod.family_dues_cents : 2600;
+    const surchargeCents = currentPeriod ? currentPeriod.electronic_surcharge_cents : 0;
 
-    res.render('renew', {member, familyMembers, individualDues, familyDues, maxFamilyMembers, token: req.params.token});
+    res.render('renew', {
+      member,
+      familyMembers,
+      individualDues,
+      familyDues,
+      surchargeCents,
+      maxFamilyMembers,
+      token: req.params.token,
+      currentPeriod
+    });
   } catch (err) {
     const log = req.logger || logger;
     log.error('Renewal GET error', {error: err.message, stack: err.stack});
@@ -292,12 +336,14 @@ router.post('/renew/:token', async (req, res) => {
       }
     }
 
-    // Get dues amount
-    const settingKey = member.membership_type === 'family'
-        ? 'family_dues_amount_cents'
-        : 'individual_dues_amount_cents';
-    const duesValue = await settingsRepo.get(settingKey);
-    const amountCents = parseInt(duesValue) || (member.membership_type === 'family' ? 2600 : 1600);
+    // Get dues + surcharge from current period
+    const currentPeriod = await periodsRepo.getCurrent();
+    if (!currentPeriod) {
+      req.session.flash_error = 'Membership renewal is not currently open. Please check back later.';
+      return res.redirect(`/renew/${req.params.token}`);
+    }
+    const amountCents = duesForType(currentPeriod, member.membership_type);
+    const surchargeCents = surchargeFor(currentPeriod, 'stripe');
 
     // Re-fetch family members after edits for Stripe metadata
     const familyMembers = member.membership_type === 'family'
@@ -313,7 +359,9 @@ router.post('/renew/:token', async (req, res) => {
       amountCents,
       baseUrl,
       membershipType: member.membership_type,
-      familyMemberIds
+      familyMemberIds,
+      surchargeCents,
+      periodId: currentPeriod.id,
     });
 
     res.redirect(303, session.url);

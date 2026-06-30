@@ -46,3 +46,27 @@ Type a query into the search bar and press Enter. The search matches against:
 - Member number (e.g., `YSH-2026-0012`)
 
 Clear the search field and press Enter to return to the full list.
+
+## Family Memberships
+
+A family membership has a primary member and up to 6 additional family members. Family members share the primary's
+payment and receive their own membership cards.
+
+From a member's detail page:
+
+- **Upgrade to Family** — converts an individual member to a family primary
+- **Add Family Member** — adds a sub-member to an existing family primary
+- **Attach to Family** — links an existing individual member as a sub-member of a family
+
+Family sub-members are hidden in the main list. They appear in the primary member's detail page under **Family Members
+**.
+
+## Cancelled Members
+
+Cancelled members cannot self-serve renew through the membership form. If a cancelled member tries to sign up, they see
+a message directing them to contact the club. An admin must manually update their status to active or pending before
+they can renew.
+
+## Renewal Reminders
+
+See [Email System](06-email-system.md) for bulk and individual renewal reminder workflows.

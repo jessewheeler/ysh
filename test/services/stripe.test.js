@@ -68,6 +68,32 @@ describe('createCheckoutSession', () => {
     expect(payment.status).toBe('pending');
   });
 
+    test('adds surcharge line item when surchargeCents > 0', async () => {
+        await createCheckoutSession({...baseParams, surchargeCents: 150});
+        const callArgs = mockSessionCreate.mock.calls[0][0];
+        expect(callArgs.line_items.length).toBe(2);
+        expect(callArgs.line_items[1].price_data.unit_amount).toBe(150);
+        expect(callArgs.line_items[1].price_data.product_data.name).toBe('Electronic payment fee');
+    });
+
+    test('records total amount_cents (dues + surcharge) in payment row', async () => {
+        await createCheckoutSession({...baseParams, amountCents: 2500, surchargeCents: 150});
+        const payment = db.prepare('SELECT * FROM payments WHERE member_id = ?').get(baseParams.memberId);
+        expect(payment.amount_cents).toBe(2650);
+    });
+
+    test('stores period_id in metadata when provided', async () => {
+        await createCheckoutSession({...baseParams, periodId: 42});
+        const callArgs = mockSessionCreate.mock.calls[0][0];
+        expect(callArgs.metadata.period_id).toBe('42');
+    });
+
+    test('does not add surcharge line item when surchargeCents is 0', async () => {
+        await createCheckoutSession({...baseParams, surchargeCents: 0});
+        const callArgs = mockSessionCreate.mock.calls[0][0];
+        expect(callArgs.line_items.length).toBe(1);
+    });
+
   test('returns the session object', async () => {
     const session = await createCheckoutSession(baseParams);
     expect(session).toEqual({ id: 'cs_test_123' });

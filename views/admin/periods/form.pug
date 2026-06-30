@@ -1,0 +1,57 @@
+extends ../layout
+
+block page_title
+    | #{period ? 'Edit' : 'New'} Membership Period
+
+block content
+    form(method="POST" action=(period ? `/admin/periods/${period.id}/edit` : '/admin/periods') enctype="multipart/form-data")
+        .form-group
+            label(for="label") Season Label
+            input#label(type="text" name="label" value=(period ? period.label : '') required placeholder="e.g. 2026–27 Season")
+
+        .form-group
+            label(for="start_date") Start Date (period opens)
+            input#start_date(type="date" name="start_date" value=(period ? period.start_date : '') required)
+            p.text-muted Members may sign up from this date. Typically April 1.
+
+        .form-group
+            label(for="end_date") End Date (expiry stamped on members)
+            input#end_date(type="date" name="end_date" value=(period ? period.end_date : '') required)
+            p.text-muted Date stamped on all members activated during this period. Typically July 31 of the following year.
+
+        h3(style="margin-top: 1.5rem;") Pricing
+
+        .form-group
+            label(for="individual_dues") Individual Dues
+            .input-prefix
+                span $
+                input#individual_dues(type="number" name="individual_dues" step="0.01" min="0" value=(period ? centsToDollars(period.individual_dues_cents) : '') required placeholder="16.00")
+
+        .form-group
+            label(for="family_dues") Family Dues
+            .input-prefix
+                span $
+                input#family_dues(type="number" name="family_dues" step="0.01" min="0" value=(period ? centsToDollars(period.family_dues_cents) : '') required placeholder="26.00")
+
+        .form-group
+            label(for="electronic_surcharge") Electronic Payment Surcharge (Stripe only)
+            .input-prefix
+                span $
+                input#electronic_surcharge(type="number" name="electronic_surcharge" step="0.01" min="0" value=(period ? centsToDollars(period.electronic_surcharge_cents) : '0.00') placeholder="1.50")
+            p.text-muted Flat fee added to Stripe checkouts only. Cash/check payments are not affected.
+
+        h3(style="margin-top: 1.5rem;") Membership Card Template
+
+        .form-group
+            label(for="image") Card Template (PNG or PDF)
+            input#image(type="file" name="image" accept="image/png,application/pdf")
+            if period && period.card_template_path
+                p.text-muted(style="margin-top: 0.5rem;")
+                    | Current: #{period.card_template_path} &mdash;
+                    a(href=`/img/${period.card_template_path}` target="_blank") preview
+            else
+                p.text-muted Upload a PNG or PDF. PDFs are converted automatically. Leave blank to use the default template.
+
+        .form-actions
+            button.btn(type="submit")= period ? 'Save Changes' : 'Create Period'
+            a.btn-outline(href="/admin/periods" style="margin-left: 1rem;") Cancel

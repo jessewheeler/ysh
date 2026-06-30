@@ -41,8 +41,18 @@ module.exports = [
         navigator: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
+        requestAnimationFrame: 'readonly',
         JSON: 'readonly',
         Date: 'readonly',
+      },
+    },
+  },
+  {
+    files: ['test/public/**/*.js'],
+    languageOptions: {
+      globals: {
+        document: 'readonly',
+        window: 'readonly',
       },
     },
   },

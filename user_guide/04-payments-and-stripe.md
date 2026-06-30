@@ -30,9 +30,16 @@ Navigate to **Payments** in the sidebar to view the payment ledger. It shows 25 
 | **Failed** | Payment attempt was unsuccessful |
 | **Refunded** | Payment was refunded through Stripe |
 
-## Dues Amount
+## Dues and Pricing
 
-The membership dues amount is configured in **Settings** (see [Site Settings](07-site-settings.md)). The value is stored in cents (e.g., `2500` = $25.00). Changing this value affects all future signups.
+Membership dues are configured per season in **Periods** (super admin only), not in Settings. Each period defines:
+
+- **Individual dues** (dollars)
+- **Family dues** (dollars)
+- **Electronic surcharge** (dollars, optional) — added as a separate line item on the Stripe Checkout page for online
+  payments; offline/manual payments do not include this charge
+
+See [Membership Periods](08a-membership-periods.md) for details on managing seasons and pricing.
 
 ## Stripe Dashboard
 

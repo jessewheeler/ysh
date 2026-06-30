@@ -39,17 +39,27 @@ router.post('/webhook', async (req, res) => {
         }
       }
 
-      // 4. Set expiry_date + membership_year for all activated members and clear renewal token on primary
+        // 4. Resolve period, set expiry_date + membership_year, enroll members, clear renewal token
       try {
-        const settingsRepo = require('../db/repos/settings');
-        const expiryDate = await settingsRepo.get('membership_expiry_date');
-        const currentYear = new Date().getFullYear();
+          const periodsRepo = require('../db/repos/membershipPeriods');
+          const membershipYearsRepo = require('../db/repos/membershipYears');
+          const paymentsRepo = require('../db/repos/payments');
+
+          const metaPeriodId = session.metadata?.period_id;
+          const period = metaPeriodId
+              ? await periodsRepo.get(parseInt(metaPeriodId))
+              : await periodsRepo.getCurrent();
+
+          const completedPayment = await paymentsRepo.findByStripeSession(session.id);
+          const paymentId = completedPayment ? completedPayment.id : null;
+
         const allIds = [memberId, ...familyMembers.map(fm => fm.id)];
         for (const id of allIds) {
-          if (expiryDate) {
-            await memberRepo.setExpiryDate(id, expiryDate);
+            if (period) {
+                await memberRepo.setExpiryDate(id, period.end_date);
+                await memberRepo.setMembershipYear(id, new Date(period.start_date).getFullYear());
+                await membershipYearsRepo.enroll(id, period.id, paymentId);
           }
-          await memberRepo.setMembershipYear(id, currentYear);
         }
         await memberRepo.clearRenewalToken(memberId);
       } catch (e) {

@@ -12,18 +12,18 @@ Settings Page Loads With Values
     Navigate To    /admin/settings
     Get Text    h1.admin-page-title    contains    Site Settings
     Get Attribute    input[name="hero_title"]    value    ==    Yellowstone Sea Hawkers
-    Get Attribute    input[name="dues_amount_cents"]    value    ==    2500
+    Wait For Elements State    input[name="stripe_publishable_key"]    visible
 
 Update Settings
     Login As Admin
     Navigate To    /admin/settings
     Fill Text    input[name="hero_title"]    Updated Title
-    Fill Text    input[name="dues_amount_cents"]    5000
+    Fill Text    input[name="hero_button_text"]    Updated Button
     Submit Admin Form
     Flash Success Should Be Visible    saved
     Navigate To    /admin/settings
     Get Attribute    input[name="hero_title"]    value    ==    Updated Title
-    Get Attribute    input[name="dues_amount_cents"]    value    ==    5000
+    Get Attribute    input[name="hero_button_text"]    value    ==    Updated Button
 
 Settings Reflect On Homepage
     Login As Admin

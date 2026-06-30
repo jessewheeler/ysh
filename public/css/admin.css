@@ -374,6 +374,28 @@
   box-shadow: 0 0 0 3px rgba(0,42,92,0.1);
 }
 
+.admin-content .form-group .input-prefix {
+  display: flex;
+  align-items: stretch;
+}
+
+.admin-content .form-group .input-prefix span {
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  background: #f5f5f5;
+  border: 1px solid #ccc;
+  border-right: none;
+  border-radius: 4px 0 0 4px;
+  font-size: 0.9rem;
+  color: #555;
+  white-space: nowrap;
+}
+
+.admin-content .form-group .input-prefix input {
+  border-radius: 0 4px 4px 0;
+}
+
 .form-actions {
   display: flex;
   gap: 1rem;

@@ -148,6 +148,34 @@ block content
       p.text-muted No payments yet.
 
   .admin-panel
+    h3 Membership Years
+    if membershipYears.length
+      table.admin-table
+        thead
+          tr
+            th Period
+            th Enrolled
+            th Payment
+            th Status
+        tbody
+          each my in membershipYears
+            tr
+              td= my.label
+              td= formatDate(my.created_at)
+              td
+                if my.payment_id
+                  | $#{(my.amount_cents / 100).toFixed(2)} via #{my.payment_method || 'stripe'} on #{formatDate(my.payment_date)}
+                else
+                  | —
+              td
+                if my.payment_id
+                  span(class=`badge badge-${my.payment_status}`)= my.payment_status
+                else
+                  | —
+    else
+      p.text-muted No enrollment history.
+
+  .admin-panel
     h3 Record Offline Payment
     form(method="POST" action=`/admin/members/${member.id}/payments`)
       .form-group
