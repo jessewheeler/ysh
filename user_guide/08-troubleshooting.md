@@ -55,10 +55,10 @@
 
 **Problem:** Uploading a PDF card template produces an error or the template does not appear.
 
-- PDF-to-PNG conversion requires **Ghostscript** (`gs`) and **ImageMagick** (`magick`). Verify they are installed:
+- PDF-to-PNG conversion requires **Ghostscript** (`gs`) and **ImageMagick**. Verify they are installed:
   ```
   gs --version
-  magick --version
+  magick --version || convert --version
   ```
 - If either tool is missing, install it:
   ```
@@ -67,6 +67,7 @@
   # ImageMagick
   sudo apt-get install imagemagick
   ```
+- ImageMagick 7 uses `magick`; ImageMagick 6 (default on Ubuntu LTS / Render) uses `convert`. The app tries both automatically.
 - Check that the `data/` directory is writable; the conversion uses a temporary file there.
 
 ## Images Not Uploading

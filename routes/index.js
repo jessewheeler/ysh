@@ -64,6 +64,10 @@ router.post('/membership', requireCaptcha('/membership'), async (req, res) => {
         req.session.flash_error = 'That email is associated with a family membership. Please contact us for help.';
         return res.redirect('/membership');
       }
+      if (existing.is_lifetime) {
+        req.session.flash_success = 'You have a lifetime membership — no renewal needed!';
+        return res.redirect('/membership');
+      }
       if (existing.status === 'cancelled') {
         req.session.flash_error = 'Your membership has been cancelled. Please contact us to reinstate it.';
         return res.redirect('/membership');

@@ -248,7 +248,8 @@ router.post('/members', async (req, res) => {
       await memberRepo.create({
         member_number, first_name, last_name, email, phone,
         address_street, address_city, address_state, address_zip,
-        membership_year: year, join_date: normalizedJoinDate, status: status || 'pending', notes,
+        membership_year: year, join_date: normalizedJoinDate, status: status || 'pending',
+        is_lifetime: req.body.is_lifetime === 'on', notes,
       });
 
       req.session.flash_success = `Member ${first_name} ${last_name} created.`;
@@ -331,7 +332,8 @@ router.post('/members/:id', async (req, res) => {
     await memberRepo.update(req.params.id, {
       first_name, last_name, email, phone,
       address_street, address_city, address_state, address_zip,
-      membership_year, join_date: normalizedJoinDate, status, notes,
+      membership_year, join_date: normalizedJoinDate, status,
+      is_lifetime: req.body.is_lifetime === 'on', notes,
     });
     req.session.flash_success = 'Member updated.';
   } catch (e) {
@@ -785,7 +787,13 @@ async function processCardTemplate(file, filename) {
         '-dNOPAUSE', '-dBATCH', '-sDEVICE=png16m', '-r300',
         `-sOutputFile=${tmpPng}`, tmpInput,
       ]);
-      await execFileAsync('magick', [tmpPng, '-trim', '-bordercolor', 'white', '-border', '20', outPath]);
+      // ImageMagick 7 uses `magick`; IM6 (common on Ubuntu LTS) uses `convert`
+      try {
+        await execFileAsync('magick', [tmpPng, '-trim', '-bordercolor', 'white', '-border', '20', outPath]);
+      } catch (e) {
+        if (e.code !== 'ENOENT') throw e;
+        await execFileAsync('convert', [tmpPng, '-trim', '-bordercolor', 'white', '-border', '20', outPath]);
+      }
       fs.unlinkSync(tmpPng);
     } else {
       fs.copyFileSync(tmpInput, outPath);

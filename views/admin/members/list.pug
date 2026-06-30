@@ -31,6 +31,9 @@ block content
             td= m.membership_type === 'family' ? 'Family' : 'Individual'
             td
               span(class=`badge badge-${m.status}`)= m.status
+              if m.is_lifetime
+                |
+                span.badge.badge-lifetime Lifetime
             td= m.membership_year
             td
               a.btn-sm(href=`/admin/members/${m.id}`) Edit

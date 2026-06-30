@@ -33,6 +33,9 @@ block content
           th Status
           td
             span(class=`badge badge-${member.status}`)= member.status
+            if member.is_lifetime
+              |
+              span.badge.badge-lifetime Lifetime
         if member.membership_type
           tr
             th Membership Type
