@@ -19,6 +19,7 @@ const SCHEMA = `
     membership_type TEXT NOT NULL DEFAULT 'individual' CHECK(membership_type IN ('individual','family')),
     primary_member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
     status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','active','expired','cancelled')),
+    is_lifetime INTEGER NOT NULL DEFAULT 0,
     notes TEXT,
     role TEXT CHECK(role IN ('super_admin','editor')),
     otp_hash TEXT,

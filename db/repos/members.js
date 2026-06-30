@@ -7,21 +7,26 @@ async function findById(id) {
 }
 
 async function findByEmail(email) {
-  return await db.get('SELECT * FROM members WHERE email = ?', email);
+  // Prefer primary members (primary_member_id IS NULL) so family primaries are
+  // returned before sub-members who may share the same email address.
+  return await db.get(
+    'SELECT * FROM members WHERE email = ? ORDER BY primary_member_id IS NULL DESC LIMIT 1',
+    email
+  );
 }
 
 async function findAdminByEmail(email) {
   return await db.get('SELECT * FROM members WHERE email = ? AND role IS NOT NULL', email);
 }
 
-async function create({ member_number, first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, join_date, status, notes }) {
+async function create({ member_number, first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, join_date, status, is_lifetime, notes }) {
     const actor = getActor();
     const result = await db.run(
         `INSERT INTO members (member_number, first_name, last_name, email, phone, address_street, address_city,
-                              address_state, address_zip, membership_year, join_date, status, notes, created_by,
+                              address_state, address_zip, membership_year, join_date, status, is_lifetime, notes, created_by,
                               updated_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, ?, ?, ?)`,
-        member_number, first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, join_date || null, status || 'pending', notes || null, actor.id || null, actor.id || null
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, ?, ?, ?, ?)`,
+        member_number, first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, join_date || null, status || 'pending', is_lifetime ? 1 : 0, notes || null, actor.id || null, actor.id || null
   );
     const row = await db.get('SELECT * FROM members WHERE id = ?', result.lastInsertRowid);
     await auditLog.insert({
@@ -35,13 +40,13 @@ async function create({ member_number, first_name, last_name, email, phone, addr
     return result;
 }
 
-async function update(id, { first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, join_date, status, notes }) {
+async function update(id, { first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, join_date, status, is_lifetime, notes }) {
     const actor = getActor();
     const old = await db.get('SELECT * FROM members WHERE id = ?', id);
     const result = await db.run(
-        `UPDATE members SET first_name=?, last_name=?, email=?, phone=?, address_street=?, address_city=?, address_state=?, address_zip=?, membership_year=?, join_date=?, status=?, notes=?, updated_at=datetime('now'), updated_by=?
+        `UPDATE members SET first_name=?, last_name=?, email=?, phone=?, address_street=?, address_city=?, address_state=?, address_zip=?, membership_year=?, join_date=?, status=?, is_lifetime=?, notes=?, updated_at=datetime('now'), updated_by=?
      WHERE id=?`,
-        first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, join_date || null, status, notes || null, actor.id || null, id
+        first_name, last_name, email, phone || null, address_street || null, address_city || null, address_state || null, address_zip || null, membership_year, join_date || null, status, is_lifetime ? 1 : 0, notes || null, actor.id || null, id
   );
     const row = await db.get('SELECT * FROM members WHERE id = ?', id);
     await auditLog.insert({
@@ -226,6 +231,7 @@ async function findNeedingRenewal(currentPeriodId, daysUntilExpiry) {
         `SELECT *
          FROM members
          WHERE primary_member_id IS NULL
+           AND is_lifetime = 0
            AND status IN ('active', 'expired')
            AND expiry_date IS NOT NULL
            AND NOT EXISTS (

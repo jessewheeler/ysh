@@ -57,6 +57,11 @@ block content
           option(value="active" selected=(member && member.status === 'active')) Active
           option(value="expired" selected=(member && member.status === 'expired')) Expired
           option(value="cancelled" selected=(member && member.status === 'cancelled')) Cancelled
+      .form-group
+        label.checkbox-label
+          input(type="checkbox" name="is_lifetime" checked=(member && member.is_lifetime))
+          |  Lifetime Member
+        p.form-hint Lifetime members are never included in renewal reminders.
     .form-group
       label(for="notes") Notes
       textarea#notes(name="notes" rows="3")= member ? member.notes : ''
