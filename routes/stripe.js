@@ -66,8 +66,14 @@ router.post('/webhook', async (req, res) => {
         logger.error('Error setting expiry date or clearing renewal token', {error: e.message});
       }
 
+      // 4b. Re-fetch members so cards/emails reflect the updated membership_year + expiry_date
+      const refreshedPrimary = await findMemberById(memberId) || primaryMember;
+      const refreshedFamily = await Promise.all(
+        familyMembers.map(async fm => (await findMemberById(fm.id)) || fm)
+      );
+
       // 5. Generate cards for all members
-      const allMembers = [primaryMember, ...familyMembers];
+      const allMembers = [refreshedPrimary, ...refreshedFamily];
       for (const member of allMembers) {
         try {
           const { generatePDF, generatePNG } = require('../services/card');
@@ -87,8 +93,8 @@ router.post('/webhook', async (req, res) => {
         const emailService = require('../services/email');
 
         // Primary member: welcome + payment confirmation
-        await emailService.sendWelcomeEmail(primaryMember);
-        await emailService.sendPaymentConfirmation(primaryMember, session);
+        await emailService.sendWelcomeEmail(refreshedPrimary);
+        await emailService.sendPaymentConfirmation(refreshedPrimary, session);
 
         // All members: card email
         for (const member of allMembers) {
