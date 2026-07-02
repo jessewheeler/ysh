@@ -375,7 +375,8 @@ router.get('/members/:id/card/pdf', async (req, res) => {
     req.session.flash_error = 'Member not found.';
     return res.redirect('/admin/members');
   }
-  const card = await cardsRepo.findLatestByMemberId(req.params.id);
+  const card = await cardsRepo.findByMemberAndYear(member.id, member.membership_year)
+    || await cardsRepo.findLatestByMemberId(req.params.id);
   if (!card || !card.pdf_path) { req.session.flash_error = 'No card found.'; return res.redirect(`/admin/members/${req.params.id}`); }
   const filename = `YSH-${member.first_name}-${member.last_name}-${card.year || 'card'}.pdf`;
   if (card.pdf_path.startsWith('http')) {
@@ -404,7 +405,8 @@ router.get('/members/:id/card/png', async (req, res) => {
     req.session.flash_error = 'Member not found.';
     return res.redirect('/admin/members');
   }
-  const card = await cardsRepo.findLatestByMemberId(req.params.id);
+  const card = await cardsRepo.findByMemberAndYear(member.id, member.membership_year)
+    || await cardsRepo.findLatestByMemberId(req.params.id);
   if (!card || !card.png_path) { req.session.flash_error = 'No card found.'; return res.redirect(`/admin/members/${req.params.id}`); }
   const filename = `YSH-${member.first_name}-${member.last_name}-${card.year || 'card'}.png`;
   if (card.png_path.startsWith('http')) {

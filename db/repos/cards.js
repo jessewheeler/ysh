@@ -17,12 +17,12 @@ async function findByMemberId(memberId) {
 async function findByMemberAndYear(memberId, year) {
     if (year == null) {
         return await db.get(
-            'SELECT id FROM membership_cards WHERE member_id = ? AND year IS NULL',
+            'SELECT * FROM membership_cards WHERE member_id = ? AND year IS NULL',
             memberId
         );
     }
     return await db.get(
-    'SELECT id FROM membership_cards WHERE member_id = ? AND year = ?',
+    'SELECT * FROM membership_cards WHERE member_id = ? AND year = ?',
     memberId, year
   );
 }
@@ -54,6 +54,7 @@ async function upsertPdf(memberId, year, pdfPath) {
 module.exports = {
   findLatestByMemberId,
   findByMemberId,
+  findByMemberAndYear,
   upsertPng,
   upsertPdf,
 };

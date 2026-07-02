@@ -100,8 +100,8 @@ describe('sendPaymentConfirmation', () => {
 });
 
 describe('sendCardEmail', () => {
-  test('throws when no card exists for member', async () => {
-    await expect(emailService.sendCardEmail(testMember)).rejects.toThrow('No card found');
+  test('throws when no card exists for the member\'s current year', async () => {
+    await expect(emailService.sendCardEmail(testMember)).rejects.toThrow(/No 2025 card found/);
   });
 
   test('sends email when card exists with pdf and png', async () => {
