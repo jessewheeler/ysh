@@ -46,7 +46,13 @@ async function resolveTemplate(memberId) {
     memberId
   );
   if (row?.card_template_path) {
-    return path.join(CARD_TEMPLATE_DIR, row.card_template_path);
+    const templatePath = path.join(CARD_TEMPLATE_DIR, row.card_template_path);
+    // Fall back to the default template if the period's configured template
+    // file is missing — otherwise card generation throws and the renewal
+    // silently ships no card (issue #67).
+    if (fs.existsSync(templatePath)) {
+      return templatePath;
+    }
   }
   return TEMPLATE_PNG;
 }

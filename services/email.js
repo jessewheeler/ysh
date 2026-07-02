@@ -190,9 +190,14 @@ async function getCardBuffer(cardPath) {
 }
 
 async function sendCardEmail(member) {
-  const card = await cardsRepo.findLatestByMemberId(member.id);
+  // Look up the card for the member's CURRENT membership year — never fall back
+  // to an older card, or a renewal whose new-year card failed to generate would
+  // silently ship last season's card (see issue #67).
+  const card = await cardsRepo.findByMemberAndYear(member.id, member.membership_year);
 
-  if (!card) throw new Error('No card found for this member');
+  if (!card) {
+    throw new Error(`No ${member.membership_year} card found for member ${member.id}`);
+  }
 
   const attachments = [];
   if (card.pdf_path) {

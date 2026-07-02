@@ -72,13 +72,16 @@ router.post('/webhook', async (req, res) => {
         familyMembers.map(async fm => (await findMemberById(fm.id)) || fm)
       );
 
-      // 5. Generate cards for all members
+      // 5. Generate cards for all members. Track which members got a card so we
+      //    never email a stale prior-year card when generation fails (issue #67).
       const allMembers = [refreshedPrimary, ...refreshedFamily];
+      const cardGenerated = new Set();
       for (const member of allMembers) {
         try {
           const { generatePDF, generatePNG } = require('../services/card');
           await generatePDF(member);
           await generatePNG(member);
+          cardGenerated.add(member.id);
         } catch (e) {
           logger.error('Card generation error', {
             memberNumber: member.member_number,
@@ -96,8 +99,15 @@ router.post('/webhook', async (req, res) => {
         await emailService.sendWelcomeEmail(refreshedPrimary);
         await emailService.sendPaymentConfirmation(refreshedPrimary, session);
 
-        // All members: card email
+        // Card email — only for members whose current-year card was produced.
         for (const member of allMembers) {
+          if (!cardGenerated.has(member.id)) {
+            logger.warn('Skipping card email — no card generated', {
+              memberNumber: member.member_number,
+              membershipYear: member.membership_year,
+            });
+            continue;
+          }
           await emailService.sendCardEmail(member);
         }
       } catch (e) {
