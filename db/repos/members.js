@@ -109,32 +109,14 @@ async function countByYear(year) {
   return row ? row.c : 0;
 }
 
-async function search({ search, status, periodId, limit, offset }) {
-  const clauses = [];
-  const params = [];
-
+async function search({ search, limit, offset }) {
+  let where = '';
+  let params = [];
   if (search) {
-    clauses.push('(LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(member_number) LIKE ?)');
+    where = 'WHERE LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(member_number) LIKE ?';
     const s = `%${search.toLowerCase()}%`;
-    params.push(s, s, s, s);
+    params = [s, s, s, s];
   }
-
-  if (status === 'active') {
-    clauses.push("status = 'active' AND (expiry_date IS NULL OR expiry_date >= date('now'))");
-  } else if (status === 'expired') {
-    clauses.push("status != 'cancelled' AND expiry_date IS NOT NULL AND expiry_date < date('now')");
-  } else if (status === 'cancelled') {
-    clauses.push("status = 'cancelled'");
-  } else if (status === 'pending') {
-    clauses.push("status = 'pending'");
-  }
-
-  if (periodId) {
-    clauses.push('id IN (SELECT member_id FROM membership_years WHERE membership_period_id = ?)');
-    params.push(periodId);
-  }
-
-  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const totalRow = await db.get(`SELECT COUNT(*) as c FROM members ${where}`, ...params);
   const total = totalRow ? totalRow.c : 0;
   const members = await db.all(`SELECT * FROM members ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`, ...params, limit, offset);
