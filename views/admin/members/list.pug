@@ -7,16 +7,6 @@ block content
   .admin-toolbar
     form.search-form(method="GET" action="/admin/members")
       input(type="text" name="search" placeholder="Search members..." value=search)
-      select(name="status" data-autosubmit)
-        option(value="" selected=(status === '')) All statuses
-        option(value="active" selected=(status === 'active')) Active
-        option(value="pending" selected=(status === 'pending')) Pending
-        option(value="expired" selected=(status === 'expired')) Expired
-        option(value="cancelled" selected=(status === 'cancelled')) Cancelled
-      select(name="period" data-autosubmit)
-        option(value="" selected=(!period)) All periods
-        each p in periods
-          option(value=p.id selected=(period === p.id))= p.label || `${p.start_date}–${p.end_date}`
       button.btn(type="submit") Search
     a.btn(href="/admin/members/new") + New Member
     a.btn-outline(href="/admin/members/export") Export CSV
@@ -51,9 +41,9 @@ block content
     if totalPages > 1
       .pagination
         if page > 1
-          a(href=`/admin/members?page=${page - 1}&search=${search}&status=${status}&period=${period}`) &laquo; Prev
+          a(href=`/admin/members?page=${page - 1}&search=${search}`) &laquo; Prev
         span Page #{page} of #{totalPages} (#{total} total)
         if page < totalPages
-          a(href=`/admin/members?page=${page + 1}&search=${search}&status=${status}&period=${period}`) Next &raquo;
+          a(href=`/admin/members?page=${page + 1}&search=${search}`) Next &raquo;
   else
     p.text-muted No members found.

@@ -17,13 +17,13 @@ function buildMember(overrides = {}) {
 function insertMember(db, overrides = {}) {
   const m = buildMember(overrides);
   const info = db.prepare(
-    `INSERT INTO members (first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, member_number, membership_type, primary_member_id, expiry_date)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO members (first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, member_number, membership_type, primary_member_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     m.first_name, m.last_name, m.email, m.phone,
     m.address_street, m.address_city, m.address_state, m.address_zip,
     m.membership_year, m.status, m.member_number || null,
-    m.membership_type || 'individual', m.primary_member_id || null, m.expiry_date || null
+    m.membership_type || 'individual', m.primary_member_id || null
   );
   return { ...m, id: info.lastInsertRowid };
 }
