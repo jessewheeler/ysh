@@ -159,11 +159,14 @@ router.get('/members', async (req, res, next) => {
     const limit = 25;
     const offset = (page - 1) * limit;
     const search = req.query.search || '';
+    const status = req.query.status || '';
+    const period = req.query.period ? parseInt(req.query.period) : '';
 
-    const { members, total } = await memberRepo.search({ search, limit, offset });
+    const { members, total } = await memberRepo.search({ search, status, periodId: period || undefined, limit, offset });
     const totalPages = Math.ceil(total / limit);
+    const periods = await periodsRepo.list();
 
-    res.render('admin/members/list', { members, page, totalPages, search, total });
+    res.render('admin/members/list', { members, page, totalPages, search, status, period, periods, total });
   } catch (err) {
     next(err);
   }

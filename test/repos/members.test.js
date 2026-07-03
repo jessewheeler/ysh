@@ -2,7 +2,11 @@ jest.mock('../../db/database', () => require('../helpers/setupDb'));
 
 const db = require('../../db/database');
 const memberRepo = require('../../db/repos/members');
-const { insertMember, insertAdmin, insertFamilyMembership } = require('../helpers/fixtures');
+const { insertMember, insertAdmin, insertFamilyMembership, insertPeriod, enrollMember } = require('../helpers/fixtures');
+
+// Dates relative to today for status-by-expiry tests.
+const FUTURE = '2999-01-01';
+const PAST = '2000-01-01';
 
 beforeEach(() => {
   db.__resetTestDb();
@@ -149,6 +153,73 @@ describe('search', () => {
     expect((await memberRepo.search({ search: 'alice@example.com', limit: 25, offset: 0 })).total).toBe(1);
     // Member number match ignoring case.
     expect((await memberRepo.search({ search: 'ysh-0042', limit: 25, offset: 0 })).total).toBe(1);
+  });
+
+  test('status=active excludes cancelled and past-expiry members', async () => {
+    const testDb = db.__getCurrentDb();
+    insertMember(testDb, { email: 'a@a.com', status: 'active', expiry_date: FUTURE });
+    insertMember(testDb, { email: 'b@b.com', status: 'active', expiry_date: null });
+    insertMember(testDb, { email: 'c@c.com', status: 'active', expiry_date: PAST });
+    insertMember(testDb, { email: 'd@d.com', status: 'cancelled', expiry_date: FUTURE });
+    insertMember(testDb, { email: 'e@e.com', status: 'pending' });
+
+    const result = await memberRepo.search({ status: 'active', limit: 25, offset: 0 });
+    expect(result.total).toBe(2);
+    expect(result.members.map((m) => m.email).sort()).toEqual(['a@a.com', 'b@b.com']);
+  });
+
+  test('status=expired returns only non-cancelled members past expiry', async () => {
+    const testDb = db.__getCurrentDb();
+    insertMember(testDb, { email: 'a@a.com', status: 'active', expiry_date: PAST });
+    insertMember(testDb, { email: 'b@b.com', status: 'expired', expiry_date: PAST });
+    insertMember(testDb, { email: 'c@c.com', status: 'active', expiry_date: FUTURE });
+    insertMember(testDb, { email: 'd@d.com', status: 'cancelled', expiry_date: PAST });
+    insertMember(testDb, { email: 'e@e.com', status: 'pending', expiry_date: null });
+
+    const result = await memberRepo.search({ status: 'expired', limit: 25, offset: 0 });
+    expect(result.total).toBe(2);
+    expect(result.members.map((m) => m.email).sort()).toEqual(['a@a.com', 'b@b.com']);
+  });
+
+  test('status=cancelled and status=pending filter on the stored status', async () => {
+    const testDb = db.__getCurrentDb();
+    insertMember(testDb, { email: 'a@a.com', status: 'cancelled' });
+    insertMember(testDb, { email: 'b@b.com', status: 'pending' });
+    insertMember(testDb, { email: 'c@c.com', status: 'active', expiry_date: FUTURE });
+
+    expect((await memberRepo.search({ status: 'cancelled', limit: 25, offset: 0 })).total).toBe(1);
+    expect((await memberRepo.search({ status: 'pending', limit: 25, offset: 0 })).total).toBe(1);
+  });
+
+  test('periodId returns only members enrolled in that period', async () => {
+    const testDb = db.__getCurrentDb();
+    const m1 = insertMember(testDb, { email: 'a@a.com' });
+    const m2 = insertMember(testDb, { email: 'b@b.com' });
+    insertMember(testDb, { email: 'c@c.com' });
+    const period = insertPeriod(testDb, { label: '2025-26' });
+    const other = insertPeriod(testDb, { label: '2024-25', start_date: '2024-04-01', end_date: '2025-03-31' });
+    enrollMember(testDb, m1.id, period.id);
+    enrollMember(testDb, m2.id, other.id);
+
+    const result = await memberRepo.search({ periodId: period.id, limit: 25, offset: 0 });
+    expect(result.total).toBe(1);
+    expect(result.members[0].email).toBe('a@a.com');
+  });
+
+  test('combines search, status and periodId with AND', async () => {
+    const testDb = db.__getCurrentDb();
+    const period = insertPeriod(testDb);
+    const match = insertMember(testDb, { email: 'alice@a.com', first_name: 'Alice', status: 'active', expiry_date: FUTURE });
+    // Same period + active but name does not match search.
+    const m2 = insertMember(testDb, { email: 'bob@b.com', first_name: 'Bob', status: 'active', expiry_date: FUTURE });
+    // Matches search + active but not enrolled in the period.
+    insertMember(testDb, { email: 'alice2@a.com', first_name: 'Alice', status: 'active', expiry_date: FUTURE });
+    enrollMember(testDb, match.id, period.id);
+    enrollMember(testDb, m2.id, period.id);
+
+    const result = await memberRepo.search({ search: 'alice', status: 'active', periodId: period.id, limit: 25, offset: 0 });
+    expect(result.total).toBe(1);
+    expect(result.members[0].email).toBe('alice@a.com');
   });
 });
 
