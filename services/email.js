@@ -78,12 +78,35 @@ async function logEmail({ to_email, to_name, subject, body_html, email_type, sta
   }
 }
 
+function htmlToText(html) {
+  return String(html)
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<a\s[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href, label) => {
+      const text = label.replace(/<[^>]+>/g, '').trim();
+      return text && text !== href ? `${text}: ${href}` : href;
+    })
+    .replace(/<\/(p|div|tr|h[1-6]|li)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s*\n\s*/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 async function mailersendSend({ to, toName, from, subject, html, attachments }) {
   const body = {
     from: { email: from.email, name: from.name },
     to: [{ email: to, name: toName || to }],
     subject,
     html,
+    text: htmlToText(html),
   };
   if (attachments && attachments.length > 0) {
     body.attachments = attachments.map(a => ({
@@ -326,4 +349,5 @@ module.exports = {
   sendOtpEmail,
   sendContactEmail,
   sendRenewalReminderEmail,
+  htmlToText,
 };
