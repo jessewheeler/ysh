@@ -56,4 +56,9 @@ async function findByPeriod(periodId) {
     );
 }
 
-module.exports = {enroll, isEnrolled, findByMember, findByPeriod};
+async function countByPeriod(periodId) {
+    const row = await db.get('SELECT COUNT(*) as c FROM membership_years WHERE membership_period_id = ?', periodId);
+    return row ? row.c : 0;
+}
+
+module.exports = {enroll, isEnrolled, findByMember, findByPeriod, countByPeriod};

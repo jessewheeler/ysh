@@ -5,13 +5,23 @@ block page_title
 
 block content
   .stats-grid
-    .stat-card
+    a.stat-card(href="/admin/members")
       .stat-number= stats.totalMembers
       .stat-label Total Members
-    .stat-card
+    a.stat-card(href="/admin/members?view=active")
       .stat-number= stats.activeMembers
       .stat-label Active Members
-    .stat-card
+    a.stat-card(href="/admin/members?view=needs-renewal")
+      .stat-number= stats.needsRenewal
+      .stat-label Needs Renewal
+    a.stat-card(href="/admin/members?view=pending")
+      .stat-number= stats.pendingMembers
+      .stat-label Pending
+    if stats.currentPeriodLabel
+      a.stat-card(href=`/admin/members?period=${stats.currentPeriodId}`)
+        .stat-number= stats.currentPeriodEnrollment
+        .stat-label= `Enrolled ${stats.currentPeriodLabel}`
+    a.stat-card(href="/admin/payments")
       .stat-number $#{(stats.totalRevenue / 100).toFixed(2)}
       .stat-label Total Revenue
     .stat-card

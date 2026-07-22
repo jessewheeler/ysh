@@ -34,8 +34,10 @@ class DatabaseManager:
         tables = [
             'membership_cards',
             'emails_log',
+            'membership_years',
             'payments',
             'members',
+            'membership_periods',
             'announcements',
             'gallery_images',
             'bios',
@@ -46,6 +48,7 @@ class DatabaseManager:
         self.conn.commit()
         self.seed_settings()
         self.seed_admin()
+        self.seed_period()
 
     def seed_settings(self):
         """Insert default site_settings."""
@@ -67,6 +70,17 @@ class DatabaseManager:
                 (key, value),
             )
         self.conn.commit()
+
+    def seed_period(self, label='Robot Test Season'):
+        """Insert a membership period that is current (spans today)."""
+        cursor = self.conn.execute(
+            """INSERT INTO membership_periods
+               (label, start_date, end_date, individual_dues_cents, family_dues_cents, electronic_surcharge_cents)
+               VALUES (?, date('now', '-30 days'), date('now', '+300 days'), 1600, 2600, 0)""",
+            (label,),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
 
     def seed_admin(self, email=None, first_name=None, last_name=None, role='super_admin'):
         """Insert a test admin into members and return the row ID."""

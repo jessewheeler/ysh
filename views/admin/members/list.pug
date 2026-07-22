@@ -3,24 +3,59 @@ extends ../layout
 block page_title
   | Members
 
+mixin sortTh(key, label)
+  - const isActive = sort === key
+  - const nextDir = isActive && dir === 'asc' ? 'desc' : 'asc'
+  th
+    a.sort-link(href=`/admin/members${qs({sort: key, dir: nextDir, page: 1})}`)
+      = label
+      if isActive
+        span.sort-indicator= dir === 'asc' ? ' ▲' : ' ▼'
+
 block content
+  .view-pills
+    - const pills = [['all', 'All', counts.all], ['active', 'Active', counts.active], ['needs-renewal', 'Needs renewal', counts.needsRenewal], ['recently-renewed', 'Recently renewed', counts.recentlyRenewed], ['pending', 'Pending', counts.pending], ['lifetime', 'Lifetime', counts.lifetime]]
+    each pill in pills
+      a(class=`view-pill${view === pill[0] ? ' view-pill-active' : ''}` href=`/admin/members${qs({view: pill[0], page: 1})}`)
+        = pill[1]
+        span.pill-count= pill[2]
+
   .admin-toolbar
-    form.search-form(method="GET" action="/admin/members")
-      input(type="text" name="search" placeholder="Search members..." value=search)
+    form.search-form.search-form-wide(method="GET" action="/admin/members")
+      if view !== 'all'
+        input(type="hidden" name="view" value=view)
+      if sort !== 'created_at'
+        input(type="hidden" name="sort" value=sort)
+      if dir !== 'desc'
+        input(type="hidden" name="dir" value=dir)
+      input(type="search" name="search" placeholder="Search name, email, or member number..." value=search)
+      select(name="period" onchange="this.form.submit()")
+        option(value="" selected=!periodId) All periods
+        each p in periods
+          option(value=p.id selected=periodId === p.id)= p.label
+      select(name="status" onchange="this.form.submit()")
+        option(value="" selected=!status) Any status
+        option(value="active" selected=status === 'active') Active
+        option(value="expired" selected=status === 'expired') Expired
+        option(value="pending" selected=status === 'pending') Pending
+        option(value="cancelled" selected=status === 'cancelled') Cancelled
       button.btn(type="submit") Search
-    a.btn(href="/admin/members/new") + New Member
-    a.btn-outline(href="/admin/members/export") Export CSV
+      if search || status || periodId
+        a.btn-outline(href=`/admin/members${qs({search: '', status: '', period: '', page: 1})}`) Clear filters
+    .toolbar-actions
+      a.btn(href="/admin/members/new") + New Member
+      a.btn-outline(href=`/admin/members/export${qs({})}`) Export CSV
 
   if members.length
     table.admin-table
       thead
         tr
-          th Number
-          th Name
-          th Email
+          +sortTh('member_number', 'Number')
+          +sortTh('name', 'Name')
+          +sortTh('email', 'Email')
           th Type
-          th Status
-          th Year
+          +sortTh('status', 'Status')
+          +sortTh('year', 'Year')
           th Actions
       tbody
         each m in members
@@ -41,9 +76,12 @@ block content
     if totalPages > 1
       .pagination
         if page > 1
-          a(href=`/admin/members?page=${page - 1}&search=${search}`) &laquo; Prev
+          a(href=`/admin/members${qs({page: page - 1})}`) &laquo; Prev
         span Page #{page} of #{totalPages} (#{total} total)
         if page < totalPages
-          a(href=`/admin/members?page=${page + 1}&search=${search}`) Next &raquo;
+          a(href=`/admin/members${qs({page: page + 1})}`) Next &raquo;
   else
-    p.text-muted No members found.
+    if view !== 'all' || search || periodId
+      p.text-muted No members match this view or search.
+    else
+      p.text-muted No members found.

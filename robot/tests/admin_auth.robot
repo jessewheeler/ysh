@@ -17,7 +17,7 @@ Successful Login Redirects To Dashboard
     Login As Admin
     Current URL Should Contain    /admin/dashboard
     ${count}=    Get Element Count    .stat-card
-    Should Be Equal As Integers    ${count}    4
+    Should Be Equal As Integers    ${count}    7
 
 Failed Login Shows Invalid Code
     Navigate To    /admin/login

@@ -109,18 +109,134 @@ async function countByYear(year) {
   return row ? row.c : 0;
 }
 
-async function search({ search, limit, offset }) {
-  let where = '';
-  let params = [];
-  if (search) {
-    where = 'WHERE LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(member_number) LIKE ?';
-    const s = `%${search.toLowerCase()}%`;
-    params = [s, s, s, s];
+// Dates are always computed in JS and bound as parameters: expiry_date and
+// membership_years.created_at are TEXT columns, and comparing them against
+// date('now') breaks on PostgreSQL (text vs date type error).
+function isoDate(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+}
+
+const NEEDS_RENEWAL_WINDOW_DAYS = 30;
+const RECENTLY_RENEWED_WINDOW_DAYS = 30;
+
+function viewClause(view, currentPeriodId) {
+  const today = isoDate();
+  switch (view) {
+    case 'active':
+      return {
+        sql: "(status = 'active' AND (is_lifetime = 1 OR expiry_date IS NULL OR expiry_date >= ?))",
+        params: [today],
+      };
+    case 'needs-renewal': {
+      const cutoff = isoDate(NEEDS_RENEWAL_WINDOW_DAYS);
+      let sql = `(primary_member_id IS NULL AND is_lifetime = 0
+        AND status IN ('active', 'expired')
+        AND expiry_date IS NOT NULL AND expiry_date <= ?`;
+      const params = [cutoff];
+      if (currentPeriodId) {
+        sql += ' AND NOT EXISTS (SELECT 1 FROM membership_years WHERE member_id = members.id AND membership_period_id = ?)';
+        params.push(currentPeriodId);
+      }
+      sql += ')';
+      return { sql, params };
+    }
+    case 'recently-renewed': {
+      if (!currentPeriodId) return { sql: '1 = 0', params: [] };
+      const since = `${isoDate(-RECENTLY_RENEWED_WINDOW_DAYS)} 00:00:00`;
+      return {
+        sql: 'EXISTS (SELECT 1 FROM membership_years WHERE member_id = members.id AND membership_period_id = ? AND created_at >= ?)',
+        params: [currentPeriodId, since],
+      };
+    }
+    case 'pending':
+      return { sql: "status = 'pending'", params: [] };
+    case 'lifetime':
+      return { sql: 'is_lifetime = 1', params: [] };
+    default:
+      return null;
   }
+}
+
+const SORTABLE = {
+  member_number: 'member_number %D%',
+  name: 'last_name %D%, first_name %D%',
+  email: 'email %D%',
+  year: 'membership_year %D%',
+  status: 'status %D%',
+  created_at: 'created_at %D%',
+};
+
+function orderClause(sort, dir) {
+  const template = SORTABLE[sort] || SORTABLE.created_at;
+  const d = dir === 'asc' ? 'ASC' : 'DESC';
+  return `ORDER BY ${template.replace(/%D%/g, d)}, id ASC`;
+}
+
+async function search({ search, view, currentPeriodId, status, periodId, sort, dir, limit, offset }) {
+  const clauses = [];
+  const params = [];
+
+  if (search) {
+    clauses.push('(LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(member_number) LIKE ?)');
+    const s = `%${search.toLowerCase()}%`;
+    params.push(s, s, s, s);
+  }
+
+  const vc = viewClause(view, currentPeriodId);
+  if (vc) {
+    clauses.push(vc.sql);
+    params.push(...vc.params);
+  }
+
+  if (status === 'active') {
+    clauses.push("(status = 'active' AND (is_lifetime = 1 OR expiry_date IS NULL OR expiry_date >= ?))");
+    params.push(isoDate());
+  } else if (status === 'expired') {
+    clauses.push("(status != 'cancelled' AND is_lifetime = 0 AND expiry_date IS NOT NULL AND expiry_date < ?)");
+    params.push(isoDate());
+  } else if (status === 'pending' || status === 'cancelled') {
+    clauses.push('status = ?');
+    params.push(status);
+  }
+
+  if (periodId) {
+    clauses.push('id IN (SELECT member_id FROM membership_years WHERE membership_period_id = ?)');
+    params.push(periodId);
+  }
+
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const totalRow = await db.get(`SELECT COUNT(*) as c FROM members ${where}`, ...params);
   const total = totalRow ? totalRow.c : 0;
-  const members = await db.all(`SELECT * FROM members ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`, ...params, limit, offset);
+
+  let sql = `SELECT * FROM members ${where} ${orderClause(sort, dir)}`;
+  const listParams = [...params];
+  if (limit !== undefined) {
+    sql += ' LIMIT ? OFFSET ?';
+    listParams.push(limit, offset || 0);
+  }
+  const members = await db.all(sql, ...listParams);
   return { members, total };
+}
+
+async function countView(view, currentPeriodId) {
+  const vc = viewClause(view, currentPeriodId);
+  const where = vc ? `WHERE ${vc.sql}` : '';
+  const row = await db.get(`SELECT COUNT(*) as c FROM members ${where}`, ...(vc ? vc.params : []));
+  return row ? row.c : 0;
+}
+
+async function countByView(currentPeriodId) {
+  const [all, active, needsRenewal, recentlyRenewed, pending, lifetime] = await Promise.all([
+    countView('all', currentPeriodId),
+    countView('active', currentPeriodId),
+    countView('needs-renewal', currentPeriodId),
+    countView('recently-renewed', currentPeriodId),
+    countView('pending', currentPeriodId),
+    countView('lifetime', currentPeriodId),
+  ]);
+  return { all, active, needsRenewal, recentlyRenewed, pending, lifetime };
 }
 
 async function listRecent(limit) {
@@ -459,6 +575,7 @@ module.exports = {
   countActive,
   countByYear,
   search,
+  countByView,
   listRecent,
   listAll,
   listActiveMembers,
