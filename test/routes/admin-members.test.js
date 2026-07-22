@@ -1,7 +1,7 @@
 jest.mock('../../db/database', () => require('../helpers/setupDb'));
 
 const db = require('../../db/database');
-const { insertAdmin, insertMember } = require('../helpers/fixtures');
+const { insertAdmin, insertMember, insertPeriod, enrollMember } = require('../helpers/fixtures');
 
 const mockHandlers = {};
 jest.mock('express', () => {
@@ -29,6 +29,111 @@ beforeEach(() => {
   db.__resetTestDb();
   Object.keys(mockHandlers).forEach(k => delete mockHandlers[k]);
   jest.isolateModules(() => { require('../../routes/admin'); });
+});
+
+describe('GET /members (views, sorting, filters)', () => {
+  test('view=pending renders only pending members with pill counts', async () => {
+    insertMember(db, { email: 'p@t.com', status: 'pending' });
+    insertMember(db, { email: 'a@t.com', status: 'active' });
+
+    const req = mockReq({ query: { view: 'pending' } });
+    const res = mockRes();
+    await mockHandlers['GET /members'](req, res);
+
+    expect(res.render).toHaveBeenCalledWith('admin/members/list', expect.objectContaining({
+      view: 'pending',
+      counts: expect.objectContaining({ all: 2, pending: 1 }),
+    }));
+    const locals = res.render.mock.calls[0][1];
+    expect(locals.members.map(m => m.email)).toEqual(['p@t.com']);
+  });
+
+  test('invalid view, sort, and dir are sanitized to defaults', async () => {
+    insertMember(db, { email: 'a@t.com' });
+
+    const req = mockReq({ query: { view: 'nonsense', sort: 'evil', dir: 'up' } });
+    const res = mockRes();
+    await mockHandlers['GET /members'](req, res);
+
+    const locals = res.render.mock.calls[0][1];
+    expect(locals.view).toBe('all');
+    expect(locals.sort).toBe('created_at');
+    expect(locals.dir).toBe('desc');
+    expect(locals.members).toHaveLength(1);
+  });
+
+  test('period param filters to enrolled members', async () => {
+    const period = insertPeriod(db);
+    const enrolled = insertMember(db, { email: 'in@t.com', status: 'active' });
+    enrollMember(db, enrolled.id, period.id);
+    insertMember(db, { email: 'out@t.com', status: 'active' });
+
+    const req = mockReq({ query: { period: String(period.id) } });
+    const res = mockRes();
+    await mockHandlers['GET /members'](req, res);
+
+    const locals = res.render.mock.calls[0][1];
+    expect(locals.members.map(m => m.email)).toEqual(['in@t.com']);
+    expect(locals.periods.map(p => p.id)).toContain(period.id);
+  });
+
+  test('qs helper preserves state and omits defaults', async () => {
+    insertMember(db, { email: 'a@t.com' });
+
+    const req = mockReq({ query: { view: 'lifetime', sort: 'name', dir: 'asc' } });
+    const res = mockRes();
+    await mockHandlers['GET /members'](req, res);
+
+    const { qs } = res.render.mock.calls[0][1];
+    expect(qs({})).toBe('?view=lifetime&sort=name&dir=asc');
+    expect(qs({ view: 'all' })).toBe('?sort=name&dir=asc');
+    expect(qs({ page: 2 })).toBe('?view=lifetime&sort=name&dir=asc&page=2');
+  });
+
+  test('clear-filters override drops search/status/period but keeps view and sort', async () => {
+    const period = insertPeriod(db);
+    insertMember(db, { email: 'a@t.com' });
+
+    const req = mockReq({ query: { view: 'active', sort: 'name', dir: 'asc', search: 'smith', status: 'active', period: String(period.id) } });
+    const res = mockRes();
+    await mockHandlers['GET /members'](req, res);
+
+    const { qs } = res.render.mock.calls[0][1];
+    expect(qs({ search: '', status: '', period: '', page: 1 })).toBe('?view=active&sort=name&dir=asc');
+  });
+});
+
+describe('GET /members/export (filter-aware)', () => {
+  function mockCsvRes() {
+    const res = { headers: {}, body: null, setHeader(k, v) { res.headers[k] = v; }, send(b) { res.body = b; } };
+    return res;
+  }
+
+  test('honors view and search params', async () => {
+    insertMember(db, { email: 'life@t.com', first_name: 'Lila', status: 'active', is_lifetime: 1 });
+    insertMember(db, { email: 'reg@t.com', first_name: 'Reggie', status: 'active' });
+
+    const req = mockReq({ query: { view: 'lifetime' } });
+    const res = mockCsvRes();
+    await mockHandlers['GET /members/export'](req, res);
+
+    expect(res.body).toContain('Lila');
+    expect(res.body).not.toContain('Reggie');
+    expect(res.headers['Content-Disposition']).toContain('ysh-members-lifetime-');
+  });
+
+  test('exports everyone when no params (backward compat)', async () => {
+    insertMember(db, { email: 'a@t.com', first_name: 'Alice' });
+    insertMember(db, { email: 'b@t.com', first_name: 'Bob' });
+
+    const req = mockReq({ query: {} });
+    const res = mockCsvRes();
+    await mockHandlers['GET /members/export'](req, res);
+
+    expect(res.body).toContain('Alice');
+    expect(res.body).toContain('Bob');
+    expect(res.headers['Content-Disposition']).toContain('ysh-members-2');
+  });
 });
 
 describe('POST /members/:id/delete', () => {

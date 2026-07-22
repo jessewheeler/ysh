@@ -17,13 +17,14 @@ function buildMember(overrides = {}) {
 function insertMember(db, overrides = {}) {
   const m = buildMember(overrides);
   const info = db.prepare(
-    `INSERT INTO members (first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, member_number, membership_type, primary_member_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO members (first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, member_number, membership_type, primary_member_id, expiry_date, is_lifetime)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     m.first_name, m.last_name, m.email, m.phone,
     m.address_street, m.address_city, m.address_state, m.address_zip,
     m.membership_year, m.status, m.member_number || null,
-    m.membership_type || 'individual', m.primary_member_id || null
+    m.membership_type || 'individual', m.primary_member_id || null,
+    m.expiry_date || null, m.is_lifetime ? 1 : 0
   );
   return { ...m, id: info.lastInsertRowid };
 }
@@ -141,11 +142,16 @@ function insertPeriod(db, overrides = {}) {
     return {...p, id: info.lastInsertRowid};
 }
 
-function enrollMember(db, memberId, periodId, paymentId = null) {
-    const info = db.prepare(
-        `INSERT OR IGNORE INTO membership_years (member_id, membership_period_id, payment_id)
+function enrollMember(db, memberId, periodId, paymentId = null, createdAt = null) {
+    const info = createdAt
+        ? db.prepare(
+            `INSERT OR IGNORE INTO membership_years (member_id, membership_period_id, payment_id, created_at)
+     VALUES (?, ?, ?, ?)`
+        ).run(memberId, periodId, paymentId, createdAt)
+        : db.prepare(
+            `INSERT OR IGNORE INTO membership_years (member_id, membership_period_id, payment_id)
      VALUES (?, ?, ?)`
-    ).run(memberId, periodId, paymentId);
+        ).run(memberId, periodId, paymentId);
     return {id: info.lastInsertRowid, member_id: memberId, membership_period_id: periodId, payment_id: paymentId};
 }
 
