@@ -5,12 +5,28 @@ block content
     .container
       h2 Board Member Bios
       .bios-grid
-        each bio in bios
-          .bio-card
+        each bio, i in bios
+          button.bio-card(type="button" data-bio-index=i aria-haspopup="dialog")
             if bio.photo_path
               img.bio-photo(src=bio.photo_path alt=bio.name)
             h3= bio.name
             if bio.role
               .bio-role= bio.role
+          template(id=`bio-tpl-${i}`)
+            if bio.photo_path
+              img.bio-modal-photo(src=bio.photo_path alt=bio.name)
+            h3.bio-modal-name(id="bio-modal-title")= bio.name
+            if bio.role
+              .bio-role= bio.role
             if bio.bio_text
-              p= bio.bio_text
+              .bio-modal-text
+                each para in bio.bio_text.split(/\n\s*\n/).filter((p) => p.trim())
+                  p= para.trim()
+
+      .bio-modal#bio-modal(role="dialog" aria-modal="true" aria-labelledby="bio-modal-title")
+        .bio-modal-backdrop
+        .bio-modal-dialog
+          button.bio-modal-close(type="button" aria-label="Close") &times;
+          .bio-modal-body#bio-modal-body
+
+  script(src="/js/bios.js")

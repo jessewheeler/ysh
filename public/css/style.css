@@ -419,17 +419,36 @@ blockquote {
 /* === Bios === */
 .bios-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 2rem;
   margin-top: 1rem;
 }
 
 .bio-card {
+  display: block;
+  width: 100%;
   background: #fff;
+  border: none;
   border-radius: 8px;
-  padding: 2.5rem;
+  padding: 2rem 1.5rem;
   text-align: center;
+  font-family: inherit;
+  cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.bio-card:hover,
+.bio-card:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.bio-card:focus-visible {
+  outline: 3px solid #69be28;
+  outline-offset: 2px;
 }
 
 .bio-photo {
@@ -449,15 +468,89 @@ blockquote {
 .bio-role {
   color: #69be28;
   font-weight: 600;
-  margin-bottom: 1.25rem;
   font-size: 0.95rem;
 }
 
-.bio-card p {
+/* Bio detail modal */
+.bio-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.bio-modal.bio-modal--open {
+  display: flex;
+}
+
+.bio-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.bio-modal-dialog {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+  padding: 2.5rem;
+  max-width: 560px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.bio-modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #555;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.bio-modal-close:hover {
+  color: #002a5c;
+}
+
+.bio-modal-photo {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 1.25rem;
+}
+
+.bio-modal-name {
+  color: #002a5c;
+  margin-bottom: 0.5rem;
+  font-size: 1.5rem;
+}
+
+.bio-modal-text {
+  margin-top: 1.5rem;
   text-align: left;
+}
+
+.bio-modal-text p {
   color: #555;
   font-size: 0.95rem;
   line-height: 1.7;
+}
+
+.bio-modal-text p + p {
+  margin-top: 1rem;
 }
 
 /* === Footer === */
