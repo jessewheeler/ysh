@@ -49,6 +49,50 @@ describe('generateRenewalToken', () => {
     expect(expiryMs).toBeGreaterThanOrEqual(before + thirtyDaysMs - 1000);
     expect(expiryMs).toBeLessThanOrEqual(after + thirtyDaysMs + 1000);
     });
+
+    test('reuses the existing token while it is still valid', async () => {
+        const testDb = getTestDb();
+        const member = insertMember(testDb, {email: 'c@c.com', status: 'active'});
+
+        const first = await renewalService.generateRenewalToken(member.id);
+        const second = await renewalService.generateRenewalToken(member.id);
+
+        expect(second).toBe(first);
+    });
+
+    test('extends the expiry of a reused token', async () => {
+        const testDb = getTestDb();
+        const member = insertMember(testDb, {email: 'd@d.com', status: 'active'});
+
+        await renewalService.generateRenewalToken(member.id);
+        const firstExpiry = testDb.prepare('SELECT renewal_token_expires_at FROM members WHERE id = ?')
+            .get(member.id).renewal_token_expires_at;
+
+        // Wind the stored expiry back a day so the refresh is unambiguous
+        const rolledBack = new Date(new Date(firstExpiry).getTime() - 24 * 60 * 60 * 1000).toISOString();
+        testDb.prepare('UPDATE members SET renewal_token_expires_at = ? WHERE id = ?').run(rolledBack, member.id);
+
+        await renewalService.generateRenewalToken(member.id);
+        const secondExpiry = testDb.prepare('SELECT renewal_token_expires_at FROM members WHERE id = ?')
+            .get(member.id).renewal_token_expires_at;
+
+        expect(new Date(secondExpiry).getTime()).toBeGreaterThan(new Date(rolledBack).getTime());
+    });
+
+    test('mints a new token when the existing one has expired', async () => {
+        const testDb = getTestDb();
+        const member = insertMember(testDb, {email: 'e@e.com', status: 'active'});
+
+        const first = await renewalService.generateRenewalToken(member.id);
+
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        testDb.prepare('UPDATE members SET renewal_token_expires_at = ? WHERE id = ?').run(yesterday, member.id);
+
+        const second = await renewalService.generateRenewalToken(member.id);
+
+        expect(second).not.toBe(first);
+        expect(second.length).toBe(64);
+    });
 });
 
 describe('findMembersNeedingRenewal', () => {
