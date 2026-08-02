@@ -272,3 +272,20 @@ describe('sendContactEmail', () => {
     expect(body.subject).toContain('Alice');
   });
 });
+
+describe('plain-text alternative part', () => {
+  test('every email includes a text part derived from the HTML', async () => {
+    await emailService.sendWelcomeEmail(testMember);
+    const body = getFetchBody();
+    expect(body.text).toBeDefined();
+    expect(body.text).toContain('YSH-2025-0001');
+    expect(body.text).not.toContain('<');
+  });
+
+  test('htmlToText strips tags and preserves link URLs', () => {
+    const text = emailService.htmlToText(
+      '<p>Hello &amp; welcome</p><p><a href="https://example.com/renew/abc">Renew My Membership</a></p>'
+    );
+    expect(text).toBe('Hello & welcome\nRenew My Membership: https://example.com/renew/abc');
+  });
+});
