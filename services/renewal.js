@@ -4,8 +4,16 @@ const settingsRepo = require('../db/repos/settings');
 const emailService = require('./email');
 const logger = require('./logger');
 
+// Reuses the member's current token when it hasn't expired, so a member who requests
+// several reminders can use the link in any of them — not just the newest email.
 async function generateRenewalToken(memberId) {
-    const token = crypto.randomBytes(32).toString('hex');
+    const member = await membersRepo.findById(memberId);
+    const stillValid = member
+        && member.renewal_token
+        && member.renewal_token_expires_at
+        && member.renewal_token_expires_at > new Date().toISOString();
+
+    const token = stillValid ? member.renewal_token : crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
     await membersRepo.setRenewalToken(memberId, token, expiresAt);
     return token;
