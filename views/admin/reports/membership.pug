@@ -11,12 +11,12 @@ block content
     form(method="GET" action="/admin/reports/membership" style="margin-bottom: 1.5rem;")
         .form-group
             label(for="period") Membership period
-            select#period(name="period" onchange="this.form.submit()")
+            select#period(name="period" data-auto-submit)
                 each p in periods
                     option(value=p.id selected=(period && period.id === p.id))= `${p.label || 'Period ' + p.id} (${p.start_date} → ${p.end_date})`
             small.form-hint Everyone enrolled in this period is listed, family members included.
-        noscript
-            button.btn-outline(type="submit") Load period
+        .form-actions
+            button#apply-period.btn-outline(type="submit") Apply period
 
     if !period
         .flash.flash-error No membership periods are defined yet, so there is nothing to report.
@@ -85,4 +85,4 @@ block content
                 input#filename(type="text" name="filename" value=reportFilename)
                 small.form-hint Prefilled with the standard name — edit it if the Council asked for something else.
             .form-actions
-                button.btn(type="submit")= `Download .xlsx (${members.length} ${members.length === 1 ? 'member' : 'members'})`
+                button#download-report.btn(type="submit")= `Download .xlsx (${members.length} ${members.length === 1 ? 'member' : 'members'})`

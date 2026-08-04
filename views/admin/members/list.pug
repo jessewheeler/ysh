@@ -29,11 +29,11 @@ block content
       if dir !== 'desc'
         input(type="hidden" name="dir" value=dir)
       input(type="search" name="search" placeholder="Search name, email, or member number..." value=search)
-      select(name="period" onchange="this.form.submit()")
+      select(name="period" data-auto-submit)
         option(value="" selected=!periodId) All periods
         each p in periods
           option(value=p.id selected=periodId === p.id)= p.label
-      select(name="status" onchange="this.form.submit()")
+      select(name="status" data-auto-submit)
         option(value="" selected=!status) Any status
         option(value="active" selected=status === 'active') Active
         option(value="expired" selected=status === 'expired') Expired

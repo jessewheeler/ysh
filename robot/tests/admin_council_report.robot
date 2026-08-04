@@ -34,7 +34,59 @@ Preview Shows Enrolled Member Count
     Login As Admin
     Navigate To    /admin/reports/membership
     Get Text    table#report-summary    contains    Total member count
-    Get Text    button.btn[type="submit"]    contains    2 members
+    Get Text    \#download-report    contains    2 members
+
+Changing The Period Dropdown Updates The Preview
+    [Documentation]    Regression: the dropdown used an inline onchange attribute, which
+    ...    helmet blocks with script-src-attr 'none', so changing the period did nothing to
+    ...    the preview or to the period the download used.
+    ${current}=    Get Current Period Id
+    ${other}=    Seed Period    label=Older Robot Season
+    ${here}=    Seed Member    first_name=In    last_name=Current    email=in@example.com
+    ${there}=    Seed Member    first_name=Two    last_name=Older    email=one@example.com
+    ${alsothere}=    Seed Member    first_name=Three    last_name=Older    email=two@example.com
+    Enroll Member    ${here}    ${current}
+    Enroll Member    ${there}    ${other}
+    Enroll Member    ${alsothere}    ${other}
+    Login As Admin
+    Navigate To    /admin/reports/membership
+    Get Text    \#download-report    contains    1 member
+
+    ${other_value}=    Convert To String    ${other}
+    Select Options By    select[name="period"]    value    ${other_value}
+    Wait For Elements State    \#download-report    visible    timeout=10s
+    Current URL Should Contain    period=${other}
+    Get Text    \#download-report    contains    2 members
+
+Changing The Period Dropdown Changes What The Download Contains
+    ${current}=    Get Current Period Id
+    ${other}=    Seed Period    label=Older Robot Season
+    ${here}=    Seed Member    first_name=In    last_name=Current    email=in@example.com
+    ${there}=    Seed Member    first_name=Two    last_name=Older    email=one@example.com
+    Enroll Member    ${here}    ${current}
+    Enroll Member    ${there}    ${other}
+    Login As Admin
+    Navigate To    /admin/reports/membership
+    ${other_value}=    Convert To String    ${other}
+    Select Options By    select[name="period"]    value    ${other_value}
+    Wait For Elements State    \#download-report    visible    timeout=10s
+    ${file}=    Download Via Click    \#download-report
+    # The workbook follows the dropdown, not the period the page first loaded with.
+    Xlsx Cell Should Be    ${file}    C4    1
+    Xlsx Cell Should Be    ${file}    C19    Older
+
+The Apply Period Button Also Applies The Period
+    [Documentation]    The button is the fallback if the auto-submit script ever fails, so
+    ...    it has to work on its own.
+    ${other}=    Seed Period    label=Older Robot Season
+    ${there}=    Seed Member    first_name=Two    last_name=Older    email=one@example.com
+    Enroll Member    ${there}    ${other}
+    Login As Admin
+    Navigate To    /admin/reports/membership?period=${other}
+    Click    button#apply-period
+    Wait For Elements State    \#download-report    visible    timeout=10s
+    Current URL Should Contain    period=${other}
+    Get Text    \#download-report    contains    1 member
 
 Preview Lists Static Social Media Links
     Login As Admin
@@ -92,7 +144,7 @@ Download Produces A Valid Workbook In The Council Format
     Seed Bio    name=Pat President    role=President    email=president@example.com    sort_order=1
     Login As Admin
     Navigate To    /admin/reports/membership
-    ${file}=    Download Via Click    .form-actions button[type="submit"]
+    ${file}=    Download Via Click    \#download-report
 
     Xlsx Should Be A Valid Workbook    ${file}
     ${sheets}=    Get Xlsx Sheet Names    ${file}
@@ -106,7 +158,7 @@ Download Fills The Header And Board Blocks
     Seed Bio    name=Pat President    role=President    email=president@example.com    sort_order=1
     Login As Admin
     Navigate To    /admin/reports/membership
-    ${file}=    Download Via Click    .form-actions button[type="submit"]
+    ${file}=    Download Via Click    \#download-report
 
     Xlsx Cell Should Be    ${file}    C3    Yellowstone Sea Hawkers
     Xlsx Cell Should Be    ${file}    C4    1
@@ -134,7 +186,7 @@ Download Writes Each Member As Their Own Row
     Enroll Member    ${second}    ${period}
     Login As Admin
     Navigate To    /admin/reports/membership
-    ${file}=    Download Via Click    .form-actions button[type="submit"]
+    ${file}=    Download Via Click    \#download-report
 
     ${rows}=    Get Xlsx Data Rows    ${file}
     Length Should Be    ${rows}    2
@@ -157,7 +209,7 @@ Download Marks Every Member As Primary Chapter Y
     Enroll Member    ${second}    ${period}
     Login As Admin
     Navigate To    /admin/reports/membership
-    ${file}=    Download Via Click    .form-actions button[type="submit"]
+    ${file}=    Download Via Click    \#download-report
 
     Xlsx Cell Should Be    ${file}    J19    Y
     Xlsx Cell Should Be    ${file}    J20    Y
@@ -169,7 +221,7 @@ Download Flags A Board Member In Their Own Row
     Seed Bio    name=Pat President    role=Director of PR/Entertainment    email=president@example.com    sort_order=1
     Login As Admin
     Navigate To    /admin/reports/membership
-    ${file}=    Download Via Click    .form-actions button[type="submit"]
+    ${file}=    Download Via Click    \#download-report
     Xlsx Cell Should Be    ${file}    L19    Director of PR/Entertainment
 
 Download Writes Board Titles Verbatim Down Rows 6 To 15
@@ -179,7 +231,7 @@ Download Writes Board Titles Verbatim Down Rows 6 To 15
     Seed Bio    name=Bee Hanson    role=Central Council Rep    email=b@example.com    sort_order=4
     Login As Admin
     Navigate To    /admin/reports/membership
-    ${file}=    Download Via Click    .form-actions button[type="submit"]
+    ${file}=    Download Via Click    \#download-report
 
     Xlsx Cell Should Be    ${file}    G6    President
     Xlsx Cell Should Be    ${file}    G7    Vice-President
@@ -199,7 +251,7 @@ Download Honours Edited Header Fields
     Fill Text    input[name="chapter_name"]    Yellowstone Sea Hawkers Chapter
     Fill Text    input[name="month_year"]    December 2026
     Fill Text    input[name="submitted_by"]    Robot Reporter
-    ${file}=    Download Via Click    .form-actions button[type="submit"]
+    ${file}=    Download Via Click    \#download-report
 
     Xlsx Cell Should Be    ${file}    C3    Yellowstone Sea Hawkers Chapter
     Xlsx Cell Should Be    ${file}    C5    December 2026
@@ -214,14 +266,14 @@ Download Preserves The Council Template Formatting Exactly
     Enroll Member    ${id}    ${period}
     Login As Admin
     Navigate To    /admin/reports/membership
-    ${file}=    Download Via Click    .form-actions button[type="submit"]
+    ${file}=    Download Via Click    \#download-report
     Xlsx Should Match Template Formatting    ${file}    ${REPORT_TEMPLATE}
 
 Download Works For A Period With Nobody Enrolled
     Login As Admin
     Navigate To    /admin/reports/membership
-    Get Text    button.btn[type="submit"]    contains    0 members
-    ${file}=    Download Via Click    .form-actions button[type="submit"]
+    Get Text    \#download-report    contains    0 members
+    ${file}=    Download Via Click    \#download-report
     Xlsx Should Be A Valid Workbook    ${file}
     Xlsx Cell Should Be    ${file}    C4    0
     Xlsx Cell Should Be    ${file}    B19    ${EMPTY}

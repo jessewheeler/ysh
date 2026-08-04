@@ -22,9 +22,9 @@ block content
           td= admin.role === 'super_admin' ? 'Super Admin' : 'Editor'
           td= formatDate(admin.created_at)
           td
-            form(method="POST" action=`/admin/admins/${admin.id}/delete` style="display:inline")
+            form(method="POST" action=`/admin/admins/${admin.id}/delete` style="display:inline" data-confirm="Demote this admin?")
               input(type="hidden" name="_csrf" value=csrfToken)
-              button.btn.btn-sm.btn-danger(type="submit" onclick="return confirm('Demote this admin?')") Demote
+              button.btn.btn-sm.btn-danger(type="submit") Demote
 
   hr
 
