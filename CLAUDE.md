@@ -74,6 +74,25 @@ robot/                       # Robot Framework end-to-end tests (Browser/Playwri
 - Prefix unused params with `_` (e.g. `_next`, `_e`)
 - No TypeScript, no semicolons-optional — semicolons are used throughout
 
+## Client-side JS in views
+
+**Inline event handler attributes do not work.** helmet sends `script-src-attr 'none'`, so
+`onchange="this.form.submit()"` and `onclick="return confirm(...)"` in a Pug template never
+fire, and nothing appears in the console to say why. This has silently broken three
+features (the report period filter, the members list period/status filters, and the
+confirmation on the Demote button).
+
+Put the behavior in `public/js/admin.js` instead, driven by a data attribute — that file is
+served from `'self'`, which the CSP allows. Two hooks already exist:
+
+- `data-auto-submit` on a form control submits its form on change
+- `data-confirm="Are you sure?"` on a form confirms before submit
+
+Inline `<style>` and `style=` attributes are fine; `style-src` includes `'unsafe-inline'`.
+Only scripts are restricted. When adding a filter control, cover it with a Robot test that
+actually changes the control — a test that navigates straight to `?filter=value` passes
+whether or not the control works.
+
 ## Testing patterns
 
 Three layers: Jest unit/repo tests, Jest HTTP integration tests through supertest, and Robot Framework
