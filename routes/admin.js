@@ -18,6 +18,7 @@ const auditLogRepo = require('../db/repos/auditLog');
 const periodsRepo = require('../db/repos/membershipPeriods');
 const membershipYearsRepo = require('../db/repos/membershipYears');
 const membershipPeriodsService = require('../services/membershipPeriods');
+const councilReport = require('../services/councilReport');
 const logger = require('../services/logger');
 const isDevOrTest = ['development', 'test', 'dev'].includes(process.env.NODE_ENV);
 
@@ -224,6 +225,74 @@ router.get('/members/export', async (req, res, next) => {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="ysh-members-${viewPart}${date}.csv"`);
     res.send(csv);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Reports: Sea Hawkers Central Council membership report ---
+
+/**
+ * Gathers everything the Council report needs for a period, plus the defaults the
+ * report form is prefilled with. Shared by the preview page and the download.
+ */
+async function collectCouncilReportData(req) {
+  const periods = await periodsRepo.list();
+  const requestedId = parseInt(req.query.period, 10);
+  const period = Number.isInteger(requestedId)
+    ? await periodsRepo.get(requestedId)
+    : await periodsRepo.getCurrent();
+
+  const [members, bios] = await Promise.all([
+    period ? membershipYearsRepo.listMembersByPeriod(period.id) : Promise.resolve([]),
+    // Visible bios only — the same set the public Bios page shows as the current board.
+    contentService.listVisibleBios(),
+  ]);
+  const { board, warnings } = councilReport.resolveBoard(bios);
+
+  const admin = req.session.adminId ? await memberRepo.findById(req.session.adminId) : null;
+  const adminName = admin ? `${admin.first_name} ${admin.last_name}`.trim() : (req.session.adminEmail || '');
+
+  return {
+    periods,
+    period,
+    members,
+    board,
+    warnings: [...warnings, ...councilReport.memberWarnings(members)],
+    chapterName: req.query.chapter_name || councilReport.DEFAULT_CHAPTER_NAME,
+    monthYearEnding: req.query.month_year || councilReport.monthYearEndingFrom(period && period.end_date),
+    submittedBy: req.query.submitted_by || adminName,
+    reportFilename: req.query.filename || councilReport.defaultFilename(period && period.end_date),
+  };
+}
+
+router.get('/reports/membership', async (req, res, next) => {
+  try {
+    const data = await collectCouncilReportData(req);
+    res.render('admin/reports/membership', {
+      ...data,
+      social: councilReport.SOCIAL,
+      boardCapacity: councilReport.BOARD_ROWS,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/reports/membership/download', async (req, res, next) => {
+  try {
+    const data = await collectCouncilReportData(req);
+    const buffer = await councilReport.buildWorkbook({
+      chapterName: data.chapterName,
+      monthYearEnding: data.monthYearEnding,
+      submittedBy: data.submittedBy,
+      board: data.board,
+      members: data.members,
+    });
+    const filename = councilReport.sanitizeFilename(data.reportFilename);
+    res.setHeader('Content-Type', councilReport.CONTENT_TYPE);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
   } catch (err) {
     next(err);
   }
@@ -781,9 +850,9 @@ router.get('/bios/new', (req, res) => {
 });
 
 router.post('/bios', async (req, res) => {
-  const { name, role, bio_text, sort_order, is_visible } = req.body;
+  const { name, role, email, bio_text, sort_order, is_visible } = req.body;
   const photo_path = req.file ? await handleUpload(req.file, 'bios') : (req.body.existing_photo || null);
-  await contentService.createBio({ name, role, bio_text, photo_path, sort_order, is_visible });
+  await contentService.createBio({ name, role, email, bio_text, photo_path, sort_order, is_visible });
   req.session.flash_success = 'Bio created.';
   res.redirect('/admin/bios');
 });
@@ -795,7 +864,7 @@ router.get('/bios/:id', async (req, res) => {
 });
 
 router.post('/bios/:id', async (req, res) => {
-  const { name, role, bio_text, sort_order, is_visible } = req.body;
+  const { name, role, email, bio_text, sort_order, is_visible } = req.body;
   const existingPhotoPath = await contentService.getBioPhotoPath(req.params.id);
   let photo_path;
   if (req.file) {
@@ -804,7 +873,7 @@ router.post('/bios/:id', async (req, res) => {
   } else {
     photo_path = req.body.existing_photo || existingPhotoPath || null;
   }
-  await contentService.updateBio(req.params.id, { name, role, bio_text, photo_path, sort_order, is_visible });
+  await contentService.updateBio(req.params.id, { name, role, email, bio_text, photo_path, sort_order, is_visible });
   req.session.flash_success = 'Bio updated.';
   res.redirect('/admin/bios');
 });

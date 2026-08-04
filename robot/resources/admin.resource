@@ -17,3 +17,13 @@ Login As Admin
 
 Submit Admin Form
     Click    .form-actions button[type="submit"]
+
+Download Via Click
+    [Documentation]    Clicks a download control and returns the saved file path.
+    ...    Browser downloads are not saved to disk unless the context asks for it, so this
+    ...    promises the download before the click and then copies it somewhere stable.
+    [Arguments]    ${selector}
+    ${promise}=    Promise To Wait For Download    saveAs=${DOWNLOAD_DIR}/report.xlsx
+    Click    ${selector}
+    ${download}=    Wait For    ${promise}
+    RETURN    ${download}[saveAs]

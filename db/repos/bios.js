@@ -19,11 +19,11 @@ async function getPhotoPath(id) {
   return row?.photo_path || null;
 }
 
-async function create({ name, role, bio_text, photo_path, sort_order, is_visible }) {
+async function create({ name, role, email, bio_text, photo_path, sort_order, is_visible }) {
     const actor = getActor();
     const result = await db.run(
-        'INSERT INTO bios (name, role, bio_text, photo_path, sort_order, is_visible, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        name, role || null, bio_text || null, photo_path || null, parseInt(sort_order) || 0, is_visible ? 1 : 0, actor.id || null, actor.id || null
+        'INSERT INTO bios (name, role, email, bio_text, photo_path, sort_order, is_visible, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        name, role || null, email || null, bio_text || null, photo_path || null, parseInt(sort_order) || 0, is_visible ? 1 : 0, actor.id || null, actor.id || null
   );
     const row = await db.get('SELECT * FROM bios WHERE id = ?', result.lastInsertRowid);
     await auditLog.insert({
@@ -37,12 +37,12 @@ async function create({ name, role, bio_text, photo_path, sort_order, is_visible
     return result;
 }
 
-async function update(id, { name, role, bio_text, photo_path, sort_order, is_visible }) {
+async function update(id, { name, role, email, bio_text, photo_path, sort_order, is_visible }) {
     const actor = getActor();
     const old = await db.get('SELECT * FROM bios WHERE id = ?', id);
     const result = await db.run(
-        `UPDATE bios SET name=?, role=?, bio_text=?, photo_path=?, sort_order=?, is_visible=?, updated_at=datetime('now'), updated_by=? WHERE id=?`,
-        name, role || null, bio_text || null, photo_path || null, parseInt(sort_order) || 0, is_visible ? 1 : 0, actor.id || null, id
+        `UPDATE bios SET name=?, role=?, email=?, bio_text=?, photo_path=?, sort_order=?, is_visible=?, updated_at=datetime('now'), updated_by=? WHERE id=?`,
+        name, role || null, email || null, bio_text || null, photo_path || null, parseInt(sort_order) || 0, is_visible ? 1 : 0, actor.id || null, id
   );
     const row = await db.get('SELECT * FROM bios WHERE id = ?', id);
     await auditLog.insert({tableName: 'bios', recordId: id, action: 'UPDATE', actor, oldValues: old, newValues: row});

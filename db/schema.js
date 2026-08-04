@@ -139,6 +139,7 @@ const SCHEMA = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     role TEXT,
+    email TEXT,
     bio_text TEXT,
     photo_path TEXT,
     sort_order INTEGER NOT NULL DEFAULT 0,

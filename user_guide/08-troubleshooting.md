@@ -35,6 +35,44 @@
 - Check MailerSend's Activity log for bounces, blocks, or suppressions.
 - If the API key was recently rotated, restart the server after updating `.env`.
 
+## Members Missing from Sender.net
+
+**Problem:** A member does not appear in Sender, or sits in the wrong group.
+
+- Confirm `SENDER_API_TOKEN`, `SENDER_GROUP_CURRENT`, and `SENDER_GROUP_LAPSED` are set in `.env`. With any of them missing the sync is skipped silently by design, and nothing reaches Sender.
+- Check the server log for `Sender sync failed for member`. Sync failures are recorded there rather than surfaced in admin, because they must never interrupt a payment or an admin save.
+- Verify the two group IDs match real groups in your Sender account. A deleted or mistyped group ID makes every group call fail.
+- Confirm the custom fields `member_number` and `membership_expires` exist in Sender. It rejects writes to field names it does not know.
+- Members with a status of pending or cancelled are in no group on purpose. Check the member's status before treating this as a fault.
+- Family members who share the primary's email address appear once, under the primary's name. This is intentional: Sender identifies subscribers by email.
+- To repair anything out of step, run `node scripts/sync-sender.js`. Use `--dry-run` first to see what it would change.
+
+## Council Report Board Block Is Wrong Or Incomplete
+
+**Problem:** Someone is missing from the board block, or a row is blank.
+
+- The block lists every **visible** board bio. A hidden bio is left off; check the Visible
+  toggle under **Board Bios**.
+- Order follows the bio **Sort Order**, top to bottom.
+- The block holds ten people. An eleventh visible bio is named in a warning and left off,
+  because the Council's box has no row for it. Hide a bio or change sort orders to choose.
+- A blank Position cell means the bio has no **Role**. A blank email means it has no
+  **Email**. The report page links to the bio in both cases.
+- Titles are written exactly as saved, so a typo in a Role reaches the Council unchanged.
+
+## Council Report Shows The Wrong Members
+
+**Problem:** The member count or roster on the report is not what you expect.
+
+- The report lists everyone enrolled in the **selected period**, plus the family members of
+  anyone enrolled. Check the period dropdown; it defaults to the current season, which is
+  not always the one you are reporting on.
+- A member who paid but is missing is probably not enrolled in that period. Look at the
+  member's detail page to see which seasons they are enrolled in.
+- Cancelled members are excluded on purpose.
+- Family members appear as separate rows by design. The Council requires each person listed
+  individually and forbids grouping entries.
+
 ## Card Generation Fails
 
 **Problem:** Clicking "Generate Card" produces an error or downloads an error page instead of a PDF.

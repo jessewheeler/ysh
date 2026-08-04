@@ -61,4 +61,23 @@ describe('create / update / deleteById', () => {
     const deleted = await biosRepo.findById(id);
     expect(deleted).toBeUndefined();
   });
+
+  test('round-trips the email the Council report reads board contacts from', async () => {
+    const result = await biosRepo.create({
+      name: 'Pat Pres', role: 'President', email: 'president@ysh.org', is_visible: true, sort_order: 0
+    });
+    const id = result.lastInsertRowid;
+    expect((await biosRepo.findById(id)).email).toBe('president@ysh.org');
+
+    await biosRepo.update(id, { name: 'Pat Pres', role: 'President', email: 'new@ysh.org', is_visible: true, sort_order: 0 });
+    expect((await biosRepo.findById(id)).email).toBe('new@ysh.org');
+
+    const log = db.prepare("SELECT * FROM audit_log WHERE table_name='bios' AND action='UPDATE'").get();
+    expect(JSON.parse(log.new_values).email).toBe('new@ysh.org');
+  });
+
+  test('stores NULL when no email is given', async () => {
+    const result = await biosRepo.create({ name: 'No Email', is_visible: true, sort_order: 0 });
+    expect((await biosRepo.findById(result.lastInsertRowid)).email).toBeNull();
+  });
 });

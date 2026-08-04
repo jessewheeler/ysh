@@ -32,6 +32,8 @@ ysh/
   services/             # Business logic (Stripe, email, cards, members)
   views/                # Pug templates (public site + admin CMS)
   public/               # Static assets (CSS, JS, images, PDFs)
+  assets/               # Non-served binary assets (Council .xlsx report template)
+  robot/                # Robot Framework browser tests (Playwright)
   uploads/              # User-uploaded images (gitignored)
   data/                 # Runtime data: SQLite DB, session store, cards (gitignored)
 ```
@@ -63,6 +65,9 @@ Configured in `.env`. See `.env.example` for the full list.
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (`whsec_...`)          |
 | `MAILERSEND_API_KEY`    | MailerSend API key (`mlsn...`)                       |
 | `FROM_EMAIL`            | Sender address for all outbound emails               |
+| `SENDER_API_TOKEN`      | Sender.net API token (optional — list sync disabled if unset) |
+| `SENDER_GROUP_CURRENT`  | Sender.net group ID for members in good standing (optional) |
+| `SENDER_GROUP_LAPSED`   | Sender.net group ID for expired members (optional)   |
 | `HCAPTCHA_SITE_KEY`     | hCaptcha site key (optional — captcha disabled if unset) |
 | `HCAPTCHA_SECRET_KEY`   | hCaptcha secret key (optional)                       |
 | `GA_MEASUREMENT_ID`     | Google Analytics measurement ID (optional)           |
@@ -73,7 +78,7 @@ Configured in `.env`. See `.env.example` for the full list.
 | `B2_APP_KEY`            | Backblaze B2 application key (optional)              |
 | `B2_PUBLIC_URL`         | Backblaze B2 public URL prefix (optional)            |
 
-> **Note:** The Stripe publishable key is configured in **Admin > Settings**, not as an environment variable. `DATABASE_URL`, hCaptcha, GA, and B2 vars are all optional — the app falls back to SQLite, no captcha, no analytics, and local disk storage when they're not set.
+> **Note:** The Stripe publishable key is configured in **Admin > Settings**, not as an environment variable. `DATABASE_URL`, hCaptcha, GA, B2, and Sender vars are all optional — the app falls back to SQLite, no captcha, no analytics, local disk storage, and no list sync when they're not set.
 
 ## Features
 
@@ -92,6 +97,8 @@ Configured in `.env`. See `.env.example` for the full list.
 - Full CRUD for **members**, **announcements**, **gallery images**, and **board bios**
 - **Family memberships** — upgrade individual members to family, attach/detach family members
 - **CSV export** for members and payments ledger
+- **Council membership report** — generates the Sea Hawkers Central Council "Chapter Membership Tracking Report" as an
+  .xlsx in the Council's own template formatting, with a preview and pre-submission warnings
 - **Manual payment entry** — record offline payments against a member
 - **Membership periods** — configurable seasons with individual dues, family dues, optional electronic surcharge, and
   per-season card template (PNG or PDF upload with auto-conversion)
@@ -125,6 +132,25 @@ All emails use a branded HTML template (navy header, white body, gray footer). T
 
 Every send is logged to the `emails_log` table.
 
+### Newsletter List Sync (Sender.net)
+
+Members are mirrored into [Sender.net](https://www.sender.net) for newsletter and campaign sending, separate from the transactional email above. The sync is one-way: YSH is the source of truth, and unsubscribes stay in Sender.
+
+Two groups hold the audience. Active and lifetime members go to the group named by `SENDER_GROUP_CURRENT`, expired members to `SENDER_GROUP_LAPSED`, and pending or cancelled members are removed from both. Sender's subscriber list is already "everyone", so there is no all-members group.
+
+A member is pushed when their Stripe checkout completes (this covers renewals, which use the same webhook) and when an admin saves a change to their record. Both call sites use `syncMemberSafe`, which logs and swallows failures so a Sender outage cannot fail a payment or an admin save. With `SENDER_API_TOKEN` unset, every entry point is a no-op.
+
+For the initial backfill, or to repair drift:
+
+```bash
+node scripts/sync-sender.js --dry-run   # report the plan, send nothing
+node scripts/sync-sender.js
+```
+
+Sender has no bulk-create endpoint, so the script creates subscribers one at a time and then reconciles group membership in a few bulk calls. It backs off on 429 and watches the `X-RateLimit-*` headers. A member whose upsert fails is counted and skipped rather than aborting the run.
+
+Before the first run, create the two groups in Sender, read their IDs from `GET /v2/groups`, and add custom fields named `member_number` and `membership_expires`. Sender rejects writes to field names it does not already know.
+
 ## Security
 
 - **Helmet** for HTTP security headers
@@ -148,10 +174,12 @@ Every send is logged to the `emails_log` table.
 | Payments        | Stripe Checkout                                         |
 | Email           | MailerSend (REST API via fetch)                         |
 | Card generation | pdfkit (PDF) + canvas (PNG)                             |
+| Report export   | jszip (values injected into the Council's .xlsx template) |
 | Security        | helmet, express-rate-limit, bcrypt, hCaptcha            |
 | File uploads    | multer                                                  |
 | Logging         | Winston + Morgan                                        |
 | Dev tooling     | nodemon, dotenv                                         |
+| Testing         | Jest + supertest (unit/integration), Robot Framework + Browser/Playwright (end-to-end) |
 
 ## Database Schema
 
@@ -163,7 +191,7 @@ Ten tables defined in `db/schema.js`, applied by `db/migrate.js`. See [`db/READM
 | `payments`           | Stripe and manual payment records                            |
 | `announcements`      | Homepage news cards                                          |
 | `gallery_images`     | Event gallery photos                                         |
-| `bios`               | Board member bios                                            |
+| `bios`               | Board member bios; `role` and `email` feed the Council report's board block |
 | `site_settings`      | Key-value config (hero text, contact email, etc.)            |
 | `emails_log`         | Log of every outbound email                                  |
 | `membership_cards`   | Generated card file paths                                    |
@@ -228,6 +256,8 @@ Ten tables defined in `db/schema.js`, applied by `db/migrate.js`. See [`db/READM
 | GET/POST | `/admin/settings`                               | Site settings (super_admin only)      |
 | GET      | `/admin/payments`                               | Payment ledger                        |
 | GET      | `/admin/payments/export`                        | CSV export of payments                |
+| GET      | `/admin/reports/membership`                     | Council membership report preview     |
+| GET      | `/admin/reports/membership/download`            | Download the report as .xlsx          |
 | GET      | `/admin/emails`                                 | Email log                             |
 | GET/POST | `/admin/emails/renewal`                         | Bulk renewal reminder composer + send |
 | GET/POST | `/admin/emails/blast`                           | Compose + send blast                  |

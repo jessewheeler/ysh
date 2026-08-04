@@ -1,0 +1,88 @@
+extends ../layout
+
+block page_title
+    | Council Membership Report
+
+block content
+    p.text-muted
+        | Generates the Sea Hawkers Central Council "Chapter Membership Tracking Report"
+        | in the Council's own workbook format, ready to submit as-is.
+
+    form(method="GET" action="/admin/reports/membership" style="margin-bottom: 1.5rem;")
+        .form-group
+            label(for="period") Membership period
+            select#period(name="period" onchange="this.form.submit()")
+                each p in periods
+                    option(value=p.id selected=(period && period.id === p.id))= `${p.label || 'Period ' + p.id} (${p.start_date} → ${p.end_date})`
+            small.form-hint Everyone enrolled in this period is listed, family members included.
+        noscript
+            button.btn-outline(type="submit") Load period
+
+    if !period
+        .flash.flash-error No membership periods are defined yet, so there is nothing to report.
+    else
+        if warnings.length
+            .flash.flash-error
+                strong Before you submit:
+                ul(style="margin: 0.5rem 0 0 1.25rem;")
+                    each warning in warnings
+                        li= warning
+
+        h2(style="margin-top: 1.5rem;") Preview
+        table#report-summary.admin-table
+            tbody
+                tr
+                    th(style="width: 14rem;") Total member count
+                    td= members.length
+                tr
+                    th Board members listed
+                    td= `${board.length} of ${boardCapacity}`
+                each link in social
+                    tr
+                        th= link[0]
+                        td: a(href=link[1] target="_blank" rel="noopener")= link[1]
+
+        h2(style="margin-top: 1.5rem;") Board block
+        p.text-muted Positions come from the Role on each visible board bio, in bio sort order.
+        table#report-board.admin-table
+            thead
+                tr
+                    th Position
+                    th Name
+                    th Email
+            tbody
+                if !board.length
+                    tr: td(colspan="3") No visible board bios.
+                each entry in board
+                    tr
+                        td
+                            if entry.position
+                                = entry.position
+                            else
+                                a(href=`/admin/bios/${entry.bioId}`) Add a role
+                        td= entry.name || '—'
+                        td
+                            if entry.email
+                                = entry.email
+                            else
+                                a(href=`/admin/bios/${entry.bioId}`) Add an email
+
+        h2(style="margin-top: 1.5rem;") Download
+        form(method="GET" action="/admin/reports/membership/download")
+            input(type="hidden" name="period" value=period.id)
+            .form-grid
+                .form-group
+                    label(for="chapter_name") Chapter name
+                    input#chapter_name(type="text" name="chapter_name" value=chapterName)
+                .form-group
+                    label(for="month_year") Month/year ending
+                    input#month_year(type="text" name="month_year" value=monthYearEnding)
+            .form-group
+                label(for="submitted_by") Submitted by
+                input#submitted_by(type="text" name="submitted_by" value=submittedBy)
+            .form-group
+                label(for="filename") File name
+                input#filename(type="text" name="filename" value=reportFilename)
+                small.form-hint Prefilled with the standard name — edit it if the Council asked for something else.
+            .form-actions
+                button.btn(type="submit")= `Download .xlsx (${members.length} ${members.length === 1 ? 'member' : 'members'})`
