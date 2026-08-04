@@ -30,6 +30,15 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
+  // Submit a filter form as soon as its control changes. This lives here rather than in an
+  // inline onchange attribute because helmet sends `script-src-attr 'none'`, which blocks
+  // inline event handlers outright — an onchange there never fires at all.
+  document.querySelectorAll('[data-auto-submit]').forEach(function (control) {
+    control.addEventListener('change', function () {
+      if (control.form) control.form.submit();
+    });
+  });
+
   // Image preview on file input change
   document.querySelectorAll('input[type="file"][accept="image/*"]').forEach(function (input) {
     input.addEventListener('change', function () {
