@@ -62,6 +62,8 @@ Multer (`upload.single('image')`) is applied as middleware on the entire `/admin
 
 **Payments & Emails:**
 - `GET /admin/payments` -- Paginated payment ledger
+- `GET /admin/reports/membership` -- Council membership report: period picker, preview, and pre-submission warnings
+- `GET /admin/reports/membership/download` -- Streams the report as .xlsx (`Content-Disposition: attachment`)
 - `GET /admin/emails` -- Paginated email log
 - `GET/POST /admin/emails/blast` -- Compose and send to all active members
 

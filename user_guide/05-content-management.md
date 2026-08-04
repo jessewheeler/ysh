@@ -62,6 +62,7 @@ Board bios appear on the public Bios page, showcasing club leadership.
 |-------|----------|-------------|
 | Name | Yes | Board member's full name |
 | Role | Yes | Position title (e.g., President, Treasurer) |
+| Email | No | Contact address; appears on the [Council membership report](09-council-report.md) |
 | Biography | Yes | Short description of the board member |
 | Photo | No | Optional headshot |
 | Sort Order | Yes | Controls display position |
@@ -74,3 +75,11 @@ Board bios appear on the public Bios page, showcasing club leadership.
 3. Upload a photo if available — the same file restrictions as gallery images apply.
 4. Use **Sort Order** to arrange bios in the desired sequence.
 5. Toggle **Visible** to control whether the bio appears on the public page.
+
+### Roles and the Council report
+
+Every visible bio appears in the board block of the Central Council's membership report,
+in sort order, with its **Role** written exactly as saved. Any title works, including ones
+the Council never pre-printed. Fill in **Email** for board members; the Council marks that
+block mandatory. The block holds ten people, so anyone beyond the tenth visible bio is
+left off with a warning. See [Council Membership Report](09-council-report.md).

@@ -56,9 +56,38 @@ async function findByPeriod(periodId) {
     );
 }
 
+/**
+ * Full member rows for everyone in a period, for the Central Council membership report.
+ *
+ * The Council requires each person listed separately, so family sub-members get their own
+ * row. Signup enrolls them individually, but older backfills only enrolled primaries —
+ * hence "enrolled, or their primary is enrolled". Their address and phone fall back to
+ * the primary's, since "see above" is not allowed on the report; their email does not,
+ * because two identical emails would let the Council collapse a family into one person.
+ */
+async function listMembersByPeriod(periodId) {
+    return db.all(
+        `SELECT m.*,
+                COALESCE(NULLIF(m.address_street, ''), p.address_street) AS report_street,
+                COALESCE(NULLIF(m.address_city, ''), p.address_city)     AS report_city,
+                COALESCE(NULLIF(m.address_state, ''), p.address_state)   AS report_state,
+                COALESCE(NULLIF(m.address_zip, ''), p.address_zip)       AS report_zip,
+                COALESCE(NULLIF(m.phone, ''), p.phone)                   AS report_phone
+         FROM members m
+         LEFT JOIN members p ON p.id = m.primary_member_id
+         WHERE (m.id IN (SELECT member_id FROM membership_years WHERE membership_period_id = ?)
+                OR m.primary_member_id IN (SELECT member_id FROM membership_years WHERE membership_period_id = ?))
+           AND m.status <> 'cancelled'
+         ORDER BY LOWER(COALESCE(m.last_name, '')) ASC,
+                  LOWER(COALESCE(m.first_name, '')) ASC,
+                  m.id ASC`,
+        periodId, periodId
+    );
+}
+
 async function countByPeriod(periodId) {
     const row = await db.get('SELECT COUNT(*) as c FROM membership_years WHERE membership_period_id = ?', periodId);
     return row ? row.c : 0;
 }
 
-module.exports = {enroll, isEnrolled, findByMember, findByPeriod, countByPeriod};
+module.exports = {enroll, isEnrolled, findByMember, findByPeriod, listMembersByPeriod, countByPeriod};

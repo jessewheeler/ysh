@@ -120,6 +120,38 @@ class DatabaseManager:
             )
         self.conn.commit()
 
+    def seed_bio(self, name='Test Person', role=None, email=None, sort_order=1,
+                 bio_text=None, is_visible=1):
+        """Insert one bio with an explicit role and email and return the row ID.
+
+        The Council membership report reads its board block from bios whose role is one
+        of the six Council titles, so those tests need control over role and email.
+        """
+        cursor = self.conn.execute(
+            'INSERT INTO bios (name, role, email, bio_text, sort_order, is_visible) VALUES (?, ?, ?, ?, ?, ?)',
+            (name, role, email, bio_text or f'Bio text for {name}', sort_order, int(is_visible)),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def enroll_member(self, member_id, period_id):
+        """Enroll a member in a membership period and return the junction row ID."""
+        cursor = self.conn.execute(
+            'INSERT OR IGNORE INTO membership_years (member_id, membership_period_id) VALUES (?, ?)',
+            (int(member_id), int(period_id)),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def get_current_period_id(self):
+        """Return the ID of the period spanning today with the latest start date."""
+        row = self.conn.execute(
+            """SELECT id FROM membership_periods
+               WHERE date('now') BETWEEN start_date AND end_date
+               ORDER BY start_date DESC LIMIT 1"""
+        ).fetchone()
+        return row[0] if row else None
+
     def seed_gallery(self, count=1):
         """Insert `count` visible gallery images."""
         for i in range(1, int(count) + 1):

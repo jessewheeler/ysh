@@ -76,6 +76,7 @@ SQLite database layer using [better-sqlite3](https://github.com/WiseLibs/better-
 | id         | INTEGER | Primary key                   |
 | name       | TEXT    | Required                      |
 | role       | TEXT    | e.g. "President", "Treasurer" |
+| email      | TEXT    | Board contact; read by the Council report |
 | bio_text   | TEXT    | Full biography                |
 | photo_path | TEXT    | Path to photo                 |
 | sort_order | INTEGER |                               |

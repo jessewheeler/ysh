@@ -43,6 +43,8 @@ async function migrate() {
       "ALTER TABLE membership_cards ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
       "ALTER TABLE membership_periods ADD COLUMN IF NOT EXISTS card_template_path TEXT",
       "ALTER TABLE members ADD COLUMN IF NOT EXISTS is_lifetime INTEGER NOT NULL DEFAULT 0",
+      // bios: contact email, required by the Central Council membership report
+      "ALTER TABLE bios ADD COLUMN IF NOT EXISTS email TEXT",
     ];
     for (const sql of pgAlters) {
       await db.exec(sql);
@@ -300,6 +302,7 @@ async function migrate() {
     "ALTER TABLE membership_cards ADD COLUMN created_by INTEGER REFERENCES members(id) ON DELETE SET NULL",
     "ALTER TABLE membership_periods ADD COLUMN card_template_path TEXT",
     "ALTER TABLE members ADD COLUMN is_lifetime INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE bios ADD COLUMN email TEXT",
   ];
   for (const sql of auditAlters) {
     try {
