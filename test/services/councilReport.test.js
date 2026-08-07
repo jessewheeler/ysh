@@ -199,7 +199,7 @@ describe('buildWorkbook — header, social and board blocks', () => {
     // Row 7 was "Vice President" in the template; it now carries the second bio's title.
     expect(value(xml, 'G7')).toBe('Treasurer');
     expect(value(xml, 'H7')).toBe('Tia Treas');
-    expect(cell(xml, 'I7')).toBe('<c r="I7" s="48"/>');
+    expect(cell(xml, 'I7')).toBe('<c r="I7" s="55"/>');
     // A role the Council never printed lands on row 8, replacing "Secretary".
     expect(value(xml, 'G8')).toBe('Director of PR/Entertainment');
     expect(value(xml, 'H8')).toBe('Dee Pee Arr');
