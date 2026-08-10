@@ -33,10 +33,26 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://js.stripe.com", "https://js.hcaptcha.com"],
+      // googletagmanager serves gtag.js; the GA bootstrap itself lives in
+      // public/js/analytics.js so no 'unsafe-inline' is needed. See CLAUDE.md.
+      scriptSrc: ["'self'", "https://js.stripe.com", "https://js.hcaptcha.com", "https://www.googletagmanager.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://assets.hcaptcha.com"],
       imgSrc: ["'self'", "data:", "https:", process.env.B2_PUBLIC_URL].filter(Boolean),
-      connectSrc: ["'self'", "https://api.stripe.com", "https://hcaptcha.com", "https://*.hcaptcha.com"],
+      // GA4 sends hits to *.google-analytics.com (region1., etc.) and reads config
+      // back from googletagmanager — without these, gtag loads but every hit is refused.
+      connectSrc: [
+        "'self'",
+        "https://api.stripe.com",
+        "https://hcaptcha.com",
+        "https://*.hcaptcha.com",
+        "https://*.google-analytics.com",
+        "https://*.analytics.google.com",
+        "https://www.googletagmanager.com",
+        // gtag.js beacons here too. analytics.js sets allow_google_signals:false, which
+        // strips personalization from the payload but does not stop the request being
+        // attempted — without this entry every page load logs a CSP violation.
+        "https://www.google.com",
+      ],
       frameSrc: ["https://js.stripe.com", "https://newassets.hcaptcha.com"],
       formAction: ["'self'", "https://checkout.stripe.com"],
       upgradeInsecureRequests: process.env.NODE_ENV === 'development' ? null : [],

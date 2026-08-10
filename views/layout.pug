@@ -6,7 +6,7 @@ html(lang="en")
     title Yellowstone Sea Hawkers
     link(rel="icon" type="image/png" href="/favicon.png")
     link(rel="stylesheet" href="/css/style.css")
-  body
+  body(data-ga-id=gaMeasurementId)
     nav.navbar
       .nav-brand
         a(href="/")
@@ -73,14 +73,7 @@ html(lang="en")
         p &copy; 2026 #[a(href="https://jessewheeler.dev" target="_blank") Built with love by a local 12.]
 
     if gaMeasurementId
-      script(async src=`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`)
-      script.
-        window.dataLayer = window.dataLayer || [];
-        function gtag() {
-          dataLayer.push(arguments);
-        }
-        gtag('js', new Date());
-        gtag('config', '#{gaMeasurementId}');
+      script(src="/js/analytics.js" defer)
 
     if hcaptchaSiteKey
       script(src="https://js.hcaptcha.com/1/api.js" async defer)
