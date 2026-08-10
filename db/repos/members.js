@@ -502,7 +502,7 @@ async function addFamilyMember(primaryId, {first_name, last_name, email, members
     return result;
 }
 
-async function createWithFamily({ primaryMember, familyMembers = [], membershipType }) {
+async function createWithFamily({ primaryMember, familyMembers = [], membershipType, campaignId = null }) {
   const { generateMemberNumber } = require('../../services/members');
     const actor = getActor();
 
@@ -514,12 +514,13 @@ async function createWithFamily({ primaryMember, familyMembers = [], membershipT
     const primaryResult = await db.run(
       `INSERT INTO members (member_number, first_name, last_name, email, phone,
         address_street, address_city, address_state, address_zip,
-                            membership_year, join_date, status, membership_type, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, ?, ?, ?)`,
+                            membership_year, join_date, status, membership_type, campaign_id, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?, ?, ?, ?, ?)`,
       primaryMemberNumber, primaryMember.first_name, primaryMember.last_name,
       primaryMember.email, primaryMember.phone || null, primaryMember.address_street || null,
       primaryMember.address_city || null, primaryMember.address_state || null, primaryMember.address_zip || null,
-      year, primaryMember.join_date || null, 'pending', membershipType, actor.id || null, actor.id || null
+      year, primaryMember.join_date || null, 'pending', membershipType, campaignId || null,
+      actor.id || null, actor.id || null
     );
 
     const primaryId = primaryResult.lastInsertRowid;

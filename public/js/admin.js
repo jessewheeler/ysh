@@ -39,6 +39,28 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
+  // Copy a field's value to the clipboard. Lives here rather than in an inline onclick for the
+  // same reason as data-auto-submit: `script-src-attr 'none'` blocks inline handlers silently.
+  document.querySelectorAll('[data-copy]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var field = document.querySelector(button.dataset.copy);
+      if (!field) return;
+      var original = button.textContent;
+      var done = function (text) {
+        button.textContent = text;
+        setTimeout(function () { button.textContent = original; }, 2000);
+      };
+      // navigator.clipboard needs a secure context, which plain-HTTP local dev is not.
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(field.value).then(function () { done('Copied!'); },
+          function () { done('Press Ctrl+C'); field.select(); });
+      } else {
+        field.select();
+        done(document.execCommand('copy') ? 'Copied!' : 'Press Ctrl+C');
+      }
+    });
+  });
+
   // Image preview on file input change
   document.querySelectorAll('input[type="file"][accept="image/*"]').forEach(function (input) {
     input.addEventListener('change', function () {

@@ -11,6 +11,7 @@ ${BASE_URL}        ${EMPTY}
 ${ADMIN_EMAIL}     ${EMPTY}
 ${OTP_CODE}        ${EMPTY}
 ${DOWNLOAD_DIR}    ${CURDIR}/../results/downloads
+${BROWSER_USER_AGENT}    Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
 ${REPORT_TEMPLATE}    ${PROJECT_ROOT}/assets/council-membership-report-template.xlsx
 
 *** Keywords ***
@@ -33,7 +34,10 @@ Reset Test State
     Close Browser
     Empty Directory Or Create It    ${DOWNLOAD_DIR}
     New Browser    chromium    headless=true
-    New Context    acceptDownloads=True
+    # A realistic user agent matters: campaign visit tracking skips bot-looking agents, and
+    # headless Chromium's default UA contains "HeadlessChrome", which that filter treats as a
+    # bot. Overriding it here means these tests exercise the same path a real visitor does.
+    New Context    acceptDownloads=True    userAgent=${BROWSER_USER_AGENT}
     New Page    ${BASE_URL}
 
 Empty Directory Or Create It

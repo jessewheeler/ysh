@@ -155,9 +155,59 @@ function enrollMember(db, memberId, periodId, paymentId = null, createdAt = null
     return {id: info.lastInsertRowid, member_id: memberId, membership_period_id: periodId, payment_id: paymentId};
 }
 
+function insertCampaign(db, overrides = {}) {
+    const c = {
+        name: 'Test Campaign',
+        utm_campaign: 'test26',
+        utm_source: 'print',
+        utm_medium: 'flyer',
+        utm_content: null,
+        target_path: '/membership',
+        notes: null,
+        is_active: 1,
+        ...overrides,
+    };
+    const info = db.prepare(
+        `INSERT INTO campaigns (name, utm_campaign, utm_source, utm_medium, utm_content, target_path, notes, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(c.name, c.utm_campaign, c.utm_source, c.utm_medium, c.utm_content, c.target_path, c.notes,
+        c.is_active ? 1 : 0);
+    return {...c, id: info.lastInsertRowid};
+}
+
+function insertCampaignVisit(db, {campaign_id, landing_path = '/membership', referrer = null, created_at = null}) {
+    const info = created_at
+        ? db.prepare(
+            `INSERT INTO campaign_visits (campaign_id, landing_path, referrer, created_at) VALUES (?, ?, ?, ?)`
+        ).run(campaign_id, landing_path, referrer, created_at)
+        : db.prepare(
+            `INSERT INTO campaign_visits (campaign_id, landing_path, referrer) VALUES (?, ?, ?)`
+        ).run(campaign_id, landing_path, referrer);
+    return {id: info.lastInsertRowid, campaign_id, landing_path, referrer};
+}
+
+function insertContactSubmission(db, overrides = {}) {
+    const s = {
+        name: 'Contact Person',
+        email: 'contact@example.com',
+        message: 'Hello there',
+        campaign_id: null,
+        email_status: 'sent',
+        ...overrides,
+    };
+    const info = db.prepare(
+        `INSERT INTO contact_submissions (name, email, message, campaign_id, email_status)
+         VALUES (?, ?, ?, ?, ?)`
+    ).run(s.name, s.email, s.message, s.campaign_id, s.email_status);
+    return {...s, id: info.lastInsertRowid};
+}
+
 module.exports = {
     buildMember,
     insertMember,
+    insertCampaign,
+    insertCampaignVisit,
+    insertContactSubmission,
     insertSetting,
     insertCard,
     buildStripeSession,

@@ -23,6 +23,8 @@ html(lang="en")
           a(href="/admin/payments" class=(currentPath && currentPath.startsWith('/admin/payments') ? 'active' : '')) Payments
           a(href="/admin/emails" class=(currentPath && currentPath.startsWith('/admin/emails') ? 'active' : '')) Emails
           a(href="/admin/reports/membership" class=(currentPath && currentPath.startsWith('/admin/reports') ? 'active' : '')) Reports
+          a(href="/admin/campaigns" class=(currentPath && currentPath.startsWith('/admin/campaigns') ? 'active' : '')) Campaigns
+          a(href="/admin/contact-submissions" class=(currentPath && currentPath.startsWith('/admin/contact-submissions') ? 'active' : '')) Contact Us
           if adminRole === 'super_admin'
             a(href="/admin/periods" class=(currentPath && currentPath.startsWith('/admin/periods') ? 'active' : '')) Membership Periods
             a(href="/admin/settings" class=(currentPath === '/admin/settings' ? 'active' : '')) Settings

@@ -10,6 +10,7 @@ const fs = require('fs');
 const seed = require('./db/seed');
 const { injectLocals } = require('./middleware/locals');
 const {captureActor} = require('./middleware/auth');
+const {captureCampaign} = require('./middleware/campaign');
 const logger = require('./services/logger');
 const { attachRequestId, attachLogger, morganMiddleware, logError } = require('./middleware/requestLogger');
 
@@ -141,6 +142,9 @@ app.use(session({
 
 // Capture authenticated admin as the audit actor for every request
 app.use(captureActor);
+
+// Resolve ?utm_campaign= into a first-touch session attribution (issue #88)
+app.use(captureCampaign);
 
 // Parse multipart form data for admin routes before CSRF check
 // (multer populates req.body for multipart forms; without this, CSRF token is inaccessible)

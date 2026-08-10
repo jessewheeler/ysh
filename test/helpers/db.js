@@ -6,6 +6,13 @@ function createTestDb() {
   sqlite.pragma('foreign_keys = ON');
   sqlite.exec(SCHEMA);
 
+  // members.campaign_id can't live in SCHEMA: members is created before campaigns, and
+  // campaigns.created_by points back at members, so one of the two FKs has to be added after
+  // the fact. db/migrate.js does this for real databases (both dialects) — mirror it here so
+  // tests see the same shape.
+  sqlite.exec('ALTER TABLE members ADD COLUMN campaign_id INTEGER REFERENCES campaigns(id) ON DELETE SET NULL');
+  sqlite.exec('CREATE INDEX IF NOT EXISTS idx_members_campaign ON members (campaign_id)');
+
   const db = {
     dialect: 'sqlite',
     async get(sql, ...params) {
