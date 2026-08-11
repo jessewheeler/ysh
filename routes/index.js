@@ -7,6 +7,7 @@ const periodsRepo = require('../db/repos/membershipPeriods');
 const {duesForType, surchargeFor} = require('../services/membershipPeriods');
 const logger = require('../services/logger');
 const { requireCaptcha } = require('../middleware/captcha');
+const mcmService = require('../services/mcm');
 
 // Homepage
 router.get('/', async (req, res, next) => {
@@ -166,6 +167,19 @@ router.post('/membership', requireCaptcha('/membership'), async (req, res) => {
 router.get('/charitable/battle-of-the-birds', (_req, res) => res.render('charitable/battle-of-the-birds'));
 router.get('/charitable/nonprofits', (_req, res) => res.render('charitable/nonprofits'));
 router.get('/charitable/heartwheels', (_req, res) => res.render('charitable/heartwheels'));
+
+// Man Crush Monday — Kate's wall. No DB; the frames come off the calendar.
+router.get('/man-crush-monday', (_req, res) => res.render('mcm', mcmService.getPage({page: 1})));
+
+// Frame feed for the infinite scroll. Renders HTML rather than JSON so the frame markup
+// lives only in mcm-frames.pug instead of being rebuilt in client-side JS.
+router.get('/man-crush-monday/frames', (req, res, next) => {
+    const {frames, page, hasMore} = mcmService.getPage({page: req.query.page});
+    res.render('mcm-frames', {frames}, (err, html) => {
+        if (err) return next(err);
+        res.set('X-MCM-Page', String(page)).set('X-MCM-Has-More', String(hasMore)).send(html);
+    });
+});
 
 // Renewal request — self-service from the Renew tab
 router.post('/membership/renew-request', requireCaptcha('/membership'), async (req, res) => {

@@ -119,3 +119,36 @@ Family Membership Switching Back To Individual Hides Section
     Wait For Elements State    \#family-members-section    visible    timeout=3s
     Click    .membership-type-card:has(input[value="individual"])
     Wait For Elements State    \#family-members-section    hidden    timeout=3s
+
+Man Crush Monday Page Renders The Wall
+    Navigate To    /man-crush-monday
+    Get Text    h2    contains    ManCrushMonday
+    Page Should Contain Text    run by Kate
+    Page Should Contain Text    Kate does not take nominations
+    ${count}=    Get Element Count    .mcm-frame
+    Should Be Equal As Integers    ${count}    24
+    Get Text    .mcm-wall    contains    Julian Love
+
+Man Crush Monday Reachable From About Nav
+    # Navigating straight to the URL would pass whether or not the nav entry works.
+    Navigate To    /
+    Hover    .nav-menu li.dropdown:has(a.dropdown-toggle[href="/#about"])
+    ${link}=    Set Variable    .nav-menu li.dropdown a[href="/man-crush-monday"]
+    Wait For Elements State    ${link}    visible    timeout=3s
+    Click    ${link}
+    Current URL Should Contain    /man-crush-monday
+    Get Text    h2    contains    ManCrushMonday
+
+Man Crush Monday Scrolls Infinitely Back To Signing Day
+    # Proves the fetch in /js/mcm.js is not being blocked by CSP.
+    Navigate To    /man-crush-monday
+    ${before}=    Get Element Count    .mcm-frame
+    Scroll To Element    \#mcm-sentinel
+    Wait Until Keyword Succeeds    10x    1s    Frame Count Should Exceed    ${before}
+
+*** Keywords ***
+Frame Count Should Exceed
+    [Arguments]    ${count}
+    Scroll To Element    \#mcm-sentinel
+    ${now}=    Get Element Count    .mcm-frame
+    Should Be True    ${now} > ${count}
