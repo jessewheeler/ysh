@@ -305,6 +305,51 @@ const SCHEMA = `
     created_by           INTEGER REFERENCES members (id) ON DELETE SET NULL,
     UNIQUE (member_id, membership_period_id)
   );
+
+  CREATE TABLE IF NOT EXISTS campaigns
+  (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    name         TEXT NOT NULL,
+    utm_campaign TEXT NOT NULL UNIQUE,
+    utm_source   TEXT,
+    utm_medium   TEXT,
+    utm_content  TEXT,
+    target_path  TEXT NOT NULL DEFAULT '/membership',
+    notes        TEXT,
+    is_active    INTEGER NOT NULL DEFAULT 1,
+    created_at   TEXT DEFAULT (datetime('now')),
+    updated_at   TEXT DEFAULT (datetime('now')),
+    created_by   INTEGER REFERENCES members (id) ON DELETE SET NULL,
+    updated_by   INTEGER REFERENCES members (id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS campaign_visits
+  (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id  INTEGER NOT NULL REFERENCES campaigns (id) ON DELETE CASCADE,
+    landing_path TEXT,
+    referrer     TEXT,
+    utm_source   TEXT,
+    utm_medium   TEXT,
+    utm_content  TEXT,
+    created_at   TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS contact_submissions
+  (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    name         TEXT NOT NULL,
+    email        TEXT NOT NULL,
+    message      TEXT NOT NULL,
+    campaign_id  INTEGER REFERENCES campaigns (id) ON DELETE SET NULL,
+    email_status TEXT NOT NULL DEFAULT 'sent' CHECK (email_status IN ('sent', 'failed')),
+    created_at   TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_campaign_visits_campaign ON campaign_visits(campaign_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_campaign_visits_created ON campaign_visits(created_at);
+  CREATE INDEX IF NOT EXISTS idx_contact_submissions_campaign ON contact_submissions(campaign_id);
+  CREATE INDEX IF NOT EXISTS idx_contact_submissions_created ON contact_submissions(created_at);
 `;
 
 /**

@@ -121,7 +121,9 @@ router.post('/membership', requireCaptcha('/membership'), async (req, res) => {
         address_street, address_city, address_state, address_zip
       },
       familyMembers,
-      membershipType: membership_type
+      membershipType: membership_type,
+      // First-touch campaign from the session, if they arrived through a tracked link.
+      campaignId: req.session.campaign_id || null
     });
 
     // Get dues + surcharge from current period
@@ -232,12 +234,28 @@ router.post('/contact', requireCaptcha('/#contact'), async (req, res) => {
     }
 
     // Try to send via email service
+    let emailStatus = 'sent';
     try {
       const emailService = require('../services/email');
       await emailService.sendContactEmail({ name, email, message });
     } catch (e) {
+      emailStatus = 'failed';
       const log = req.logger || logger;
       log.warn('Email service not available or error', { error: e.message });
+    }
+
+    // Store the submission regardless of delivery — a failed send used to lose the message
+    // entirely, and the stored row is what campaign attribution reports against.
+    try {
+      const contactSubmissionsRepo = require('../db/repos/contactSubmissions');
+      await contactSubmissionsRepo.create({
+        name, email, message,
+        campaign_id: req.session.campaign_id || null,
+        email_status: emailStatus,
+      });
+    } catch (e) {
+      const log = req.logger || logger;
+      log.error('Failed to store contact submission', { error: e.message });
     }
 
     res.redirect('/contact/success');

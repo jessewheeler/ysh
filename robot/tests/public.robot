@@ -18,7 +18,7 @@ Homepage Loads With All Sections
 Bios Page Renders Board Members
     Seed Bios    2
     Navigate To    /bios
-    Get Text    h2    contains    Board Member Bios
+    Get Text    h2    contains    Board Members
     ${count}=    Get Element Count    .bio-card
     Should Be True    ${count} >= 1
     Get Text    .bios-grid    contains    Test Person 1

@@ -46,6 +46,11 @@ class ServerManager:
         # empty string is falsy in JS, and dotenv won't clobber an already-set var.
         env['HCAPTCHA_SITE_KEY'] = ''
         env['HCAPTCHA_SECRET_KEY'] = ''
+        # Pin a fake measurement ID. env is copied from the shell and dotenv loads .env,
+        # so without this every end-to-end run would send real hits to the production GA
+        # property. A syntactically valid ID keeps the tag rendering so the analytics
+        # suite still exercises the real code path.
+        env['GA_MEASUREMENT_ID'] = 'G-ROBOTTEST0'
 
         self.process = subprocess.Popen(
             ['node', 'server.js'],

@@ -32,12 +32,16 @@ db/repos/                    # Data-access layer (one file per table)
   payments.js                #   CRUD + audit logging for payments
   cards.js                   #   membership_cards
   auditLog.js                #   insert() + list() for audit_log table
+  campaigns.js               #   campaigns + attribution stats
+  campaignVisits.js          #   campaign_visits (no audit rows — high-volume system writes)
+  contactSubmissions.js      #   stored contact-form messages
   announcements.js bios.js gallery.js emailLog.js settings.js
 routes/                      # Express routers (index, admin, stripe)
 services/                    # Business logic
   members.js stripe.js email.js card.js  # core domain services
   admin.js                   #   admin-specific operations
   auth.js                    #   password hashing / OTP
+  campaigns.js               #   UTM link building, QR (PNG/SVG), campaign validation
   content.js                 #   announcements, bios, gallery CRUD
   councilReport.js           #   Central Council membership report (.xlsx, template injection)
   csv.js                     #   CSV export helpers
@@ -49,6 +53,7 @@ services/                    # Business logic
   storage.js                 #   file upload/delete (S3-compatible)
 middleware/                  # Express middleware
   auth.js                    #   requireAdmin, requireSuperAdmin, captureActor (ALS)
+  campaign.js                #   captureCampaign — ?utm_campaign= → first-touch session + visit
   locals.js                  #   site settings + flash into res.locals
   captcha.js                 #   hCaptcha verification
   requestLogger.js           #   Morgan + Winston request logging
@@ -125,7 +130,7 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
 
 - SQLite via better-sqlite3, WAL mode, foreign keys ON
 - Schema defined in `db/schema.js`, applied by `db/migrate.js`
-- Tables: members, payments, announcements, gallery_images, bios, site_settings, emails_log, membership_cards, admins, audit_log, membership_periods, membership_years
+- Tables: members, payments, announcements, gallery_images, bios, site_settings, emails_log, membership_cards, admins, audit_log, membership_periods, membership_years, campaigns, campaign_visits, contact_submissions
 - `audit_log` captures table_name, record_id, action (INSERT/UPDATE/DELETE), actor_id, actor_email, old_values (JSON), new_values (JSON), changed_at
 - `created_by`/`updated_by` FK columns on all mutable tables; actor propagated via AsyncLocalStorage in `db/audit-context.js`
 - Sensitive fields (`otp_hash`, `renewal_token`) are stripped from audit JSON snapshots
@@ -133,6 +138,10 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
 - Adding a column: put it in `db/schema.js` for fresh installs, then add an idempotent ALTER to **both**
   arms of `db/migrate.js` — `pgAlters` (`ADD COLUMN IF NOT EXISTS`) and the SQLite `auditAlters` list
   (wrapped in the existing per-statement try/catch)
+- `members.campaign_id` is the one exception: it lives only in the migrate ALTERs (and is mirrored in
+  `test/helpers/db.js`), because `members` is created before `campaigns` while `campaigns.created_by`
+  references `members`, and PostgreSQL rejects a forward `REFERENCES` at `CREATE TABLE` time
+- Campaign tracking is documented in `docs/campaign-tracking.md`
 
 ## CI
 

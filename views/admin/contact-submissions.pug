@@ -1,0 +1,47 @@
+extends layout
+
+block page_title
+    | Contact Us Submissions
+
+block content
+    p.text-muted
+        | Every message sent through the contact form on the homepage. These are stored even when
+        | the notification email fails to send.
+
+    if submissions.length === 0
+        p.text-muted No submissions yet.
+    else
+        table#contact-submissions.admin-table
+            thead
+                tr
+                    th Received
+                    th Name
+                    th Email
+                    th Message
+                    th Campaign
+                    th Email
+            tbody
+                each s in submissions
+                    tr
+                        td= s.created_at
+                        td= s.name
+                        td: a(href=`mailto:${s.email}`)= s.email
+                        td= s.message
+                        td
+                            if s.campaign_id
+                                a(href=`/admin/campaigns/${s.campaign_id}`)= s.campaign_name || s.utm_campaign
+                            else
+                                span.text-muted —
+                        td
+                            if s.email_status === 'failed'
+                                span.badge.badge-expired Send failed
+                            else
+                                span.badge.badge-active Sent
+
+        if totalPages > 1
+            .pagination(style="margin-top: 1rem;")
+                if page > 1
+                    a.btn-outline(href=`/admin/contact-submissions?page=${page - 1}`) &larr; Previous
+                span.text-muted(style="margin: 0 0.75rem;")= `Page ${page} of ${totalPages} (${total} total)`
+                if page < totalPages
+                    a.btn-outline(href=`/admin/contact-submissions?page=${page + 1}`) Next &rarr;

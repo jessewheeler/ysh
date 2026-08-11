@@ -1,0 +1,48 @@
+extends ../layout
+
+block page_title
+    | #{campaign ? 'Edit' : 'New'} Campaign
+
+block content
+    form(method="POST" action=(campaign ? `/admin/campaigns/${campaign.id}/edit` : '/admin/campaigns'))
+        .form-group
+            label(for="name") Campaign Name
+            input#name(type="text" name="name" value=(campaign ? campaign.name : '') required placeholder="e.g. 2026 Watch Party Flyer")
+            p.text-muted For your reference only — this never appears in the link.
+
+        .form-group
+            label(for="utm_campaign") Campaign Code (utm_campaign)
+            input#utm_campaign(type="text" name="utm_campaign" value=(campaign ? campaign.utm_campaign : '') required placeholder="flyer26")
+            p.text-muted
+                | Lowercase letters, numbers, dots, dashes and underscores. This is the value matched
+                | on inbound links, so keep it short — it ends up printed on the flyer.
+
+        .form-group
+            label(for="target_path") Target Page
+            input#target_path(type="text" name="target_path" value=(campaign ? campaign.target_path : defaultTargetPath) placeholder=defaultTargetPath)
+            p.text-muted A path on this site, starting with "/". Use #{defaultTargetPath} to send people straight to the signup form.
+
+        h3(style="margin-top: 1.5rem;") Attribution Details
+
+        .form-group
+            label(for="utm_source") Source (utm_source)
+            input#utm_source(type="text" name="utm_source" value=(campaign ? campaign.utm_source || '' : '') placeholder="print")
+            p.text-muted Where the link lives: print, facebook, newsletter, instagram.
+
+        .form-group
+            label(for="utm_medium") Medium (utm_medium)
+            input#utm_medium(type="text" name="utm_medium" value=(campaign ? campaign.utm_medium || '' : '') placeholder="flyer")
+            p.text-muted The kind of placement: flyer, qr, post, email, banner.
+
+        .form-group
+            label(for="utm_content") Content (utm_content)
+            input#utm_content(type="text" name="utm_content" value=(campaign ? campaign.utm_content || '' : '') placeholder="table-tent")
+            p.text-muted Optional — use it to tell two versions of the same campaign apart.
+
+        .form-group
+            label(for="notes") Notes
+            textarea#notes(name="notes" rows="3")= campaign ? campaign.notes || '' : ''
+
+        .form-actions
+            button.btn(type="submit")= campaign ? 'Save Changes' : 'Create Campaign'
+            a.btn-outline(href=(campaign ? `/admin/campaigns/${campaign.id}` : '/admin/campaigns') style="margin-left: 1rem;") Cancel

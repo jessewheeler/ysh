@@ -2,6 +2,24 @@ const db = require('./database');
 const { SCHEMA, toPgSchema } = require('./schema');
 const logger = require('../services/logger');
 
+const VISIT_RETENTION_DAYS = 730; // two years
+
+/**
+ * Deletes campaign_visits rows older than the retention window, keeping the table bounded
+ * without a cron job. The cutoff is computed in JS and bound as a parameter — comparing a
+ * TEXT/TIMESTAMP date column against an inline SQL date function does not survive the
+ * SQLite→PostgreSQL dialect translation (see the PR #69 revert).
+ */
+async function pruneCampaignVisits() {
+  const cutoff = new Date(Date.now() - VISIT_RETENTION_DAYS * 24 * 60 * 60 * 1000)
+    .toISOString().slice(0, 19).replace('T', ' ');
+  const result = await db.run('DELETE FROM campaign_visits WHERE created_at < ?', cutoff);
+  const removed = result?.changes || 0;
+  if (removed > 0) {
+    logger.info('Pruned old campaign visits', { removed, cutoff });
+  }
+}
+
 async function migrate() {
   if (db.dialect === 'pg') {
     await db.exec(toPgSchema(SCHEMA));
@@ -45,6 +63,10 @@ async function migrate() {
       "ALTER TABLE members ADD COLUMN IF NOT EXISTS is_lifetime INTEGER NOT NULL DEFAULT 0",
       // bios: contact email, required by the Central Council membership report
       "ALTER TABLE bios ADD COLUMN IF NOT EXISTS email TEXT",
+      // members: campaign attribution (issue #88). Added here rather than in schema.js because
+      // members is created before campaigns and campaigns.created_by points back at members.
+      "ALTER TABLE members ADD COLUMN IF NOT EXISTS campaign_id INTEGER REFERENCES campaigns(id) ON DELETE SET NULL",
+      "CREATE INDEX IF NOT EXISTS idx_members_campaign ON members (campaign_id)",
     ];
     for (const sql of pgAlters) {
       await db.exec(sql);
@@ -100,6 +122,8 @@ async function migrate() {
         activeMembers: pgActiveMembers.length
       });
     }
+
+    await pruneCampaignVisits();
 
     logger.info('PostgreSQL schema creation complete');
     return;
@@ -303,6 +327,10 @@ async function migrate() {
     "ALTER TABLE membership_periods ADD COLUMN card_template_path TEXT",
     "ALTER TABLE members ADD COLUMN is_lifetime INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE bios ADD COLUMN email TEXT",
+    // members: campaign attribution (issue #88). Added here rather than in schema.js because
+    // members is created before campaigns and campaigns.created_by points back at members.
+    "ALTER TABLE members ADD COLUMN campaign_id INTEGER REFERENCES campaigns(id) ON DELETE SET NULL",
+    "CREATE INDEX IF NOT EXISTS idx_members_campaign ON members (campaign_id)",
   ];
   for (const sql of auditAlters) {
     try {
@@ -357,6 +385,8 @@ async function migrate() {
     }
     logger.info('Backfilled membership_periods from settings', {periodId, activeMembers: activeMembers.length});
   }
+
+  await pruneCampaignVisits();
 
   logger.info('Database migration complete');
 }

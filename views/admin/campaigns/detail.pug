@@ -1,0 +1,106 @@
+extends ../layout
+
+block page_title
+    | #{campaign.name}
+
+block content
+    .admin-actions(style="margin-bottom: 1rem;")
+        a.btn-outline(href="/admin/campaigns") &larr; All Campaigns
+        a.btn-outline(href=`/admin/campaigns/${campaign.id}/edit` style="margin-left: 0.5rem;") Edit
+        if !campaign.is_active
+            span.badge.badge-expired(style="margin-left: 0.5rem;") Inactive — no longer attributing
+
+    h2 Trackable Link
+    .form-group
+        input#campaign-url(type="text" value=url readonly style="font-family: monospace;")
+        .form-actions(style="margin-top: 0.5rem;")
+            button#copy-url.btn-outline(type="button" data-copy="#campaign-url") Copy link
+            a.btn-outline(href=url target="_blank" rel="noopener" style="margin-left: 0.5rem;") Open
+
+    h2(style="margin-top: 1.5rem;") QR Code
+    .qr-block(style="display:flex; gap:1.5rem; align-items:flex-start; flex-wrap:wrap;")
+        img#campaign-qr(src=`/admin/campaigns/${campaign.id}/qr.png?size=300` alt=`QR code for ${campaign.name}` width="300" height="300" style="border:1px solid #ddd; background:#fff;")
+        div
+            p.text-muted
+                | Scanning this code opens the link above, so every scan is counted as a visit.
+            p
+                a.btn(href=`/admin/campaigns/${campaign.id}/qr.png?size=1200&download=1`) Download PNG
+            p
+                a.btn-outline(href=`/admin/campaigns/${campaign.id}/qr.svg`) Download SVG
+            p.text-muted
+                | Use the SVG for anything printed larger than about two inches — it stays sharp at
+                | any size. The PNG is easier to drop into a Facebook post or an email.
+
+    h2(style="margin-top: 1.5rem;") Performance
+    table#campaign-stats.admin-table
+        tbody
+            tr
+                th(style="width: 14rem;") Visits
+                td#stat-visits= stats.visit_count
+            tr
+                th Membership signups
+                td#stat-signups= stats.signup_count
+            tr
+                th Contact submissions
+                td#stat-contacts= stats.contact_count
+            tr
+                th Conversion (signups / visits)
+                td= conversion
+
+    h2(style="margin-top: 1.5rem;") Attributed Signups
+    if signups.length === 0
+        p.text-muted No signups attributed to this campaign yet.
+    else
+        table#campaign-signups.admin-table
+            thead
+                tr
+                    th Member
+                    th Email
+                    th Status
+                    th Signed up
+            tbody
+                each m in signups
+                    tr
+                        td: a(href=`/admin/members/${m.id}`)= `${m.first_name} ${m.last_name}`
+                        td= m.email
+                        td= m.status
+                        td= m.created_at
+
+    h2(style="margin-top: 1.5rem;") Contact Submissions
+    if submissions.length === 0
+        p.text-muted No contact submissions attributed to this campaign yet.
+    else
+        table#campaign-contacts.admin-table
+            thead
+                tr
+                    th Name
+                    th Email
+                    th Message
+                    th Received
+            tbody
+                each s in submissions
+                    tr
+                        td= s.name
+                        td= s.email
+                        td= s.message
+                        td= s.created_at
+
+    h2(style="margin-top: 1.5rem;") Recent Visits
+    if visits.length === 0
+        p.text-muted No visits recorded yet.
+    else
+        table#campaign-visits.admin-table
+            thead
+                tr
+                    th Landed on
+                    th Referrer
+                    th Source / Medium
+                    th When
+            tbody
+                each v in visits
+                    tr
+                        td= v.landing_path
+                        td.text-muted= v.referrer || 'direct'
+                        td.text-muted= [v.utm_source, v.utm_medium].filter(Boolean).join(' / ') || '—'
+                        td= v.created_at
+        p.text-muted Showing the 25 most recent. Visits are pruned after two years.

@@ -18,6 +18,10 @@ const auditLogRepo = require('../db/repos/auditLog');
 const periodsRepo = require('../db/repos/membershipPeriods');
 const membershipYearsRepo = require('../db/repos/membershipYears');
 const membershipPeriodsService = require('../services/membershipPeriods');
+const campaignsRepo = require('../db/repos/campaigns');
+const campaignVisitsRepo = require('../db/repos/campaignVisits');
+const contactSubmissionsRepo = require('../db/repos/contactSubmissions');
+const campaignsService = require('../services/campaigns');
 const councilReport = require('../services/councilReport');
 const logger = require('../services/logger');
 const isDevOrTest = ['development', 'test', 'dev'].includes(process.env.NODE_ENV);
@@ -918,6 +922,187 @@ async function processCardTemplate(file, filename) {
   }
   return filename;
 }
+
+// --- Campaigns (issue #88) ---
+// Available to editors as well as super admins: running outreach is exactly the job an editor
+// has, and campaigns carry no member PII beyond what /admin/members already shows.
+
+router.get('/campaigns', async (req, res, next) => {
+  try {
+    const campaigns = await campaignsRepo.listWithStats();
+    res.render('admin/campaigns/list', {
+      campaigns,
+      baseUrl: campaignsService.resolveBaseUrl(),
+      buildUrl: campaignsService.buildUrl,
+      conversionRate: campaignsService.conversionRate,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/campaigns.csv', async (req, res, next) => {
+  try {
+    const campaigns = await campaignsRepo.listWithStats();
+    const { toCsv } = require('../services/csv');
+    const rows = campaigns.map(c => ({
+      ...c,
+      url: campaignsService.buildUrl(c),
+      conversion_rate: campaignsService.conversionRate(c),
+      is_active: c.is_active ? 'yes' : 'no',
+    }));
+    const columns = ['name', 'utm_campaign', 'utm_source', 'utm_medium', 'utm_content',
+      'target_path', 'url', 'visit_count', 'signup_count', 'contact_count', 'conversion_rate',
+      'is_active', 'created_at'];
+    const headers = ['Name', 'Campaign', 'Source', 'Medium', 'Content', 'Target path', 'URL',
+      'Visits', 'Signups', 'Contacts', 'Conversion', 'Active', 'Created'];
+    const date = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="ysh-campaigns-${date}.csv"`);
+    res.send(toCsv(rows, columns, headers));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/campaigns/new', (req, res) => {
+  res.render('admin/campaigns/form', {campaign: null, defaultTargetPath: campaignsService.DEFAULT_TARGET_PATH});
+});
+
+/** Turns a duplicate-code constraint violation into something an admin can act on. */
+function campaignErrorMessage(err) {
+  if (err.message.includes('UNIQUE') || err.code === '23505') {
+    return 'Another campaign already uses that campaign code. Pick a different one.';
+  }
+  return err.message;
+}
+
+router.post('/campaigns', async (req, res) => {
+  try {
+    const data = campaignsService.validateCampaign(req.body);
+    const campaign = await campaignsRepo.create(data);
+    req.session.flash_success = 'Campaign created.';
+    res.redirect(`/admin/campaigns/${campaign.id}`);
+  } catch (err) {
+    req.session.flash_error = campaignErrorMessage(err);
+    res.redirect('/admin/campaigns/new');
+  }
+});
+
+router.get('/campaigns/:id', async (req, res, next) => {
+  try {
+    const campaign = await campaignsRepo.get(req.params.id);
+    if (!campaign) {
+      req.session.flash_error = 'Campaign not found.';
+      return res.redirect('/admin/campaigns');
+    }
+    const [stats, visits, signups, submissions] = await Promise.all([
+      campaignsRepo.statsFor(campaign.id),
+      campaignVisitsRepo.listRecent(campaign.id),
+      campaignsRepo.listSignups(campaign.id),
+      contactSubmissionsRepo.listByCampaign(campaign.id),
+    ]);
+    res.render('admin/campaigns/detail', {
+      campaign,
+      stats,
+      visits,
+      signups,
+      submissions,
+      url: campaignsService.buildUrl(campaign),
+      conversion: campaignsService.conversionRate(stats),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/campaigns/:id/edit', async (req, res) => {
+  const campaign = await campaignsRepo.get(req.params.id);
+  if (!campaign) {
+    req.session.flash_error = 'Campaign not found.';
+    return res.redirect('/admin/campaigns');
+  }
+  res.render('admin/campaigns/form', {campaign, defaultTargetPath: campaignsService.DEFAULT_TARGET_PATH});
+});
+
+router.post('/campaigns/:id/edit', async (req, res) => {
+  const id = req.params.id;
+  try {
+    const data = campaignsService.validateCampaign(req.body);
+    await campaignsRepo.update(id, data);
+    req.session.flash_success = 'Campaign updated.';
+    res.redirect(`/admin/campaigns/${id}`);
+  } catch (err) {
+    req.session.flash_error = campaignErrorMessage(err);
+    res.redirect(`/admin/campaigns/${id}/edit`);
+  }
+});
+
+// Deactivate rather than delete: visits and attributed members reference the campaign, and a
+// code that has already gone out on a flyer should stop attributing without losing its history.
+router.post('/campaigns/:id/toggle', async (req, res) => {
+  try {
+    const campaign = await campaignsRepo.get(req.params.id);
+    if (!campaign) {
+      req.session.flash_error = 'Campaign not found.';
+      return res.redirect('/admin/campaigns');
+    }
+    await campaignsRepo.setActive(campaign.id, !campaign.is_active);
+    req.session.flash_success = campaign.is_active ? 'Campaign deactivated.' : 'Campaign reactivated.';
+  } catch (err) {
+    req.session.flash_error = err.message;
+  }
+  res.redirect('/admin/campaigns');
+});
+
+router.get('/campaigns/:id/qr.png', async (req, res, next) => {
+  try {
+    const campaign = await campaignsRepo.get(req.params.id);
+    if (!campaign) return res.status(404).render('error', {status: 404, message: 'Campaign not found'});
+    const png = await campaignsService.qrPng(campaignsService.buildUrl(campaign), {size: req.query.size});
+    res.setHeader('Content-Type', 'image/png');
+    if (req.query.download) {
+      res.setHeader('Content-Disposition', `attachment; filename="${campaignsService.qrFilename(campaign, 'png')}"`);
+    }
+    res.send(png);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/campaigns/:id/qr.svg', async (req, res, next) => {
+  try {
+    const campaign = await campaignsRepo.get(req.params.id);
+    if (!campaign) return res.status(404).render('error', {status: 404, message: 'Campaign not found'});
+    const svg = await campaignsService.qrSvg(campaignsService.buildUrl(campaign));
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Content-Disposition', `attachment; filename="${campaignsService.qrFilename(campaign, 'svg')}"`);
+    res.send(svg);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Contact form submissions ---
+router.get('/contact-submissions', async (req, res, next) => {
+  try {
+    const perPage = 50;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const [submissions, total] = await Promise.all([
+      contactSubmissionsRepo.list({limit: perPage, offset: (page - 1) * perPage}),
+      contactSubmissionsRepo.count(),
+    ]);
+    res.render('admin/contact-submissions', {
+      submissions,
+      page,
+      perPage,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / perPage)),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // --- Membership Periods (super_admin only) ---
 router.get('/periods', requireSuperAdmin, async (req, res, next) => {

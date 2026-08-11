@@ -609,6 +609,24 @@ a.stat-card:hover {
   min-height: 36px;
 }
 
+/* A submit button that has to sit inline beside real links — used for actions that
+   need a POST (and so can't be an <a>) but should read as a link, like "Resend code"
+   on the OTP screen. Matches the base anchor styling in style.css. */
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: #002a5c;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+}
+
 /* === Pagination === */
 .pagination {
   display: flex;

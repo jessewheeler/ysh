@@ -36,7 +36,10 @@ class DatabaseManager:
             'emails_log',
             'membership_years',
             'payments',
+            'campaign_visits',
+            'contact_submissions',
             'members',
+            'campaigns',
             'membership_periods',
             'announcements',
             'gallery_images',
@@ -81,6 +84,42 @@ class DatabaseManager:
         )
         self.conn.commit()
         return cursor.lastrowid
+
+    def seed_campaign(self, name='Robot Campaign', utm_campaign='robot26',
+                      utm_source='print', utm_medium='flyer', target_path='/membership',
+                      is_active=1):
+        """Insert a campaign and return its row ID."""
+        cursor = self.conn.execute(
+            """INSERT INTO campaigns (name, utm_campaign, utm_source, utm_medium, target_path, is_active)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (name, utm_campaign, utm_source, utm_medium, target_path, int(is_active)),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def count_campaign_visits(self, campaign_id):
+        """Return how many visits are recorded against a campaign."""
+        row = self.conn.execute(
+            'SELECT COUNT(*) AS c FROM campaign_visits WHERE campaign_id = ?', (campaign_id,)
+        ).fetchone()
+        return row['c']
+
+    def count_contact_submissions(self, campaign_id=None):
+        """Return the contact submission count, optionally for one campaign."""
+        if campaign_id is None:
+            row = self.conn.execute('SELECT COUNT(*) AS c FROM contact_submissions').fetchone()
+        else:
+            row = self.conn.execute(
+                'SELECT COUNT(*) AS c FROM contact_submissions WHERE campaign_id = ?', (campaign_id,)
+            ).fetchone()
+        return row['c']
+
+    def get_member_campaign_id(self, email):
+        """Return the campaign_id attributed to a member, or None."""
+        row = self.conn.execute(
+            'SELECT campaign_id FROM members WHERE email = ? ORDER BY id LIMIT 1', (email,)
+        ).fetchone()
+        return row['campaign_id'] if row else None
 
     def seed_admin(self, email=None, first_name=None, last_name=None, role='super_admin'):
         """Insert a test admin into members and return the row ID."""
