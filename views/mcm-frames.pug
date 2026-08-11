@@ -1,0 +1,13 @@
+//- One batch of frames for the Man Crush Monday wall.
+//- Included by mcm.pug for the first page and rendered standalone by
+//- GET /man-crush-monday/frames for every page after it, so the markup exists once.
+each frame in frames
+    article.mcm-frame(class=frame.isSigningDay ? 'mcm-frame--signing' : '')
+        .mcm-frame-mat
+            img.mcm-photo(src=frame.photo alt=`Julian Love, Man Crush Monday for ${frame.label}` loading="lazy")
+        .mcm-plaque
+            .mcm-plaque-title Man Crush Monday
+            .mcm-plaque-name Julian Love
+            .mcm-plaque-date= frame.label
+            if frame.isSigningDay
+                .mcm-plaque-note Signing Day — where it all began

@@ -1,0 +1,29 @@
+extends layout
+
+block content
+    section#mcm.section
+        .container
+            h2 #ManCrushMonday
+            p.mcm-lede.
+                Every Monday, without fail, without a vote, and without any input from the board,
+                the Yellowstone Sea Hawkers recognize a Man Crush of the Week.
+
+            .mcm-curator
+                h3 A program run by Kate
+                p.
+                    Kate does not take nominations. Kate does not take questions. Kate has been asked
+                    to consider other players and has declined. The wall below is #{total} weeks deep
+                    and grows by one frame every Monday.
+
+    section.section.alt-bg
+        .container
+            h3.mcm-wall-heading The Wall
+            .mcm-wall#mcm-wall
+                include mcm-frames
+
+            .mcm-sentinel#mcm-sentinel(data-next-page=page + 1 data-total-pages=totalPages)
+                span.mcm-sentinel-text Hanging more frames&hellip;
+            p.mcm-end#mcm-end(hidden)
+                | You have reached March 17, 2023. Kate thanks you for your time.
+
+    script(src="/js/mcm.js")

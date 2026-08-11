@@ -40,6 +40,8 @@ module.exports = [
         alert: 'readonly',
         confirm: 'readonly',
         FileReader: 'readonly',
+          IntersectionObserver: 'readonly',
+          fetch: 'readonly',
         localStorage: 'readonly',
         navigator: 'readonly',
         setTimeout: 'readonly',
