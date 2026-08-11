@@ -41,9 +41,9 @@ block content
                             else
                                 span.badge.badge-expired Inactive
                         td
-                            a(href=`/admin/campaigns/${c.id}/edit`) Edit
-                            form(method="POST" action=`/admin/campaigns/${c.id}/toggle` style="display:inline; margin-left:0.5rem;" data-confirm=(c.is_active ? 'Deactivate this campaign? Links already in print will stop being attributed.' : 'Reactivate this campaign?'))
-                                button.btn-link(type="submit")= c.is_active ? 'Deactivate' : 'Reactivate'
+                            a.btn-sm(href=`/admin/campaigns/${c.id}/edit`) Edit
+                            form(method="POST" action=`/admin/campaigns/${c.id}/toggle` style="display:inline" data-confirm=(c.is_active ? 'Deactivate this campaign? Links already in print will stop being attributed.' : 'Reactivate this campaign?'))
+                                button(type="submit" class=c.is_active ? 'btn-sm btn-danger' : 'btn-sm')= c.is_active ? 'Deactivate' : 'Reactivate'
 
     p.text-muted(style="margin-top: 1.5rem;")
         | Visits count one per visitor per campaign, exclude known bots, and are pruned after two
