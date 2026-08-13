@@ -88,6 +88,13 @@ describe('POST /admin/members/:id/renewal-link', () => {
     expect(page.text).toContain('Renewal Link');
   });
 
+  test('the button opts into the spinner — the round trip is not instant', async () => {
+    // Asserted on the markup rather than in the browser: the form submits and navigates, so the
+    // spinner state is too short-lived to catch reliably from a Robot test.
+    const page = await agent.get(`/admin/members/${member.id}`).expect(200);
+    expect(page.text).toMatch(/renewal-link"[^>]*data-spinner=/);
+  });
+
   test('the link is one-shot — a later page load does not show it again', async () => {
     await generateLink(agent, member.id);
     await agent.get(`/admin/members/${member.id}`).expect(200);

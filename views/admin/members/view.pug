@@ -77,7 +77,7 @@ block content
         if !member.primary_member_id
           form(method="POST" action=`/admin/members/${member.id}/send-renewal` style="display:inline" data-confirm=`Send renewal reminder to ${member.first_name} ${member.last_name}?`)
             button.btn-outline(type="submit") Send Renewal Reminder
-          form(method="POST" action=`/admin/members/${member.id}/renewal-link` style="display:inline")
+          form(method="POST" action=`/admin/members/${member.id}/renewal-link` style="display:inline" data-spinner="Generating…")
             button.btn-outline(type="submit") Generate Renewal Link
         if member.membership_type !== 'family' && !member.primary_member_id
           form(method="POST" action=`/admin/members/${member.id}/upgrade-to-family` style="display:inline" data-confirm=`Upgrade ${member.first_name} ${member.last_name} to a family membership?`)
