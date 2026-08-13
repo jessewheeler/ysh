@@ -121,6 +121,9 @@ async function seed() {
     contact_email: 'info@yellowstoneseahawkers.com',
     stripe_publishable_key: '',
     renewal_reminder_days_before: '30',
+    attention_reminder_count: '2',
+    attention_pending_payment_hours: '24',
+    attention_lookback_days: '180',
     social_facebook_url: '',
     social_instagram_url: '',
   };

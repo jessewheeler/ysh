@@ -29,6 +29,7 @@ db/audit-context.js          # AsyncLocalStorage actor propagation (getActor, ru
 db/pg-translate.js           # SQLite→PostgreSQL SQL dialect translation helpers
 db/repos/                    # Data-access layer (one file per table)
   members.js                 #   CRUD + audit logging for members
+  memberAttention.js         #   "needs attention" signal predicates (stalled signups/renewals)
   payments.js                #   CRUD + audit logging for payments
   cards.js                   #   membership_cards
   auditLog.js                #   insert() + list() for audit_log table
@@ -40,6 +41,7 @@ routes/                      # Express routers (index, admin, stripe)
 services/                    # Business logic
   members.js stripe.js email.js card.js  # core domain services
   admin.js                   #   admin-specific operations
+  attention.js               #   thresholds + current period for the needs-attention filter
   auth.js                    #   password hashing / OTP
   campaigns.js               #   UTM link building, QR (PNG/SVG), campaign validation
   content.js                 #   announcements, bios, gallery CRUD
@@ -141,7 +143,13 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
 - `members.campaign_id` is the one exception: it lives only in the migrate ALTERs (and is mirrored in
   `test/helpers/db.js`), because `members` is created before `campaigns` while `campaigns.created_by`
   references `members`, and PostgreSQL rejects a forward `REFERENCES` at `CREATE TABLE` time
+- `payments.status` allows `pending`/`completed`/`failed`/`refunded`. `failed` is written only by the
+  Stripe failure webhooks (`checkout.session.expired`, `payment_intent.payment_failed`), and
+  `payments.failure_reason` holds Stripe's message. Nothing writes `refunded`.
 - Campaign tracking is documented in `docs/campaign-tracking.md`
+- The Needs attention member filter is documented in `docs/needs-attention-signals.md` — read it
+  before changing a signal predicate or threshold, and note that neither Jest nor Robot exercises
+  `pg-translate`, so those queries need a manual PostgreSQL check
 
 ## CI
 

@@ -1,6 +1,7 @@
 const db = require('../database');
 const {getActor} = require('../audit-context');
 const auditLog = require('./auditLog');
+const memberAttention = require('./memberAttention');
 
 async function findById(id) {
   return await db.get('SELECT * FROM members WHERE id = ?', id);
@@ -121,7 +122,16 @@ function isoDate(offsetDays = 0) {
 const NEEDS_RENEWAL_WINDOW_DAYS = 30;
 const RECENTLY_RENEWED_WINDOW_DAYS = 30;
 
-function viewClause(view, currentPeriodId) {
+// Accepts either a bare currentPeriodId (the original signature, still used by
+// countByView and findNeedingRenewal) or the fuller attention context object.
+function normalizeViewCtx(ctx) {
+  if (ctx === null || ctx === undefined) return {};
+  return typeof ctx === 'object' ? ctx : { currentPeriodId: ctx };
+}
+
+function viewClause(view, ctxOrPeriodId) {
+  const ctx = normalizeViewCtx(ctxOrPeriodId);
+  const currentPeriodId = ctx.currentPeriodId ?? null;
   const today = isoDate();
   switch (view) {
     case 'active':
@@ -154,6 +164,8 @@ function viewClause(view, currentPeriodId) {
       return { sql: "status = 'pending'", params: [] };
     case 'lifetime':
       return { sql: 'is_lifetime = 1', params: [] };
+    case 'needs-attention':
+      return memberAttention.attentionClause(ctx);
     default:
       return null;
   }
@@ -174,7 +186,7 @@ function orderClause(sort, dir) {
   return `ORDER BY ${template.replace(/%D%/g, d)}, id ASC`;
 }
 
-async function search({ search, view, currentPeriodId, status, periodId, sort, dir, limit, offset }) {
+async function search({ search, view, currentPeriodId, status, periodId, sort, dir, limit, offset, signal, minReminders, staleHours, lookbackDays }) {
   const clauses = [];
   const params = [];
 
@@ -184,7 +196,15 @@ async function search({ search, view, currentPeriodId, status, periodId, sort, d
     params.push(s, s, s, s);
   }
 
-  const vc = viewClause(view, currentPeriodId);
+  // `signal` narrows the needs-attention view to a single signal; it is meaningless
+  // under any other view, so it is not passed through.
+  const vc = viewClause(view, {
+    currentPeriodId,
+    minReminders,
+    staleHours,
+    lookbackDays,
+    signal: view === 'needs-attention' ? signal : undefined,
+  });
   if (vc) {
     clauses.push(vc.sql);
     params.push(...vc.params);
@@ -220,23 +240,25 @@ async function search({ search, view, currentPeriodId, status, periodId, sort, d
   return { members, total };
 }
 
-async function countView(view, currentPeriodId) {
-  const vc = viewClause(view, currentPeriodId);
+async function countView(view, ctxOrPeriodId) {
+  const vc = viewClause(view, ctxOrPeriodId);
   const where = vc ? `WHERE ${vc.sql}` : '';
   const row = await db.get(`SELECT COUNT(*) as c FROM members ${where}`, ...(vc ? vc.params : []));
   return row ? row.c : 0;
 }
 
-async function countByView(currentPeriodId) {
-  const [all, active, needsRenewal, recentlyRenewed, pending, lifetime] = await Promise.all([
-    countView('all', currentPeriodId),
-    countView('active', currentPeriodId),
-    countView('needs-renewal', currentPeriodId),
-    countView('recently-renewed', currentPeriodId),
-    countView('pending', currentPeriodId),
-    countView('lifetime', currentPeriodId),
+async function countByView(ctxOrPeriodId) {
+  const ctx = normalizeViewCtx(ctxOrPeriodId);
+  const [all, active, needsRenewal, recentlyRenewed, pending, lifetime, needsAttention] = await Promise.all([
+    countView('all', ctx),
+    countView('active', ctx),
+    countView('needs-renewal', ctx),
+    countView('recently-renewed', ctx),
+    countView('pending', ctx),
+    countView('lifetime', ctx),
+    countView('needs-attention', ctx),
   ]);
-  return { all, active, needsRenewal, recentlyRenewed, pending, lifetime };
+  return { all, active, needsRenewal, recentlyRenewed, pending, lifetime, needsAttention };
 }
 
 async function listRecent(limit) {

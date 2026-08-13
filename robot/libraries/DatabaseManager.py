@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from datetime import datetime, timedelta
 
 
 class DatabaseManager:
@@ -203,7 +204,8 @@ class DatabaseManager:
     def seed_member(self, first_name='Test', last_name='Member', email=None,
                     phone=None, status='active', membership_year=2026,
                     member_number=None, address_street=None, address_city=None,
-                    address_state='MT', address_zip=None, notes=None):
+                    address_state='MT', address_zip=None, notes=None,
+                    expiry_date=None):
         """Insert a member and return the row ID."""
         if email is None:
             import random
@@ -215,11 +217,53 @@ class DatabaseManager:
             '''INSERT INTO members
                (member_number, first_name, last_name, email, phone,
                 address_street, address_city, address_state, address_zip,
-                membership_year, status, notes)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                membership_year, status, notes, expiry_date)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (member_number, first_name, last_name, email, phone,
              address_street, address_city, address_state, address_zip,
-             membership_year, status, notes),
+             membership_year, status, notes, expiry_date),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def seed_payment(self, member_id, status='completed', amount_cents=1600,
+                     stripe_session_id=None, stripe_payment_intent=None,
+                     failure_reason=None, hours_ago=None):
+        """Insert a payment and return the row ID.
+
+        `hours_ago` backdates created_at, which is how a test makes a pending payment
+        old enough to count as an abandoned checkout.
+        """
+        if hours_ago is None:
+            created_at = datetime.utcnow()
+        else:
+            created_at = datetime.utcnow() - timedelta(hours=float(hours_ago))
+        cursor = self.conn.execute(
+            '''INSERT INTO payments
+               (member_id, amount_cents, currency, status, description, payment_method,
+                stripe_session_id, stripe_payment_intent, failure_reason, created_at)
+               VALUES (?, ?, 'usd', ?, 'Robot test payment', 'stripe', ?, ?, ?, ?)''',
+            (int(member_id), int(amount_cents), status, stripe_session_id,
+             stripe_payment_intent, failure_reason,
+             created_at.strftime('%Y-%m-%d %H:%M:%S')),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def seed_email_log(self, member_id=None, email_type='renewal_reminder',
+                       status='sent', to_email='robot@example.com', days_ago=None):
+        """Insert an emails_log row and return the row ID."""
+        if days_ago is None:
+            created_at = datetime.utcnow()
+        else:
+            created_at = datetime.utcnow() - timedelta(days=float(days_ago))
+        cursor = self.conn.execute(
+            '''INSERT INTO emails_log
+               (to_email, to_name, subject, email_type, status, member_id, created_at)
+               VALUES (?, 'Robot Test', 'Robot test email', ?, ?, ?, ?)''',
+            (to_email, email_type, status,
+             int(member_id) if member_id is not None else None,
+             created_at.strftime('%Y-%m-%d %H:%M:%S')),
         )
         self.conn.commit()
         return cursor.lastrowid

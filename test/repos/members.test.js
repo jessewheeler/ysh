@@ -307,6 +307,9 @@ describe('countByView', () => {
       recentlyRenewed: 1,
       pending: 1,
       lifetime: 1,
+      // The pending member was created just now, so it is still inside the
+      // unfinished-checkout grace period and nothing is flagged yet.
+      needsAttention: 0,
     });
   });
 

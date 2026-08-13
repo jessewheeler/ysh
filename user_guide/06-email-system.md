@@ -49,3 +49,19 @@ If emails show as **failed** in the log:
 1. Verify the `MAILERSEND_API_KEY` and `FROM_EMAIL` environment variables are set correctly.
 2. Check that the sender domain is verified in your MailerSend account.
 3. Review MailerSend's Activity log for bounce or block details.
+
+To find *which members* were affected rather than which messages, use the **Needs attention** filter on the Members
+page and narrow to **Email send failed** — see [Managing Members](02-managing-members.md). That gives you a list of
+people to phone instead of email.
+
+### What the log cannot tell you
+
+A **sent** status means only that MailerSend accepted the message for delivery. It does **not** mean the member
+received it. Email that was accepted and then bounced, or that was delivered straight into a spam folder, looks
+identical to email that was read — YSH receives no delivery notifications back from MailerSend, so none of it is
+visible here or anywhere else in the admin.
+
+This matters most for renewal reminders. If a member insists they never got one, the log showing **sent** does not
+contradict them. The **Reminded, not renewed** badge on the Members page exists for exactly this case: repeated
+reminders with no response is the closest thing to evidence of spam filtering that the app can offer. Check MailerSend's
+own Activity log for the actual delivery outcome.

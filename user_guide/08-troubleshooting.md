@@ -21,10 +21,43 @@
 
 **Problem:** A member signed up but their status never changed to active.
 
-- Check the **Payments** ledger for their transaction. If the payment shows as pending, the Stripe webhook may not have fired.
-- Verify the `STRIPE_WEBHOOK_SECRET` environment variable matches the secret in your Stripe Dashboard under Developers > Webhooks.
+Start with the **Needs attention** filter on the Members page — it identifies stuck members and tells you *why* each one
+is stuck, which determines the fix. See [Managing Members](02-managing-members.md).
+
+- **Payment failed** — Stripe declined their card. Nothing is wrong with the site; the member needs to retry or pay by
+  check.
+- **Checkout not finished** or **Never reached checkout** — they abandoned the process. Again nothing to fix
+  technically; this is an outreach case.
+- **No badge at all, but still pending after paying** — this is the actual webhook failure case. Continue below.
+
+If a member paid but stayed pending:
+
+- Check the **Payments** ledger for their transaction. If the payment shows as completed but the member is still
+  pending, the webhook fired but a later step failed — check the server logs.
+- If the payment shows as pending, the Stripe webhook may not have fired at all.
+- Verify the `STRIPE_WEBHOOK_SECRET` environment variable matches the secret in your Stripe Dashboard under Developers >
+  Webhooks, and that all three required events are subscribed (see
+  [Payments & Stripe](04-payments-and-stripe.md)).
 - Check server logs for webhook errors.
 - As a workaround, you can manually set the member's status to active from their detail page.
+
+## Needs Attention List Looks Wrong
+
+**Problem:** The **Needs attention** count seems too high, too low, or flags people who are fine.
+
+- **Far too long the first time** — expected. It reports problems going back to the lookback window, so the first pass
+  is a backlog. Work through it once and it will settle.
+- **Flagging people who are still mid-checkout** — raise **Unfinished Checkout Age (hours)** in Settings.
+- **Not flagging people you know are stuck** — lower **Reminders Before Flagging**, or check whether the lookback window
+  is shorter than the problem is old.
+- **Payment failed never appears** — the two Stripe failure events are probably not subscribed on the webhook endpoint.
+  See [Payments & Stripe](04-payments-and-stripe.md). This is the most common cause of a list that looks
+  suspiciously clean.
+- **A member is flagged but the badge seems wrong** — the badges are inferences from payment and email records, not
+  statements of fact. `docs/needs-attention-signals.md` documents exactly what each one does and does not prove.
+
+All three thresholds are on the Settings page under **Needs Attention** — see
+[Site Settings](07-site-settings.md).
 
 ## Emails Not Sending
 

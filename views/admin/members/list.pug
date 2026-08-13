@@ -14,7 +14,7 @@ mixin sortTh(key, label)
 
 block content
   .view-pills
-    - const pills = [['all', 'All', counts.all], ['active', 'Active', counts.active], ['needs-renewal', 'Needs renewal', counts.needsRenewal], ['recently-renewed', 'Recently renewed', counts.recentlyRenewed], ['pending', 'Pending', counts.pending], ['lifetime', 'Lifetime', counts.lifetime]]
+    - const pills = [['all', 'All', counts.all], ['active', 'Active', counts.active], ['needs-renewal', 'Needs renewal', counts.needsRenewal], ['recently-renewed', 'Recently renewed', counts.recentlyRenewed], ['pending', 'Pending', counts.pending], ['lifetime', 'Lifetime', counts.lifetime], ['needs-attention', 'Needs attention', counts.needsAttention]]
     each pill in pills
       a(class=`view-pill${view === pill[0] ? ' view-pill-active' : ''}` href=`/admin/members${qs({view: pill[0], page: 1})}`)
         = pill[1]
@@ -39,9 +39,14 @@ block content
         option(value="expired" selected=status === 'expired') Expired
         option(value="pending" selected=status === 'pending') Pending
         option(value="cancelled" selected=status === 'cancelled') Cancelled
+      if view === 'needs-attention'
+        select(name="signal" data-auto-submit)
+          option(value="" selected=!signal) Any problem
+          each s in signalOptions
+            option(value=s.key selected=signal === s.key title=s.label)= s.short
       button.btn(type="submit") Search
-      if search || status || periodId
-        a.btn-outline(href=`/admin/members${qs({search: '', status: '', period: '', page: 1})}`) Clear filters
+      if search || status || periodId || signal
+        a.btn-outline(href=`/admin/members${qs({search: '', status: '', period: '', signal: '', page: 1})}`) Clear filters
     .toolbar-actions
       a.btn(href="/admin/members/new") + New Member
       a.btn-outline(href=`/admin/members/export${qs({})}`) Export CSV
@@ -56,6 +61,8 @@ block content
           th Type
           +sortTh('status', 'Status')
           +sortTh('year', 'Year')
+          if view === 'needs-attention'
+            th Signals
           th Actions
       tbody
         each m in members
@@ -70,6 +77,10 @@ block content
                 |
                 span.badge.badge-lifetime Lifetime
             td= m.membership_year
+            if view === 'needs-attention'
+              td
+                each s in (m.attention_signals || [])
+                  span.badge.badge-attention(title=s.label)= s.short
             td
               a.btn-sm(href=`/admin/members/${m.id}`) Edit
 
@@ -81,7 +92,9 @@ block content
         if page < totalPages
           a(href=`/admin/members${qs({page: page + 1})}`) Next &raquo;
   else
-    if view !== 'all' || search || periodId
+    if view === 'needs-attention' && !search && !status && !periodId && !signal
+      p.text-muted No members need attention right now.
+    else if view !== 'all' || search || status || periodId || signal
       p.text-muted No members match this view or search.
     else
       p.text-muted No members found.

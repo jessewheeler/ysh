@@ -57,6 +57,10 @@ async function createCheckoutSession({
         payment_method_types: ['card'],
         customer_email: email,
         metadata,
+        // Copy the metadata onto the PaymentIntent as well. A
+        // payment_intent.payment_failed event carries the intent, not the session, so
+        // without this a declined card cannot be traced back to a member.
+        payment_intent_data: {metadata},
         line_items: lineItems,
     mode: 'payment',
     success_url: `${baseUrl}/membership/success?session_id={CHECKOUT_SESSION_ID}`,

@@ -87,6 +87,21 @@ block content
       input#renewal_reminder_days_before(type="number" name="renewal_reminder_days_before" value=(site.renewal_reminder_days_before || '30') min="1" max="365")
       p.text-muted Members with expiry dates within this many days will be included in renewal reminder sends.
 
+    h3 Needs Attention
+    p.text-muted These thresholds control which members appear under the Needs attention filter on the Members page.
+    .form-group
+      label(for="attention_reminder_count") Reminders Before Flagging
+      input#attention_reminder_count(type="number" name="attention_reminder_count" value=(site.attention_reminder_count || '2') min="1" max="20")
+      p.text-muted Flag a member once they have received this many renewal reminders without renewing. Lower this to widen the list.
+    .form-group
+      label(for="attention_pending_payment_hours") Unfinished Checkout Age (hours)
+      input#attention_pending_payment_hours(type="number" name="attention_pending_payment_hours" value=(site.attention_pending_payment_hours || '24') min="1" max="720")
+      p.text-muted How long a payment may sit unfinished before it counts as abandoned. Raise this to stop flagging people who are still mid-checkout.
+    .form-group
+      label(for="attention_lookback_days") Lookback Window (days)
+      input#attention_lookback_days(type="number" name="attention_lookback_days" value=(site.attention_lookback_days || '180') min="1" max="3650")
+      p.text-muted Only problems from the last this-many days are flagged, so the list stays an outreach queue rather than the full history.
+
     h3 Social Media
     .form-group
       label(for="social_facebook_url") Facebook Page URL
