@@ -44,6 +44,67 @@ async function completeBySessionId(sessionId, paymentIntent) {
     return result;
 }
 
+/**
+ * Marks a still-pending checkout as failed. The `status = 'pending'` guard makes this
+ * idempotent on Stripe webhook redelivery and stops a late-arriving expiry event from
+ * clobbering a payment that actually completed.
+ */
+async function failBySessionId(sessionId, reason) {
+    const actor = getActor();
+    const old = await db.get("SELECT * FROM payments WHERE stripe_session_id = ? AND status = 'pending'", sessionId);
+    if (!old) return null;
+
+    const result = await db.run(
+        `UPDATE payments SET status = 'failed', failure_reason = ?, updated_at = datetime('now'), updated_by = ?
+     WHERE stripe_session_id = ? AND status = 'pending'`,
+        reason || null, actor.id || null, sessionId
+    );
+    const row = await db.get('SELECT * FROM payments WHERE id = ?', old.id);
+    await auditLog.insert({
+        tableName: 'payments',
+        recordId: old.id,
+        action: 'UPDATE',
+        actor,
+        oldValues: old,
+        newValues: row
+    });
+    return result;
+}
+
+/**
+ * Records a declined payment that has no pending row to update — a card failure on a
+ * PaymentIntent. Idempotent on redelivery via the payment-intent lookup.
+ */
+async function recordFailure({ member_id, stripe_payment_intent, amount_cents, reason }) {
+    const actor = getActor();
+    if (stripe_payment_intent) {
+        const existing = await db.get(
+            "SELECT id FROM payments WHERE stripe_payment_intent = ? AND status = 'failed'",
+            stripe_payment_intent
+        );
+        if (existing) return null;
+    }
+
+    const result = await db.run(
+        `INSERT INTO payments (member_id, stripe_payment_intent, amount_cents, currency, status, description,
+                               failure_reason, payment_method, created_by, updated_by)
+         VALUES (?, ?, ?, 'usd', 'failed', ?, ?, 'stripe', ?, ?)`,
+        member_id, stripe_payment_intent || null, amount_cents || 0,
+        `${new Date().getFullYear()} Membership Dues`, reason || null,
+        actor.id || null, actor.id || null
+    );
+    const row = await db.get('SELECT * FROM payments WHERE id = ?', result.lastInsertRowid);
+    await auditLog.insert({
+        tableName: 'payments',
+        recordId: result.lastInsertRowid,
+        action: 'INSERT',
+        actor,
+        oldValues: null,
+        newValues: row
+    });
+    return result;
+}
+
 async function findByMemberId(memberId) {
   return await db.all('SELECT * FROM payments WHERE member_id = ? ORDER BY created_at DESC', memberId);
 }
@@ -103,6 +164,8 @@ async function findByStripeSession(sessionId) {
 module.exports = {
   create,
   completeBySessionId,
+  failBySessionId,
+  recordFailure,
   findByMemberId,
   listWithMembers,
   listAllWithMembers,

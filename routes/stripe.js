@@ -114,6 +114,33 @@ router.post('/webhook', async (req, res) => {
         logger.error('Email send error', { error: e.message, stack: e.stack });
       }
     }
+  } else if (event.type === 'checkout.session.expired') {
+    // Abandoned checkout. Wrapped so a DB error still returns 2xx — Stripe retries on
+    // anything else, and this is not worth a retry storm.
+    const session = event.data.object;
+    try {
+      await paymentsService.expireStripeCheckout(session.id, 'Checkout session expired');
+    } catch (e) {
+      logger.error('Error recording expired checkout', { error: e.message, sessionId: session.id });
+    }
+  } else if (event.type === 'payment_intent.payment_failed') {
+    const intent = event.data.object;
+    const memberId = intent.metadata?.member_id;
+    if (!memberId) {
+      // Pre-dates payment_intent_data.metadata, or an intent we did not create.
+      logger.warn('Payment failure with no member_id metadata', { paymentIntent: intent.id });
+    } else {
+      try {
+        await paymentsService.recordStripeFailure({
+          memberId,
+          paymentIntent: intent.id,
+          amountCents: intent.amount,
+          reason: intent.last_payment_error?.message || 'Payment failed',
+        });
+      } catch (e) {
+        logger.error('Error recording payment failure', { error: e.message, paymentIntent: intent.id });
+      }
+    }
   }
 
   res.json({ received: true });

@@ -27,8 +27,12 @@ Navigate to **Payments** in the sidebar to view the payment ledger. It shows 25 
 |--------|---------|
 | **Pending** | Checkout session created but not yet completed |
 | **Completed** | Payment confirmed by Stripe webhook |
-| **Failed** | Payment attempt was unsuccessful |
-| **Refunded** | Payment was refunded through Stripe |
+| **Failed** | Stripe declined the card, or the checkout session expired unpaid |
+| **Refunded** | Reserved — refunds are not currently recorded in YSH; issue and track them in the Stripe Dashboard |
+
+A payment sitting at **Pending** for more than a few minutes means the member never finished checkout. Both **Pending**
+and **Failed** payments feed the **Needs attention** filter on the Members page — see
+[Managing Members](02-managing-members.md).
 
 ## Dues and Pricing
 
@@ -44,3 +48,17 @@ See [Membership Periods](08a-membership-periods.md) for details on managing seas
 ## Stripe Dashboard
 
 For refunds, disputes, or detailed transaction investigation, log into the Stripe Dashboard directly. The payment ledger in YSH is a read-only view of transaction records.
+
+### Required Webhook Events
+
+Under **Developers > Webhooks**, the YSH endpoint must be subscribed to all three of these:
+
+| Event | Why it is needed |
+|-------|------------------|
+| `checkout.session.completed` | Activates the member, enrolls them in the season, generates cards, sends email. Without it members stay **Pending** after paying. |
+| `checkout.session.expired` | Marks an abandoned checkout as **Failed**. |
+| `payment_intent.payment_failed` | Records a declined card as **Failed**, with Stripe's reason. |
+
+The last two are what make declined payments visible. If they are not subscribed, the **Payment failed** badge on the
+Members page will silently never appear — the list will look clean when it isn't. Adding them is safe at any time, but
+only affects payments made afterwards; earlier failures were never recorded and cannot be recovered.

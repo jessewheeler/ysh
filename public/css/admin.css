@@ -310,6 +310,18 @@ a.stat-card:hover {
   margin-left: 0.4rem;
 }
 
+/* Needs-attention signals. A member can trip several at once, so these wrap and
+   keep their own spacing rather than relying on whitespace in the template. */
+.badge-attention {
+  background: #ffe8cc;
+  color: #8a4b00;
+  border: 1px solid #ffd8a8;
+  text-transform: none;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  margin: 0 0.3rem 0.3rem 0;
+}
+
 /* === Toolbar === */
 .admin-toolbar {
   display: flex;

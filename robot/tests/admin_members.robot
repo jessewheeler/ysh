@@ -78,3 +78,54 @@ Edit Member Updates Fields
     Submit Admin Form
     Flash Success Should Be Visible    updated
     Get Text    .detail-table    contains    After Edit
+
+Needs Attention Pill Filters The List
+    [Documentation]    Drives the pill itself rather than navigating to ?view=needs-attention,
+    ...    because a URL-only test passes even when the pill is broken.
+    ${flagged}=    Seed Member    first_name=Dana    last_name=Declined    email=declined@example.com    status=pending
+    Seed Payment    ${flagged}    status=failed
+    ${clean}=    Seed Member    first_name=Casey    last_name=Clean    email=clean@example.com    status=active
+    ${period}=    Get Current Period Id
+    Enroll Member    ${clean}    ${period}
+    Seed Payment    ${clean}    status=completed
+    Login As Admin
+    Navigate To    /admin/members
+    Click    .view-pill >> text=Needs attention
+    Wait For Elements State    .admin-table    visible    timeout=10s
+    Get Text    .admin-table    contains    Dana Declined
+    Get Text    .badge-attention    contains    Payment failed
+    ${page_text}=    Get Text    .admin-table
+    Should Not Contain    ${page_text}    Casey Clean
+
+Needs Attention Signal Select Auto Submits
+    [Documentation]    Changes the select and asserts the table updated with NO further
+    ...    click. helmet sends script-src-attr 'none', so an inline onchange would never
+    ...    fire and would fail silently — this is the regression guard for that.
+    ${declined}=    Seed Member    first_name=Dana    last_name=Declined    email=declined@example.com    status=pending
+    Seed Payment    ${declined}    status=failed
+    # Lapsed rather than paid up — members in good standing are excluded from the list.
+    ${bounced}=    Seed Member    first_name=Boris    last_name=Bounced    email=bounced@example.com    status=active    expiry_date=2020-01-01
+    Seed Email Log    ${bounced}    email_type=card_delivery    status=failed
+    Login As Admin
+    Navigate To    /admin/members
+    Click    .view-pill >> text=Needs attention
+    Wait For Elements State    select[name="signal"]    visible    timeout=10s
+    Get Text    .admin-table    contains    Boris Bounced
+    Select Options By    select[name="signal"]    value    payment_failed
+    Wait For Elements State    .admin-table    visible    timeout=10s
+    Get Text    .admin-table    contains    Dana Declined
+    ${page_text}=    Get Text    .admin-table
+    Should Not Contain    ${page_text}    Boris Bounced
+
+Needs Attention Export Includes Signals
+    ${flagged}=    Seed Member    first_name=Dana    last_name=Declined    email=declined@example.com    status=pending
+    Seed Payment    ${flagged}    status=failed
+    Login As Admin
+    Navigate To    /admin/members
+    Click    .view-pill >> text=Needs attention
+    Wait For Elements State    .admin-table    visible    timeout=10s
+    ${path}=    Download Via Click    .toolbar-actions a.btn-outline    filename=members.csv
+    ${csv}=    Get File    ${path}
+    Should Contain    ${csv}    Signals
+    Should Contain    ${csv}    Stripe reported a failed payment
+    Should Contain    ${csv}    declined@example.com

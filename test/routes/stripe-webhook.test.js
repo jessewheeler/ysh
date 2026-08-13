@@ -1,7 +1,7 @@
 jest.mock('../../db/database', () => require('../helpers/setupDb'));
 
 const db = require('../../db/database');
-const { insertMember, insertPeriod } = require('../helpers/fixtures');
+const { insertMember, insertPeriod, insertPayment } = require('../helpers/fixtures');
 
 const mockHandlers = {};
 jest.mock('express', () => {
@@ -116,5 +116,124 @@ describe('POST /webhook — checkout.session.completed', () => {
 
     expect(res.json).toHaveBeenCalledWith({ received: true });
     expect(emailService.sendWelcomeEmail).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Failure events are what give the Needs attention filter its payment signals — before
+ * these branches existed, payments.status = 'failed' was declared in the schema but
+ * never written by any code path.
+ */
+describe('POST /webhook — checkout.session.expired', () => {
+  async function fire(session) {
+    stripeService.constructWebhookEvent.mockReturnValue({
+      type: 'checkout.session.expired', data: { object: session },
+    });
+    const res = mockRes();
+    await mockHandlers['POST /webhook'](mockReq(), res);
+    return res;
+  }
+
+  test('flips the pending payment to failed', async () => {
+    const testDb = getTestDb();
+    const member = insertMember(testDb, { email: 'abandoned@test.com', status: 'pending' });
+    insertPayment(testDb, { member_id: member.id, status: 'pending', stripe_session_id: 'cs_exp_1' });
+
+    const res = await fire({ id: 'cs_exp_1' });
+
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+    const row = testDb.prepare('SELECT status, failure_reason FROM payments WHERE stripe_session_id = ?').get('cs_exp_1');
+    expect(row.status).toBe('failed');
+    expect(row.failure_reason).toBe('Checkout session expired');
+  });
+
+  test('is idempotent on redelivery', async () => {
+    const testDb = getTestDb();
+    const member = insertMember(testDb, { email: 'abandoned@test.com', status: 'pending' });
+    insertPayment(testDb, { member_id: member.id, status: 'pending', stripe_session_id: 'cs_exp_2' });
+
+    await fire({ id: 'cs_exp_2' });
+    await fire({ id: 'cs_exp_2' });
+
+    const rows = testDb.prepare("SELECT id FROM payments WHERE stripe_session_id = ? AND status = 'failed'").all('cs_exp_2');
+    expect(rows).toHaveLength(1);
+  });
+
+  test('never clobbers a payment that already completed', async () => {
+    const testDb = getTestDb();
+    const member = insertMember(testDb, { email: 'paid@test.com', status: 'active' });
+    insertPayment(testDb, { member_id: member.id, status: 'completed', stripe_session_id: 'cs_exp_3' });
+
+    await fire({ id: 'cs_exp_3' });
+
+    const row = testDb.prepare('SELECT status FROM payments WHERE stripe_session_id = ?').get('cs_exp_3');
+    expect(row.status).toBe('completed');
+  });
+
+  test('tolerates a session it has no payment row for', async () => {
+    const res = await fire({ id: 'cs_unknown' });
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+  });
+});
+
+describe('POST /webhook — payment_intent.payment_failed', () => {
+  async function fire(intent) {
+    stripeService.constructWebhookEvent.mockReturnValue({
+      type: 'payment_intent.payment_failed', data: { object: intent },
+    });
+    const res = mockRes();
+    await mockHandlers['POST /webhook'](mockReq(), res);
+    return res;
+  }
+
+  test('records a failed payment against the member', async () => {
+    const testDb = getTestDb();
+    const member = insertMember(testDb, { email: 'declined@test.com', status: 'pending' });
+
+    const res = await fire({
+      id: 'pi_fail_1',
+      amount: 1600,
+      metadata: { member_id: String(member.id) },
+      last_payment_error: { message: 'Your card was declined.' },
+    });
+
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+    const row = testDb.prepare('SELECT * FROM payments WHERE stripe_payment_intent = ?').get('pi_fail_1');
+    expect(row.status).toBe('failed');
+    expect(row.member_id).toBe(member.id);
+    expect(row.amount_cents).toBe(1600);
+    expect(row.failure_reason).toBe('Your card was declined.');
+  });
+
+  test('is idempotent on redelivery', async () => {
+    const testDb = getTestDb();
+    const member = insertMember(testDb, { email: 'declined@test.com', status: 'pending' });
+    const intent = { id: 'pi_fail_2', amount: 1600, metadata: { member_id: String(member.id) } };
+
+    await fire(intent);
+    await fire(intent);
+
+    const rows = testDb.prepare('SELECT id FROM payments WHERE stripe_payment_intent = ?').all('pi_fail_2');
+    expect(rows).toHaveLength(1);
+  });
+
+  test('falls back to a generic reason when Stripe gives none', async () => {
+    const testDb = getTestDb();
+    const member = insertMember(testDb, { email: 'declined@test.com', status: 'pending' });
+
+    await fire({ id: 'pi_fail_3', amount: 1600, metadata: { member_id: String(member.id) } });
+
+    const row = testDb.prepare('SELECT failure_reason FROM payments WHERE stripe_payment_intent = ?').get('pi_fail_3');
+    expect(row.failure_reason).toBe('Payment failed');
+  });
+
+  test('no-ops without member_id metadata', async () => {
+    const testDb = getTestDb();
+
+    const res = await fire({ id: 'pi_fail_4', amount: 1600, metadata: {} });
+
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+    const rows = testDb.prepare('SELECT id FROM payments').all();
+    expect(rows).toHaveLength(0);
   });
 });

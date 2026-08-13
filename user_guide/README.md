@@ -5,7 +5,7 @@ Welcome to the Yellowstone Sea Hawkers administration guide. These documents cov
 ## Table of Contents
 
 1. [Getting Started](01-getting-started.md) — Admin accounts, email OTP login, roles, and navigating the dashboard
-2. [Managing Members](02-managing-members.md) — Adding, editing, searching, and tracking member status
+2. [Managing Members](02-managing-members.md) — Adding, editing, searching, and tracking member status, plus the Needs attention list for stalled signups and renewals
 3. [Membership Cards](03-membership-cards.md) — Generating, downloading, and emailing PDF/PNG membership cards
 4. [Payments & Stripe](04-payments-and-stripe.md) — Understanding the payment flow, viewing the ledger, and handling Stripe
 5. [Content Management](05-content-management.md) — Announcements, gallery images, and board bios

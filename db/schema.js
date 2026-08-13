@@ -57,6 +57,7 @@ const SCHEMA = `
     currency TEXT NOT NULL DEFAULT 'usd',
     status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','completed','failed','refunded')),
     description TEXT,
+    failure_reason TEXT,
     payment_method TEXT NOT NULL DEFAULT 'stripe',
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT
@@ -350,6 +351,12 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_campaign_visits_created ON campaign_visits(created_at);
   CREATE INDEX IF NOT EXISTS idx_contact_submissions_campaign ON contact_submissions(campaign_id);
   CREATE INDEX IF NOT EXISTS idx_contact_submissions_created ON contact_submissions(created_at);
+
+  -- Supports the "needs attention" member signals, which probe payments and emails_log
+  -- once per signal per member. See docs/needs-attention-signals.md.
+  CREATE INDEX IF NOT EXISTS idx_payments_member_status ON payments(member_id, status);
+  CREATE INDEX IF NOT EXISTS idx_emails_log_member_type ON emails_log(member_id, email_type);
+  CREATE INDEX IF NOT EXISTS idx_emails_log_status ON emails_log(status, created_at);
 `;
 
 /**

@@ -29,6 +29,8 @@ async function migrate() {
     const pgAlters = [
       // payments: payment_method added for offline payments
       "ALTER TABLE payments ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'stripe'",
+      // payments: why Stripe declined, captured by the failure webhooks
+      'ALTER TABLE payments ADD COLUMN IF NOT EXISTS failure_reason TEXT',
       // members: admin columns merged from admins table
       "ALTER TABLE members ADD COLUMN IF NOT EXISTS role TEXT CHECK(role IN ('super_admin','editor'))",
       "ALTER TABLE members ADD COLUMN IF NOT EXISTS otp_hash TEXT",
@@ -331,6 +333,8 @@ async function migrate() {
     // members is created before campaigns and campaigns.created_by points back at members.
     "ALTER TABLE members ADD COLUMN campaign_id INTEGER REFERENCES campaigns(id) ON DELETE SET NULL",
     "CREATE INDEX IF NOT EXISTS idx_members_campaign ON members (campaign_id)",
+    // payments: why Stripe declined, captured by the failure webhooks
+    'ALTER TABLE payments ADD COLUMN failure_reason TEXT',
   ];
   for (const sql of auditAlters) {
     try {

@@ -52,6 +52,14 @@ describe('createCheckoutSession', () => {
     expect(callArgs.metadata.member_id).toBe(String(baseParams.memberId));
   });
 
+  test('copies metadata onto the payment intent', async () => {
+    await createCheckoutSession(baseParams);
+    const callArgs = mockSessionCreate.mock.calls[0][0];
+    // A payment_intent.payment_failed event carries the intent, not the session, so
+    // without this the failure cannot be attributed to a member.
+    expect(callArgs.payment_intent_data.metadata.member_id).toBe(String(baseParams.memberId));
+  });
+
   test('sets correct success and cancel URLs', async () => {
     await createCheckoutSession(baseParams);
     const callArgs = mockSessionCreate.mock.calls[0][0];

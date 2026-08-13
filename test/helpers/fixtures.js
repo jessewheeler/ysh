@@ -17,14 +17,16 @@ function buildMember(overrides = {}) {
 function insertMember(db, overrides = {}) {
   const m = buildMember(overrides);
   const info = db.prepare(
-    `INSERT INTO members (first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, member_number, membership_type, primary_member_id, expiry_date, is_lifetime)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO members (first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, status, member_number, membership_type, primary_member_id, expiry_date, is_lifetime, renewal_token, renewal_token_expires_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`
   ).run(
     m.first_name, m.last_name, m.email, m.phone,
     m.address_street, m.address_city, m.address_state, m.address_zip,
     m.membership_year, m.status, m.member_number || null,
     m.membership_type || 'individual', m.primary_member_id || null,
-    m.expiry_date || null, m.is_lifetime ? 1 : 0
+    m.expiry_date || null, m.is_lifetime ? 1 : 0,
+    m.renewal_token || null, m.renewal_token_expires_at || null,
+    m.created_at || null
   );
   return { ...m, id: info.lastInsertRowid };
 }
@@ -80,11 +82,30 @@ function insertPayment(db, overrides = {}) {
     stripe_session_id: overrides.stripe_session_id || null,
     stripe_payment_intent: overrides.stripe_payment_intent || null,
   };
+  // created_at is overridable so a test can make a payment old enough to count as an
+  // abandoned checkout.
   const info = db.prepare(
-    `INSERT INTO payments (member_id, amount_cents, currency, status, description, payment_method, stripe_session_id, stripe_payment_intent)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(p.member_id, p.amount_cents, p.currency, p.status, p.description, p.payment_method, p.stripe_session_id, p.stripe_payment_intent);
-  return { ...p, id: info.lastInsertRowid };
+    `INSERT INTO payments (member_id, amount_cents, currency, status, description, payment_method, stripe_session_id, stripe_payment_intent, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`
+  ).run(p.member_id, p.amount_cents, p.currency, p.status, p.description, p.payment_method, p.stripe_session_id, p.stripe_payment_intent, overrides.created_at || null);
+  return { ...p, created_at: overrides.created_at || null, id: info.lastInsertRowid };
+}
+
+function insertEmailLog(db, overrides = {}) {
+  const e = {
+    to_email: overrides.to_email || 'jane@example.com',
+    to_name: overrides.to_name || 'Jane Doe',
+    subject: overrides.subject || 'Test subject',
+    email_type: overrides.email_type || 'renewal_reminder',
+    status: overrides.status || 'sent',
+    error: overrides.error || null,
+    member_id: overrides.member_id ?? null,
+  };
+  const info = db.prepare(
+    `INSERT INTO emails_log (to_email, to_name, subject, email_type, status, error, member_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`
+  ).run(e.to_email, e.to_name, e.subject, e.email_type, e.status, e.error, e.member_id, overrides.created_at || null);
+  return { ...e, id: info.lastInsertRowid };
 }
 
 function buildFamilyMembership(overrides = {}) {
@@ -214,6 +235,7 @@ module.exports = {
     buildAdmin,
     insertAdmin,
     insertPayment,
+    insertEmailLog,
     buildFamilyMembership,
     insertFamilyMembership,
     insertPeriod,

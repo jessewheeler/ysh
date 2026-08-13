@@ -22,6 +22,8 @@ const campaignsRepo = require('../db/repos/campaigns');
 const campaignVisitsRepo = require('../db/repos/campaignVisits');
 const contactSubmissionsRepo = require('../db/repos/contactSubmissions');
 const campaignsService = require('../services/campaigns');
+const attentionService = require('../services/attention');
+const memberAttentionRepo = require('../db/repos/memberAttention');
 const councilReport = require('../services/councilReport');
 const logger = require('../services/logger');
 const isDevOrTest = ['development', 'test', 'dev'].includes(process.env.NODE_ENV);
@@ -158,9 +160,10 @@ router.get('/dashboard', async (req, res, next) => {
 });
 
 // --- Members CRUD ---
-const MEMBER_VIEWS = ['all', 'active', 'needs-renewal', 'recently-renewed', 'pending', 'lifetime'];
+const MEMBER_VIEWS = ['all', 'active', 'needs-renewal', 'recently-renewed', 'pending', 'lifetime', 'needs-attention'];
 const MEMBER_SORTS = ['member_number', 'name', 'email', 'year', 'status', 'created_at'];
 const MEMBER_STATUSES = ['active', 'expired', 'pending', 'cancelled'];
+const MEMBER_SIGNALS = attentionService.SIGNAL_KEYS;
 
 function parseMemberListQuery(req) {
   return {
@@ -170,6 +173,7 @@ function parseMemberListQuery(req) {
     search: req.query.search || '',
     status: MEMBER_STATUSES.includes(req.query.status) ? req.query.status : '',
     periodId: parseInt(req.query.period) || null,
+    signal: MEMBER_SIGNALS.includes(req.query.signal) ? req.query.signal : '',
   };
 }
 
@@ -180,11 +184,24 @@ function memberListQs(state, overrides = {}) {
   if (q.search) params.set('search', q.search);
   if (q.status) params.set('status', q.status);
   if (q.period) params.set('period', q.period);
+  if (q.signal) params.set('signal', q.signal);
   if (q.sort && q.sort !== 'created_at') params.set('sort', q.sort);
   if (q.dir && q.dir !== 'desc') params.set('dir', q.dir);
   if (q.page && q.page > 1) params.set('page', q.page);
   const s = params.toString();
   return s ? `?${s}` : '';
+}
+
+/**
+ * Attaches the list of signals that fired to each member, for badges and CSV.
+ * Only meaningful under the needs-attention view.
+ */
+async function attachAttentionSignals(members, attentionCtx) {
+  if (!members.length) return;
+  const byId = await memberAttentionRepo.signalsForIds(members.map(m => m.id), attentionCtx);
+  for (const member of members) {
+    member.attention_signals = byId.get(member.id) || [];
+  }
 }
 
 router.get('/members', async (req, res, next) => {
@@ -194,21 +211,27 @@ router.get('/members', async (req, res, next) => {
     const offset = (page - 1) * limit;
     const parsed = parseMemberListQuery(req);
 
-    const currentPeriod = await periodsRepo.getCurrent();
-    const currentPeriodId = currentPeriod ? currentPeriod.id : null;
+    // The attention context carries the current period as well as the thresholds, so
+    // it doubles as the view context for every other view.
+    const attentionCtx = await attentionService.buildContext();
     const [{ members, total }, counts, periods] = await Promise.all([
-      memberRepo.search({ ...parsed, currentPeriodId, limit, offset }),
-      memberRepo.countByView(currentPeriodId),
+      memberRepo.search({ ...parsed, ...attentionCtx, limit, offset }),
+      memberRepo.countByView(attentionCtx),
       periodsRepo.list(),
     ]);
     const totalPages = Math.ceil(total / limit);
 
-    const { view, sort, dir, search, status, periodId } = parsed;
+    const { view, sort, dir, search, status, periodId, signal } = parsed;
+    if (view === 'needs-attention') {
+      await attachAttentionSignals(members, { ...attentionCtx, signal });
+    }
+
     res.render('admin/members/list', {
       members, page, totalPages, total,
-      view, sort, dir, search, status, periodId,
+      view, sort, dir, search, status, periodId, signal,
       counts, periods,
-      qs: (overrides) => memberListQs({ view, search, status, period: periodId, sort, dir }, overrides),
+      signalOptions: attentionService.SIGNAL_LABELS,
+      qs: (overrides) => memberListQs({ view, search, status, period: periodId, signal, sort, dir }, overrides),
     });
   } catch (err) {
     next(err);
@@ -219,10 +242,22 @@ router.get('/members/export', async (req, res, next) => {
   try {
     const { toCsv } = require('../services/csv');
     const parsed = parseMemberListQuery(req);
-    const currentPeriod = await periodsRepo.getCurrent();
-    const { members } = await memberRepo.search({ ...parsed, currentPeriodId: currentPeriod ? currentPeriod.id : null });
+    const attentionCtx = await attentionService.buildContext();
+    const { members } = await memberRepo.search({ ...parsed, ...attentionCtx });
     const columns = ['member_number', 'first_name', 'last_name', 'email', 'phone', 'address_street', 'address_city', 'address_state', 'address_zip', 'membership_year', 'status', 'notes', 'created_at'];
     const headers = ['Member Number', 'First Name', 'Last Name', 'Email', 'Phone', 'Street', 'City', 'State', 'Zip', 'Year', 'Status', 'Notes', 'Created'];
+
+    // The whole point of this export is the outreach call list, so the signals have to
+    // travel with it — a row without them tells the Coordinator nothing about why.
+    if (parsed.view === 'needs-attention') {
+      await attachAttentionSignals(members, { ...attentionCtx, signal: parsed.signal });
+      for (const member of members) {
+        member.attention_signal_labels = member.attention_signals.map(s => s.label).join('; ');
+      }
+      columns.push('attention_signal_labels');
+      headers.push('Signals');
+    }
+
     const csv = toCsv(members, columns, headers);
     const date = new Date().toISOString().slice(0, 10);
     const viewPart = parsed.view !== 'all' ? `${parsed.view}-` : '';
@@ -1182,6 +1217,7 @@ router.post('/settings', requireSuperAdmin, async (req, res) => {
     'gallery_album_url',
     'contact_email', 'stripe_publishable_key',
     'renewal_reminder_days_before',
+    'attention_reminder_count', 'attention_pending_payment_hours', 'attention_lookback_days',
     'social_facebook_url', 'social_instagram_url',
   ];
   const keyValues = {};
