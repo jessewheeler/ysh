@@ -89,6 +89,18 @@ they can renew.
 
 See [Email System](06-email-system.md) for bulk and individual renewal reminder workflows.
 
+### Generating a Renewal Link
+
+**Generate Renewal Link** on a member's page gives you their renewal link directly, without sending anything. Use it
+when email isn't the right channel — you have them on the phone, you're texting them, or their address is bouncing.
+Click it, then use **Copy link** to put the URL on your clipboard.
+
+The link goes straight to the renewal form with their details already filled in, so it is specific to that one member —
+don't post it publicly or forward it to anyone else. It works for 30 days. Generating a link does not invalidate one you
+emailed earlier; it hands back the same link and resets the 30 days.
+
+The link only shows once. Leave the page and it's gone — click the button again to get it back.
+
 ## Needs Attention
 
 This is the outreach list. It collects members who look like they *meant* to join or renew but didn't finish — the
@@ -118,6 +130,10 @@ Click the **Needs attention** pill. Each row is badged with the problem or probl
 
 Hover a badge to see a longer description. A member can carry more than one badge — someone who signed up twice and had
 a card declined shows both.
+
+Most of these say "call" or "text," which raises the obvious question of what to send them once you have them. Open the
+member and use [Generate Renewal Link](#generating-a-renewal-link) — that gives you a link you can read out or text,
+which is the whole point for the members whose email clearly isn't reaching them.
 
 ### Working the list
 

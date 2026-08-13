@@ -12,9 +12,14 @@ async function injectLocals(req, res, next) {
     // Flash messages
     res.locals.flash_success = req.session && req.session.flash_success;
     res.locals.flash_error = req.session && req.session.flash_error;
+    // A generated renewal link, carried as {url, expiresAt} so the member page can render it
+    // in a copyable field. One-shot like the other flashes — it is a freshly minted credential,
+    // so it should not linger on the page after the admin navigates away.
+    res.locals.flash_renewal_link = (req.session && req.session.flash_renewal_link) || null;
     if (req.session) {
       delete req.session.flash_success;
       delete req.session.flash_error;
+      delete req.session.flash_renewal_link;
     }
 
     // hCaptcha site key (empty string when not configured — widget is hidden)

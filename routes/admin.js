@@ -619,6 +619,33 @@ router.post('/members/:id/send-renewal', async (req, res) => {
   res.redirect(`/admin/members/${req.params.id}`);
 });
 
+// --- Generate Renewal Link ---
+// Same token step as send-renewal, but hands the link back to the admin instead of emailing it —
+// for the member whose email is bouncing or who is on the phone right now.
+router.post('/members/:id/renewal-link', async (req, res) => {
+  const member = await memberRepo.findById(req.params.id);
+  if (!member) {
+    req.session.flash_error = 'Member not found.';
+    return res.redirect('/admin/members');
+  }
+  try {
+    const renewalService = require('../services/renewal');
+    const token = await renewalService.generateRenewalToken(member.id);
+    // generateRenewalToken returns only the token; re-read for the expiry it just wrote.
+    const updated = await memberRepo.findById(member.id);
+    req.session.flash_renewal_link = {
+      url: `${campaignsService.resolveBaseUrl()}/renew/${token}`,
+      expiresAt: updated.renewal_token_expires_at,
+    };
+    (req.logger || logger).info('Renewal link generated', {memberId: member.id});
+    req.session.flash_success = `Renewal link generated for ${member.first_name} ${member.last_name}.`;
+  } catch (e) {
+    (req.logger || logger).error('Renewal link generation failed', {error: e.message, stack: e.stack, memberId: member.id});
+    req.session.flash_error = 'Failed to generate renewal link: ' + e.message;
+  }
+  res.redirect(`/admin/members/${req.params.id}`);
+});
+
 // --- Offline Payment ---
 router.post('/members/:id/payments', async (req, res) => {
   const member = await memberRepo.findById(req.params.id);
