@@ -38,6 +38,20 @@ View Member Details
     Get Text    .detail-table    contains    view@example.com
     Get Text    .detail-table    contains    YSH-2026-9001
 
+Generate Renewal Link
+    [Documentation]    Clicks the real button rather than posting to the route directly. The copy
+    ...    control is wired in public/js/admin.js because helmet's script-src-attr 'none' kills
+    ...    inline handlers silently, so only a real click proves the panel works.
+    ${id}=    Seed Member    first_name=Rita    last_name=Renewer    email=rita@example.com
+    Login As Admin
+    Navigate To    /admin/members/${id}
+    Click    button >> text=Generate Renewal Link
+    Flash Success Should Be Visible    Renewal link generated
+    Wait For Elements State    input#renewal-link    visible    timeout=10s
+    ${url}=    Get Property    input#renewal-link    value
+    Should Match Regexp    ${url}    /renew/[a-f0-9]{64}$
+    Wait For Elements State    button#copy-renewal-link    visible    timeout=10s
+
 Delete Member
     ${id}=    Seed Member    first_name=Delete    last_name=Me    email=delete@example.com
     Login As Admin

@@ -77,11 +77,24 @@ block content
         if !member.primary_member_id
           form(method="POST" action=`/admin/members/${member.id}/send-renewal` style="display:inline" data-confirm=`Send renewal reminder to ${member.first_name} ${member.last_name}?`)
             button.btn-outline(type="submit") Send Renewal Reminder
+          form(method="POST" action=`/admin/members/${member.id}/renewal-link` style="display:inline")
+            button.btn-outline(type="submit") Generate Renewal Link
         if member.membership_type !== 'family' && !member.primary_member_id
           form(method="POST" action=`/admin/members/${member.id}/upgrade-to-family` style="display:inline" data-confirm=`Upgrade ${member.first_name} ${member.last_name} to a family membership?`)
             button.btn-outline(type="submit") Upgrade to Family
         form(method="POST" action=`/admin/members/${member.id}/delete` style="display:inline" data-confirm="Delete this member?")
           button.btn-danger(type="submit") Delete
+
+    if flash_renewal_link
+      .admin-panel
+        h3 Renewal Link
+        p.text-muted Read this out over the phone or paste it into a text. It goes straight to the renewal form — no email is sent.
+        .form-group
+          input#renewal-link(type="text" value=flash_renewal_link.url readonly style="font-family: monospace;")
+          .form-actions(style="margin-top: 0.5rem;")
+            button#copy-renewal-link.btn-outline(type="button" data-copy="#renewal-link") Copy link
+            a.btn-outline(href=flash_renewal_link.url target="_blank" rel="noopener" style="margin-left: 0.5rem;") Open
+          p.text-muted(style="margin-top: 0.5rem;") Expires #{formatDate(flash_renewal_link.expiresAt)}
 
     .admin-panel
       h3 Membership Cards
