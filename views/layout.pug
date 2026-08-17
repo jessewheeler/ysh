@@ -11,19 +11,21 @@ html(lang="en")
       .nav-brand
         a(href="/")
           img.nav-logo(src="/img/logo.png" alt="Yellowstone Sea Hawkers")
-      button.nav-toggle(aria-label="Toggle navigation") &#9776;
-      ul.nav-menu
+      button.nav-toggle(aria-label="Open menu" aria-expanded="false" aria-controls="nav-menu") &#9776;
+      ul#nav-menu.nav-menu
         li: a(href="/") Home
         li.dropdown
           a.dropdown-toggle(href="/#about") About YSH
-          ul.dropdown-menu
+          button.dropdown-caret(type="button" aria-label="Show About YSH pages" aria-expanded="false" aria-controls="menu-about")
+          ul#menu-about.dropdown-menu
             li: a(href="/bios") Board Member Bios
-              li: a(href="/man-crush-monday") Man Crush Monday
-        li: a(href="/#news") Team News
+            li: a(href="/man-crush-monday") Man Crush Monday
+        li: a(href="/#news") Club News
         li: a(href="/membership") Membership
         li.dropdown
           a.dropdown-toggle(href="/#charitable") Charitable Work
-          ul.dropdown-menu
+          button.dropdown-caret(type="button" aria-label="Show Charitable Work pages" aria-expanded="false" aria-controls="menu-charitable")
+          ul#menu-charitable.dropdown-menu
             li: a(href="/charitable/battle-of-the-birds") Battle of the Birds
             li: a(href="/charitable/nonprofits") Annual Non-Profit Support
             li: a(href="/charitable/heartwheels") Heartwheels

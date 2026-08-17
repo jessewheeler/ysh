@@ -22,19 +22,22 @@ block content
     .container
       h3.text-center In the News
 
-      .video-embed
-        iframe(
-          src="https://www.youtube-nocookie.com/embed/0S-kCaPTRlo"
-          title="KTVQ: Seahawks fans in Billings turn game day into fundraising watch party"
-          loading="lazy"
-          referrerpolicy="strict-origin-when-cross-origin"
-          allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowfullscreen
-        )
-
-      p.video-caption.
-        KTVQ covered a Battle of the Birds watch party in November 2025:
-        #[a(href="https://youtu.be/0S-kCaPTRlo" target="_blank" rel="noopener noreferrer") Seahawks fans in Billings turn game day into fundraising watch party].
+      //- Not an embed: the video owner has disabled off-site playback, so an iframe
+      //- here renders a black "Video unavailable" box. This links out to the source.
+      a.video-card(href="https://youtu.be/0S-kCaPTRlo" target="_blank" rel="noopener noreferrer")
+        .video-card-media
+          img(
+            src="/img/ktvq-battle-of-the-birds.jpg"
+            alt="KTVQ news coverage of a Battle of the Birds watch party in Billings"
+            loading="lazy"
+            width="1280"
+            height="720"
+          )
+          span.video-card-play(aria-hidden="true")
+        .video-card-body
+          span.video-card-kicker KTVQ · November 2025
+          span.video-card-title Seahawks fans in Billings turn game day into fundraising watch party
+          span.video-card-cue Watch on YouTube
 
   section.section
     .container
