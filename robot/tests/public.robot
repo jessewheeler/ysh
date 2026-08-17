@@ -146,6 +146,14 @@ Man Crush Monday Scrolls Infinitely Back To Signing Day
     Scroll To Element    \#mcm-sentinel
     Wait Until Keyword Succeeds    10x    1s    Frame Count Should Exceed    ${before}
 
+Battle Of The Birds Page Shows The News Video
+    Navigate To    /charitable/battle-of-the-birds
+    Get Text    h2    contains    Battle of the Birds
+    Wait For Elements State    .video-embed iframe    attached    timeout=5s
+    ${src}=    Get Attribute    .video-embed iframe    src
+    Should Contain    ${src}    youtube-nocookie.com/embed/0S-kCaPTRlo
+    Page Should Contain Text    KTVQ
+
 *** Keywords ***
 Frame Count Should Exceed
     [Arguments]    ${count}

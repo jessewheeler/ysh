@@ -374,6 +374,31 @@ blockquote {
   margin-bottom: 1.25rem;
 }
 
+/* === Video Embed === */
+.video-embed {
+  max-width: 800px;
+  margin: 0 auto 1.5rem;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+}
+
+.video-embed iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.video-caption {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+  font-size: 0.95rem;
+  color: #555;
+}
+
 /* === Contact Form === */
 .contact-form {
   max-width: 600px;

@@ -53,7 +53,10 @@ app.use(helmet({
         // attempted — without this entry every page load logs a CSP violation.
         "https://www.google.com",
       ],
-      frameSrc: ["https://js.stripe.com", "https://newassets.hcaptcha.com"],
+      // youtube-nocookie is the privacy-enhanced player domain; the Battle of the
+      // Birds page embeds a KTVQ news segment from it. Without this the iframe is
+      // blocked and the section renders as an empty box.
+      frameSrc: ["https://js.stripe.com", "https://newassets.hcaptcha.com", "https://www.youtube-nocookie.com"],
       formAction: ["'self'", "https://checkout.stripe.com"],
       upgradeInsecureRequests: process.env.NODE_ENV === 'development' ? null : [],
     },
