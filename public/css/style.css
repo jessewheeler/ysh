@@ -21,9 +21,40 @@ a:hover {
   text-decoration: underline;
 }
 
+/* One global focus ring. The browser default is nearly invisible against the navy
+   navbar, which left keyboard users with no way to see where they were. */
+a:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible,
+summary:focus-visible {
+  outline: 3px solid #69be28;
+  outline-offset: 2px;
+}
+
+.navbar a:focus-visible,
+.navbar button:focus-visible,
+footer a:focus-visible {
+  outline-offset: -3px;
+}
+
 img {
   max-width: 100%;
   height: auto;
+}
+
+/* The navbar is sticky, so jumping to #news or #contact used to park the heading
+   underneath it — "About YSH" landed entirely behind an 84px bar. This offsets every
+   scroll target so the section's top edge lands just below the navbar in its scrolled
+   state (84px at desktop, 86px below 1024px); the section's own 5rem top padding then
+   supplies the air above the heading. Applies to scrollIntoView() as well as #hash
+   jumps. Keep it just above the taller of the two, or a sliver of the previous
+   section shows through under the bar. */
+:root {
+  --nav-scroll-offset: 88px;
+}
+
+[id] {
+  scroll-margin-top: var(--nav-scroll-offset);
 }
 
 /* === Navbar === */
@@ -38,6 +69,14 @@ img {
   transition: padding 0.3s ease;
 }
 
+/* The brand must never be squeezed by the nav row. Without flex: 0 0 auto here and
+   flex-shrink: 0 on the image, the logo shrinks horizontally while its height stays
+   fixed — between roughly 769px and 1100px it rendered 4x too narrow and the
+   wordmark turned to mush. */
+.nav-brand {
+  flex: 0 0 auto;
+}
+
 .nav-brand a {
   display: flex;
   align-items: center;
@@ -45,28 +84,35 @@ img {
 }
 
 .nav-logo {
-  height: 120px;
+  height: 90px;
+  width: auto;
+  flex-shrink: 0;
   margin: 0.75rem 0;
   transition: height 0.3s ease, margin 0.3s ease;
 }
 
 .navbar--scrolled .nav-logo {
-  height: 75px;
+  height: 60px;
   margin: 0.25rem 0;
 }
 
+/* Centering has to come from flex, not line-height/text-align: the media query flips
+   this to display: flex, which turns the glyph into an anonymous flex item and parks it
+   in the start corner — the icon sat left of centre and high inside its focus ring. */
 .nav-toggle {
   display: none;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: #fff;
   font-size: 24px;
+  line-height: 1;
   cursor: pointer;
   width: 44px;
   height: 44px;
+  padding: 0;
   border-radius: 50%;
-  line-height: 44px;
-  text-align: center;
   transition: background 0.15s ease;
 }
 
@@ -101,6 +147,65 @@ img {
 }
 
 /* Dropdown */
+/* nowrap matters here: the submenu is absolutely positioned at this width, so the row
+   holds only the link and its caret, and allowing a wrap drops the caret onto a
+   second line as soon as the nav gets tight. */
+.nav-menu li.dropdown {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+/* Needs the element in the selector: .nav-menu a sets the padding shorthand and would
+   otherwise outrank a bare .dropdown-toggle, leaving the label/caret gap untightened. */
+.nav-menu a.dropdown-toggle {
+  padding-right: 0.4rem;
+}
+
+/* A real button, not a glyph inside the link: on a phone the link still navigates to
+   the section anchor while this expands the submenu, and keyboard users get a
+   focusable control. Hover alone used to be the only way in, which meant touch and
+   keyboard users could never reach the pages underneath. */
+.dropdown-caret {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1.25rem 0 0.1rem;
+  min-height: 60px;
+  align-self: stretch;
+}
+
+.dropdown-caret::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-0.12rem) rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+/* The link and its caret are one control, so the tint covers the whole item. Tinting
+   the caret on its own put a detached box next to the label. :focus-within is here for
+   the tint only — it does not open the menu. */
+.nav-menu li.dropdown:hover,
+.nav-menu li.dropdown:focus-within,
+.nav-menu li.dropdown.dropdown--open {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Otherwise the link's own tint stacks on the item's and the label half goes darker. */
+.nav-menu li.dropdown:hover > a.dropdown-toggle,
+.nav-menu li.dropdown:focus-within > a.dropdown-toggle,
+.nav-menu li.dropdown.dropdown--open > a.dropdown-toggle,
+.nav-menu li.dropdown > a.dropdown-toggle:hover {
+  background: none;
+}
+
 .dropdown-menu {
   display: none;
   position: absolute;
@@ -113,8 +218,19 @@ img {
   padding: 0.5rem 0;
 }
 
-.dropdown:hover .dropdown-menu {
+/* Two ways in, deliberately: :hover for pointers (hover isn't exposed to assistive
+   tech, so it needs no ARIA), and the .dropdown--open class the caret button toggles,
+   which is what aria-expanded reports. Opening on :focus-within as well would mean the
+   menu could be open while aria-expanded said "false" — a state that lies to a screen
+   reader — so keyboard users get the button instead. */
+.dropdown:hover .dropdown-menu,
+.dropdown--open .dropdown-menu {
   display: block;
+}
+
+.dropdown:hover .dropdown-caret::before,
+.dropdown--open .dropdown-caret::before {
+  transform: translateY(0.06rem) rotate(-135deg);
 }
 
 .dropdown-menu a {
@@ -222,13 +338,16 @@ img {
 }
 
 /* === Buttons === */
+/* Navy on action green measures 6.06:1; the white label it replaced was 2.33:1 and
+   failed WCAG AA on every primary button on the site. Navy-on-green is also the
+   actual Seahawks lockup, so the brand green stays at full strength. */
 .btn {
   display: inline-block;
   background: #69be28;
-  color: #fff;
+  color: #002a5c;
   padding: 0.75rem 1.75rem;
   border-radius: 4px;
-  font-weight: 600;
+  font-weight: 700;
   border: none;
   cursor: pointer;
   font-size: 1rem;
@@ -238,9 +357,9 @@ img {
 }
 
 .btn:hover {
-  background: #5aa622;
+  background: #7ed136;
   text-decoration: none;
-  color: #fff;
+  color: #002a5c;
 }
 
 .btn-outline {
@@ -374,29 +493,105 @@ blockquote {
   margin-bottom: 1.25rem;
 }
 
-/* === Video Embed === */
-.video-embed {
+/* === Linked video card === */
+/* Used where a video can't be embedded. Reads as a news clipping you click, rather
+   than a player that failed to load. */
+.video-card {
+  display: block;
   max-width: 800px;
-  margin: 0 auto 1.5rem;
-  aspect-ratio: 16 / 9;
+  margin: 0 auto;
+  background: #fff;
   border-radius: 8px;
   overflow: hidden;
-  background: #000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  color: inherit;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.video-embed iframe {
+.video-card:hover,
+.video-card:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  text-decoration: none;
+}
+
+.video-card-media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #002a5c;
+}
+
+.video-card-media img {
   width: 100%;
   height: 100%;
-  border: 0;
+  object-fit: cover;
   display: block;
 }
 
-.video-caption {
-  max-width: 800px;
-  margin: 0 auto;
-  text-align: center;
-  font-size: 0.95rem;
-  color: #555;
+.video-card-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: rgba(0, 42, 92, 0.88);
+  border: 3px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+/* Play triangle, drawn with borders so there's no second asset to load. */
+.video-card-play::after {
+  content: '';
+  border-style: solid;
+  border-width: 13px 0 13px 21px;
+  border-color: transparent transparent transparent #fff;
+  margin-left: 5px;
+}
+
+.video-card:hover .video-card-play {
+  background: #69be28;
+}
+
+.video-card:hover .video-card-play::after {
+  border-left-color: #002a5c;
+}
+
+.video-card-body {
+  padding: 1.25rem 1.5rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.video-card-kicker {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6b6b6b;
+}
+
+.video-card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #002a5c;
+  line-height: 1.4;
+}
+
+/* Says where the link goes, since it leaves the site. */
+.video-card-cue {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #4a7d1d;
+}
+
+.video-card-cue::after {
+  content: ' ↗';
 }
 
 /* === Contact Form === */
@@ -490,8 +685,10 @@ blockquote {
   font-size: 1.25rem;
 }
 
+/* Green reads as "you can act on this" everywhere else, so a role label uses the
+   darker text green — #69be28 on white is only 2.33:1 in any case. */
 .bio-role {
-  color: #69be28;
+  color: #4a7d1d;
   font-weight: 600;
   font-size: 0.95rem;
 }
@@ -794,7 +991,7 @@ footer {
   padding: 0.6rem 1.1rem 0.7rem;
   font-size: 1rem;
   font-weight: 600;
-  color: #888;
+  color: #6b6b6b;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
   white-space: nowrap;
@@ -815,7 +1012,7 @@ footer {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.09em;
-  color: #999;
+  color: #6b6b6b;
   margin-bottom: 0.875rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid #eee;
@@ -913,7 +1110,7 @@ footer {
 
 .card-type-detail {
   font-size: 0.78rem;
-  color: #888;
+  color: #6b6b6b;
   line-height: 1.4;
 }
 
@@ -927,7 +1124,7 @@ footer {
 /* Label optional hint */
 .label-optional {
   font-weight: 400;
-  color: #999;
+  color: #6b6b6b;
   font-size: 0.875rem;
 }
 
@@ -940,20 +1137,17 @@ footer {
 }
 
 /* === Responsive === */
-@media (max-width: 768px) {
-    /* Two across, not one — a single column of frames stops reading as a wall. */
-    .mcm-wall {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 1rem;
-    }
 
+/* The nav collapses well before the content does: six items plus the logo run out of
+   room around 1100px, which is where the brand used to get crushed. */
+@media (max-width: 1024px) {
   .nav-logo {
     height: 82px;
     margin: 0.5rem 0;
   }
 
   .navbar--scrolled .nav-logo {
-    height: 68px;
+    height: 62px;
     margin: 0.25rem 0;
   }
 
@@ -971,6 +1165,11 @@ footer {
     right: 0;
     background: #002a5c;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    /* Not calc(100vh - 100%): the percentage resolves against .navbar, whose height is
+       content-derived, so the max-height would be indeterminate and the scroll would
+       never engage. The offset token tracks the scrolled navbar height. */
+    max-height: calc(100vh - var(--nav-scroll-offset));
+    overflow-y: auto;
   }
 
   .nav-menu.active {
@@ -983,19 +1182,79 @@ footer {
     min-height: 48px;
   }
 
+  /* The link takes the row and the caret takes a tap target beside it, so tapping
+     "About YSH" still goes to the section while the caret opens the submenu. The
+     submenu is in normal flow now, so it wraps onto its own full-width row below. */
+  .nav-menu li.dropdown {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .nav-menu a.dropdown-toggle {
+    flex: 1;
+    padding-right: 1.5rem;
+  }
+
+  .dropdown-caret {
+    width: 60px;
+    min-height: 48px;
+    padding: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
   .dropdown-menu {
     position: static;
     box-shadow: none;
     padding: 0;
+    flex-basis: 100%;
   }
 
   .dropdown-menu a {
     padding-left: 2.5rem;
   }
 
+  /* The submenu is inside the item here, so an item-wide tint would wash over the
+     expanded rows as well. The caret alone marks the open section instead. */
+  .nav-menu li.dropdown:hover,
+  .nav-menu li.dropdown:focus-within,
+  .nav-menu li.dropdown.dropdown--open {
+    background: none;
+  }
+
+  .dropdown.dropdown--open > .dropdown-caret {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Touch devices have no hover, so a lingering :hover from a tap would leave the
+     submenu stuck open. The caret button is the only way in at this width. */
   .dropdown:hover .dropdown-menu {
+    display: none;
+  }
+
+  .dropdown.dropdown--open .dropdown-menu {
     display: block;
   }
+
+  .dropdown:hover .dropdown-caret::before {
+    transform: translateY(-0.12rem) rotate(45deg);
+  }
+
+  .dropdown.dropdown--open .dropdown-caret::before {
+    transform: translateY(0.06rem) rotate(-135deg);
+  }
+
+  .membership-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+    /* Two across, not one — a single column of frames stops reading as a wall. */
+    .mcm-wall {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
 
   .hero {
     padding: 4rem 1.5rem;
@@ -1034,10 +1293,6 @@ footer {
   .form-group input:not([type="checkbox"]):not([type="radio"]),
   .form-group textarea {
     font-size: 16px; /* Prevents iOS zoom on focus */
-  }
-
-  .membership-layout {
-    grid-template-columns: 1fr;
   }
 
   .membership-badge {
@@ -1235,7 +1490,7 @@ footer {
 .mcm-end {
     margin-top: 2.5rem;
     text-align: center;
-    color: #777;
+    color: #6b6b6b;
     font-size: 0.95rem;
 }
 

@@ -1,8 +1,10 @@
 /**
- * Guards the Battle of the Birds video embed. The iframe and the CSP that permits it live in
- * two different files (views/charitable/battle-of-the-birds.pug and server.js), so either half
- * can be changed without the other and the page still returns 200 — the embed just renders as
- * an empty box with a console-only refusal. These assertions pin both halves together.
+ * Guards how the Battle of the Birds page presents the KTVQ segment. It used to be an iframe
+ * from youtube-nocookie, but the video owner disabled off-site playback, so that embed rendered
+ * a black "Video unavailable" box in the middle of the page. The page now links out to the
+ * source behind a locally-hosted thumbnail. These assertions pin that decision down in both
+ * halves — the markup (views/charitable/battle-of-the-birds.pug) and the CSP (server.js) — so
+ * the embed can't quietly come back.
  */
 process.env.NODE_ENV = 'test';
 
@@ -19,29 +21,42 @@ function directive(res, name) {
   return match ? match.trim() : '';
 }
 
-describe('Battle of the Birds video embed', () => {
-  it('embeds the KTVQ segment from the privacy-enhanced player domain', async () => {
+describe('Battle of the Birds news segment', () => {
+  it('links out to the source video instead of embedding it', async () => {
     const res = await request(app).get(PATH);
     expect(res.status).toBe(200);
-    expect(res.text).toContain('https://www.youtube-nocookie.com/embed/0S-kCaPTRlo');
+    expect(res.text).toContain('https://youtu.be/0S-kCaPTRlo');
+    expect(res.text).not.toContain('youtube-nocookie.com/embed');
+    expect(res.text).not.toContain('<iframe');
   });
 
-  it('allows the player origin in frame-src', async () => {
-    // Without this entry the iframe is refused and the section renders empty.
+  it('serves the thumbnail from this origin', async () => {
+    // A hotlinked thumbnail would leave the page depending on a third party again.
     const res = await request(app).get(PATH);
-    expect(directive(res, 'frame-src')).toContain('https://www.youtube-nocookie.com');
+    expect(res.text).toContain('/img/ktvq-battle-of-the-birds.jpg');
+    expect(res.text).not.toContain('i.ytimg.com');
+
+    const img = await request(app).get('/img/ktvq-battle-of-the-birds.jpg');
+    expect(img.status).toBe(200);
   });
 
-  it('keeps the existing frame-src entries', async () => {
-    // Stripe checkout and hCaptcha frame in on other pages; adding YouTube must not drop them.
+  it('tells the reader the link leaves the site', async () => {
+    const res = await request(app).get(PATH);
+    expect(res.text).toContain('Watch on YouTube');
+    expect(res.text).toContain('KTVQ');
+  });
+
+  it('no longer allows the player origin in frame-src', async () => {
+    // Nothing frames YouTube any more, so the allowance would be dead surface area.
+    const res = await request(app).get(PATH);
+    expect(directive(res, 'frame-src')).not.toContain('youtube-nocookie.com');
+  });
+
+  it('keeps the frame-src entries that are still in use', async () => {
+    // Stripe checkout and hCaptcha frame in on other pages.
     const res = await request(app).get(PATH);
     const frameSrc = directive(res, 'frame-src');
     expect(frameSrc).toContain('https://js.stripe.com');
     expect(frameSrc).toContain('https://newassets.hcaptcha.com');
-  });
-
-  it('links out to the source video', async () => {
-    const res = await request(app).get(PATH);
-    expect(res.text).toContain('https://youtu.be/0S-kCaPTRlo');
   });
 });
