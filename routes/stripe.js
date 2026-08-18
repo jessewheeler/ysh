@@ -113,6 +113,13 @@ router.post('/webhook', async (req, res) => {
       } catch (e) {
         logger.error('Email send error', { error: e.message, stack: e.stack });
       }
+
+      // 7. Push to Sender. Last, and non-throwing — a Sender outage must never fail a
+      //    paid signup. Covers renewals too; they land on this same webhook. One call
+      //    per unique email: family sub-members share the primary's address, and
+      //    Sender keys on email, so syncing each would clobber the primary's name.
+      const senderService = require('../services/sender');
+      await senderService.syncMembersSafe(allMembers);
     }
   } else if (event.type === 'checkout.session.expired') {
     // Abandoned checkout. Wrapped so a DB error still returns 2xx — Stripe retries on

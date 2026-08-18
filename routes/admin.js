@@ -384,15 +384,18 @@ router.post('/members', async (req, res) => {
       });
 
       // Activate all members if status is active
-      if (status === 'active') {
-        const primary = await memberRepo.findByEmail(email);
-        if (primary) {
-          await memberRepo.activate(primary.id);
-          const family = await memberRepo.findFamilyMembers(primary.id);
-          for (const fm of family) {
-            await memberRepo.activate(fm.id);
-          }
+      const primaryRecord = await memberRepo.findByEmail(email);
+      if (status === 'active' && primaryRecord) {
+        await memberRepo.activate(primaryRecord.id);
+        const family = await memberRepo.findFamilyMembers(primaryRecord.id);
+        for (const fm of family) {
+          await memberRepo.activate(fm.id);
         }
+      }
+
+      // Sender only ever sees the primary here — family members share their email.
+      if (primaryRecord) {
+        await require('../services/sender').syncMemberSafe(primaryRecord.id);
       }
 
       const count = familyMembers.length + 1;
@@ -402,12 +405,14 @@ router.post('/members', async (req, res) => {
       const { generateMemberNumber } = require('../services/members');
       const member_number = await generateMemberNumber(year);
 
-      await memberRepo.create({
+      const created = await memberRepo.create({
         member_number, first_name, last_name, email, phone,
         address_street, address_city, address_state, address_zip,
         membership_year: year, join_date: normalizedJoinDate, status: status || 'pending',
         is_lifetime: req.body.is_lifetime === 'on', notes,
       });
+
+      await require('../services/sender').syncMemberSafe(created.lastInsertRowid);
 
       req.session.flash_success = `Member ${first_name} ${last_name} created.`;
     }
@@ -492,6 +497,8 @@ router.post('/members/:id', async (req, res) => {
       membership_year, join_date: normalizedJoinDate, status,
       is_lifetime: req.body.is_lifetime === 'on', notes,
     });
+    // Propagate status/name changes to Sender. Logs and swallows any Sender failure.
+    await require('../services/sender').syncMemberSafe(req.params.id);
     req.session.flash_success = 'Member updated.';
   } catch (e) {
     req.session.flash_error = e.message;
@@ -504,7 +511,12 @@ router.post('/members/:id/delete', async (req, res) => {
     req.session.flash_error = 'You cannot delete your own account while logged in.';
     return res.redirect(`/admin/members/${req.params.id}`);
   }
+  const doomed = await memberRepo.findById(req.params.id);
   await memberRepo.deleteById(req.params.id);
+  // Drop the address from both Sender groups unless another member still holds it —
+  // otherwise a deleted member keeps receiving newsletters, and no later sync can fix
+  // it because syncAllMembers only ever sees members who still exist.
+  if (doomed) await require('../services/sender').syncEmailSafe(doomed.email);
   req.session.flash_success = 'Member deleted.';
   res.redirect('/admin/members');
 });
@@ -708,6 +720,11 @@ router.post('/members/:id/payments', async (req, res) => {
     });
   }
 
+  // Sync on every recorded payment, not just activations: a renewal for a member who is
+  // already active changes their expiry date, which Sender carries as a custom field.
+  // Family sub-members share the primary's email, so the primary is what Sender sees.
+  await require('../services/sender').syncMemberSafe(member.primary_member_id || member.id);
+
   req.session.flash_success = `Payment of $${dollars.toFixed(2)} recorded.`;
   res.redirect(`/admin/members/${req.params.id}`);
 });
@@ -729,6 +746,7 @@ router.post('/members/:id/upgrade-to-family', async (req, res) => {
   }
   try {
     await memberRepo.upgradeMembershipType(req.params.id, 'family');
+    await require('../services/sender').syncMemberSafe(req.params.id);
     req.session.flash_success = `${member.first_name} ${member.last_name}'s membership upgraded to family.`;
   } catch (e) {
     req.session.flash_error = e.message;
@@ -805,12 +823,16 @@ router.post('/members/:id/family-members/:familyId/remove', async (req, res) => 
     return res.redirect(`/admin/members/${req.params.id}`);
   }
   try {
+    const senderService = require('../services/sender');
     const wouldDelete = await memberRepo.emailConflictsWithPrimary(familyMember.email, familyMember.id);
     if (wouldDelete) {
       await memberRepo.deleteById(req.params.familyId);
+      await senderService.syncEmailSafe(familyMember.email);
       req.session.flash_success = `${familyMember.first_name} ${familyMember.last_name} was deleted — their email (${familyMember.email}) is already used by another primary member.`;
     } else {
       await memberRepo.detachFamilyMember(req.params.familyId);
+      // Now a primary in their own right, and cancelled — belongs in neither group.
+      await senderService.syncMemberSafe(req.params.familyId);
       req.session.flash_success = `${familyMember.first_name} ${familyMember.last_name} removed from family membership and converted to individual.`;
     }
   } catch (e) {

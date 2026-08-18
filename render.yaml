@@ -28,6 +28,12 @@ services:
         sync: false
       - key: FROM_EMAIL
         sync: false
+      - key: SENDER_API_TOKEN
+        sync: false
+      - key: SENDER_GROUP_CURRENT
+        sync: false
+      - key: SENDER_GROUP_LAPSED
+        sync: false
       - key: B2_ENDPOINT
         sync: false
       - key: B2_REGION
