@@ -94,18 +94,18 @@ SQLite database layer using [better-sqlite3](https://github.com/WiseLibs/better-
 Seeded keys: `hero_title`, `hero_subtitle`, `hero_button_text`, `hero_button_url`, `about_quote`, `about_text`, `gallery_album_url`, `dues_amount_cents`, `contact_email`, `stripe_publishable_key`.
 
 ### emails_log
-| Column     | Type    | Notes                                                                     |
-|------------|---------|---------------------------------------------------------------------------|
-| id         | INTEGER | Primary key                                                               |
-| to_email   | TEXT    | Required                                                                  |
-| to_name    | TEXT    |                                                                           |
-| subject    | TEXT    |                                                                           |
-| body_html  | TEXT    |                                                                           |
-| email_type | TEXT    | `welcome`, `payment_confirmation`, `card_delivery`, `blast`, or `contact` |
-| status     | TEXT    | `sent` or `failed`                                                        |
-| error      | TEXT    | Error message if failed                                                   |
-| member_id  | INTEGER | FK to `members.id`, nullable, sets null on delete                         |
-| created_at | TEXT    |                                                                           |
+| Column     | Type    | Notes                                                                                                                                                                                                                                                           |
+|------------|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| id         | INTEGER | Primary key                                                                                                                                                                                                                                                     |
+| to_email   | TEXT    | Required                                                                                                                                                                                                                                                        |
+| to_name    | TEXT    |                                                                                                                                                                                                                                                                 |
+| subject    | TEXT    |                                                                                                                                                                                                                                                                 |
+| body_html  | TEXT    |                                                                                                                                                                                                                                                                 |
+| email_type | TEXT    | `welcome`, `payment_confirmation`, `card_delivery`, `blast`, `contact`, `otp`, or `renewal_reminder`. Signup/renewal card delivery is folded into the `welcome` email; `card_delivery` now means an admin resend or a family sub-member with their own address. |
+| status     | TEXT    | `sent` or `failed`                                                                                                                                                                                                                                              |
+| error      | TEXT    | Error message if failed                                                                                                                                                                                                                                         |
+| member_id  | INTEGER | FK to `members.id`, nullable, sets null on delete                                                                                                                                                                                                               |
+| created_at | TEXT    |                                                                                                                                                                                                                                                                 |
 
 ### membership_cards
 | Column     | Type    | Notes                                  |

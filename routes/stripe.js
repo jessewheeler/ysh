@@ -91,27 +91,37 @@ router.post('/webhook', async (req, res) => {
         }
       }
 
-      // 6. Send emails
-      try {
+        // 6. Send emails. Cards ride along with the welcome instead of arriving in their
+        //    own message (issue #73) — a family sharing one address used to get a card
+        //    email per member on top of the welcome and the receipt.
         const emailService = require('../services/email');
 
-        // Primary member: welcome + payment confirmation
-        await emailService.sendWelcomeEmail(refreshedPrimary);
-        await emailService.sendPaymentConfirmation(refreshedPrimary, session);
-
-        // Card email — only for members whose current-year card was produced.
-        for (const member of allMembers) {
-          if (!cardGenerated.has(member.id)) {
-            logger.warn('Skipping card email — no card generated', {
-              memberNumber: member.member_number,
-              membershipYear: member.membership_year,
+        const cardReady = allMembers.filter(m => {
+            if (cardGenerated.has(m.id)) return true;
+            logger.warn('Skipping card delivery — no card generated', {
+                memberNumber: m.member_number,
+                membershipYear: m.membership_year,
             });
-            continue;
-          }
-          await emailService.sendCardEmail(member);
-        }
-      } catch (e) {
-        logger.error('Email send error', { error: e.message, stack: e.stack });
+            return false;
+        });
+
+        const sameAddress = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
+        const primaryCards = cardReady.filter(m => sameAddress(m.email, refreshedPrimary.email));
+        // Sub-members who supplied their own address can't ride along on the primary's email.
+        const ownAddressCards = cardReady.filter(m => !sameAddress(m.email, refreshedPrimary.email));
+
+        // Each send is isolated: one bad address must not drop the rest.
+        const sends = [
+            () => emailService.sendWelcomeEmail(refreshedPrimary, primaryCards),
+            () => emailService.sendPaymentConfirmation(refreshedPrimary, session),
+            ...ownAddressCards.map(m => () => emailService.sendCardEmail(m)),
+        ];
+        for (const send of sends) {
+            try {
+                await send();
+            } catch (e) {
+                logger.error('Email send error', {error: e.message, stack: e.stack});
+            }
       }
 
       // 7. Push to Sender. Last, and non-throwing — a Sender outage must never fail a
