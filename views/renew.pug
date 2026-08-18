@@ -51,29 +51,35 @@ block content
           label(for="address_zip") ZIP Code
           input#address_zip(type="text" name="address_zip" value=(member.address_zip || ''))
 
-        //- Family members (editable)
+        //- Family members (editable). Shares .family-member-row and its labelled
+        //- fields with the signup form, so the two pages present this the same way.
+        //- Indentation is structure in Pug: the hidden id and the three .form-groups
+        //- have to stay inside .family-member-row or each member's fields render
+        //- outside their own bordered row.
         if member.membership_type === 'family'
-          h3(style="margin-top: 1.5rem;") Family Members
-          p.text-muted You may have up to #{maxFamilyMembers - 1} additional family members. Each will receive their own membership card.
+          p.form-section-heading.renew-family-heading Family members
+          p.form-hint You may have up to #{maxFamilyMembers - 1} additional family members. Each will receive their own membership card.
 
           #family-members-container(data-max=maxFamilyMembers)
             each fm, i in familyMembers
-              .family-member-row(style="border:1px solid #ddd; padding:1rem; margin-bottom:1rem; border-radius:4px; position:relative;")
-                button.remove-family-member(type="button" style="position:absolute; top:0.5rem; right:0.5rem; background:#dc3545; color:white; border:none; border-radius:3px; padding:0.25rem 0.5rem; cursor:pointer;") Remove
+              .family-member-row
+                .family-member-head
+                  span.family-member-legend Family member #{i + 1}
+                  button.btn-remove.remove-family-member(type="button") Remove
                 input(type="hidden" name=`family_members[${i}][id]` value=fm.id)
                 .form-group
-                  label First Name
-                  input(type="text" name=`family_members[${i}][first_name]` value=fm.first_name required)
+                  label(for=`renew-family-${i}-first_name`) First Name
+                  input(id=`renew-family-${i}-first_name` type="text" name=`family_members[${i}][first_name]` value=fm.first_name required)
                 .form-group
-                  label Last Name
-                  input(type="text" name=`family_members[${i}][last_name]` value=fm.last_name required)
+                  label(for=`renew-family-${i}-last_name`) Last Name
+                  input(id=`renew-family-${i}-last_name` type="text" name=`family_members[${i}][last_name]` value=fm.last_name required)
                 .form-group
-                  label Email (optional)
-                  input(type="email" name=`family_members[${i}][email]` value=(fm.email && fm.email !== member.email ? fm.email : ''))
+                  label(for=`renew-family-${i}-email`) Email (optional)
+                  input(id=`renew-family-${i}-email` type="email" name=`family_members[${i}][email]` value=(fm.email && fm.email !== member.email ? fm.email : ''))
 
-          button.btn-outline(type="button" id="add-family-member" style=(familyMembers.length >= maxFamilyMembers - 1 ? 'display:none' : '')) + Add Family Member
+          button.btn-outline.btn-add-family(type="button" id="add-family-member" hidden=(familyMembers.length >= maxFamilyMembers - 1)) + Add family member
 
-        div(style="margin-top: 2rem; text-align: right;")
+        .renew-submit
           button.btn(type="submit") Continue to Payment →
 
   script(src="/js/renew.js")

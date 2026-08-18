@@ -174,3 +174,58 @@ describe('POST /membership — family sub-member email', () => {
     expect(res._redirectUrl).toBe('/membership');
   });
 });
+
+describe('POST /membership — family rows with a duplicated field index', () => {
+    // The form used to reuse an index after a removal (add three, remove the middle, add
+    // another), which Express parses into an array rather than a string. Calling .trim()
+    // on that threw, and the catch turned it into "Something went wrong" — the member
+    // lost every field they had filled in. public/js/membership.js no longer produces
+    // duplicates; this proves a malformed post can't take the payment flow down either.
+    test('still reaches Stripe instead of failing the signup', async () => {
+        insertPeriod(db, {start_date: '2025-01-01', end_date: '2099-12-31'});
+        insertSetting(db, 'max_family_members', '6');
+
+        const req = mockReq({
+            body: {
+                ...validBody,
+                email: 'collision@example.com',
+                membership_type: 'family',
+                family_members: [
+                    {first_name: 'Solo', last_name: 'Row'},
+                    // What qs produces from two rows sharing family_members[1].
+                    {first_name: ['Ada', 'Bea'], last_name: ['Wheeler', 'Wheeler']},
+                ],
+            },
+            session: {},
+        });
+        const res = mockRes();
+        await mockHandlers['POST /membership'](req, res);
+
+        expect(req.session.flash_error).toBeUndefined();
+        expect(res._redirectUrl).toBe('https://stripe.test/checkout');
+
+        const members = await db.all(
+            'SELECT first_name, last_name FROM members ORDER BY id'
+        );
+        expect(members.map(m => m.first_name)).toEqual(['New', 'Solo', 'Ada']);
+    });
+
+    test('tolerates a non-object family_members value', async () => {
+        insertPeriod(db, {start_date: '2025-01-01', end_date: '2099-12-31'});
+        insertSetting(db, 'max_family_members', '6');
+
+        const req = mockReq({
+            body: {
+                ...validBody,
+                email: 'junk@example.com',
+                membership_type: 'family',
+                family_members: 'not-an-object',
+            },
+            session: {},
+        });
+        const res = mockRes();
+        await mockHandlers['POST /membership'](req, res);
+
+        expect(res._redirectUrl).toBe('https://stripe.test/checkout');
+    });
+});

@@ -10,154 +10,224 @@ const membershipJs = fs.readFileSync(
   'utf8'
 );
 
-function setupDom({ includeFamilySection = true, includeCaptcha = false } = {}) {
+function setupDom({includeFamilySection = true, maxFamily = 6} = {}) {
   document.body.innerHTML = `
-    <form class="membership-form">
-      <label class="membership-type-card">
-        <input type="radio" name="membership_type" value="individual">
-        <div class="card-check"></div>
-        <div class="card-type-name">Individual</div>
-      </label>
-      <label class="membership-type-card">
-        <input type="radio" name="membership_type" value="family">
-        <div class="card-check"></div>
-        <div class="card-type-name">Family</div>
-      </label>
+    <button class="membership-tab membership-tab-active" data-tab="new" aria-selected="true">Become a Member</button>
+    <button class="membership-tab" data-tab="renew" aria-selected="false">Renew Membership</button>
 
-      <div id="membership-captcha-step" style="display: none;">
-        ${includeCaptcha ? '<div class="h-captcha" data-sitekey="test-key"></div>' : ''}
-      </div>
-
-      <div id="membership-pii-section" style="display: none;">
-        ${includeFamilySection ? `
-          <div id="family-members-section" data-max="6" style="display: none;">
-            <h3>Additional Family Members</h3>
-            <div id="family-members-container"></div>
-            <button type="button" id="add-family-member">+ Add Family Member</button>
-          </div>
-        ` : ''}
+    <div id="tab-new">
+      <form class="membership-form">
+        <label class="membership-type-card">
+          <input type="radio" name="membership_type" value="individual" required>
+          <span class="card-type-name">Individual</span>
+        </label>
+        <label class="membership-type-card">
+          <input type="radio" name="membership_type" value="family" required>
+          <span class="card-type-name">Family</span>
+        </label>
 
         <input type="text" id="first_name" name="first_name">
         <input type="text" id="last_name" name="last_name">
         <input type="email" id="email" name="email">
+
+        ${includeFamilySection ? `
+          <fieldset id="family-members-section" data-max="${maxFamily}" hidden>
+            <div id="family-members-container"></div>
+            <p id="family-members-limit" hidden>That's the maximum.</p>
+            <button type="button" id="add-family-member">+ Add family member</button>
+          </fieldset>
+        ` : ''}
+
         <button type="submit">Continue to Payment</button>
-      </div>
-    </form>
+      </form>
+    </div>
+
+    <div id="tab-renew" hidden>
+      <form><input type="email" id="renew_email" name="email"></form>
+    </div>
   `;
 
-  // eslint-disable-next-line no-new-func
   new Function(membershipJs)();
 }
 
-describe('membership type card picker', () => {
+function chooseFamily() {
+    const radio = document.querySelector('input[value="family"]');
+    radio.checked = true;
+    radio.dispatchEvent(new Event('change'));
+}
+
+function addMembers(n) {
+    for (let i = 0; i < n; i++) document.getElementById('add-family-member').click();
+}
+
+function fieldNames() {
+    return [...document.querySelectorAll('#family-members-container input')].map(i => i.name);
+}
+
+describe('the whole form is available from the start', () => {
   beforeEach(() => setupDom());
 
-  test('no card is selected by default', () => {
-    const cards = document.querySelectorAll('.membership-type-card');
-    cards.forEach(c => expect(c.classList.contains('selected')).toBe(false));
+    test('personal fields are present without choosing a plan first', () => {
+        // The panel used to show two prices and 330px of blank white until you guessed
+        // to click a card, with nothing saying a click was expected.
+        ['first_name', 'last_name', 'email'].forEach(id => {
+            expect(document.getElementById(id)).not.toBeNull();
+        });
   });
 
-  test('clicking individual card selects it', () => {
-    const indCard = document.querySelector('.membership-type-card:has(input[value="individual"])');
-    indCard.click();
-    expect(indCard.classList.contains('selected')).toBe(true);
-  });
-
-  test('clicking family card selects it and deselects individual', () => {
-    const indCard = document.querySelector('.membership-type-card:has(input[value="individual"])');
-    const famCard = document.querySelector('.membership-type-card:has(input[value="family"])');
-    indCard.click();
-    famCard.click();
-    expect(famCard.classList.contains('selected')).toBe(true);
-    expect(indCard.classList.contains('selected')).toBe(false);
-  });
-
-  test('clicking family card checks the family radio', () => {
-    const famCard = document.querySelector('.membership-type-card:has(input[value="family"])');
-    famCard.click();
-    expect(document.querySelector('input[value="family"]').checked).toBe(true);
+    test('no plan is preselected, and the radios are required', () => {
+        const radios = [...document.querySelectorAll('input[name="membership_type"]')];
+        expect(radios.some(r => r.checked)).toBe(false);
+        radios.forEach(r => expect(r.required).toBe(true));
   });
 });
 
-describe('captcha step — dev mode (no captcha widget)', () => {
-  beforeEach(() => setupDom({ includeCaptcha: false }));
+describe('tab switching', () => {
+    beforeEach(() => setupDom());
 
-  test('captcha step stays hidden when a card is clicked', () => {
-    document.querySelector('.membership-type-card').click();
-    const captchaStep = document.getElementById('membership-captcha-step');
-    expect(captchaStep.style.display).toBe('none');
+    test('the renew panel is hidden until its tab is chosen', () => {
+        expect(document.getElementById('tab-renew').hidden).toBe(true);
+        document.querySelector('[data-tab="renew"]').click();
+        expect(document.getElementById('tab-renew').hidden).toBe(false);
+        expect(document.getElementById('tab-new').hidden).toBe(true);
   });
 
-  test('PII section is revealed immediately when a card is clicked', () => {
-    document.querySelector('.membership-type-card').click();
-    const pii = document.getElementById('membership-pii-section');
-    expect(pii.style.display).toBe('block');
-  });
-
-  test('clicking a second card does not hide the PII section', () => {
-    const [indCard, famCard] = document.querySelectorAll('.membership-type-card');
-    indCard.click();
-    famCard.click();
-    expect(document.getElementById('membership-pii-section').style.display).toBe('block');
-  });
-});
-
-describe('captcha step — with captcha widget', () => {
-  beforeEach(() => setupDom({ includeCaptcha: true }));
-
-  test('captcha step is revealed when a card is clicked', () => {
-    document.querySelector('.membership-type-card').click();
-    const captchaStep = document.getElementById('membership-captcha-step');
-    expect(captchaStep.style.display).toBe('block');
-  });
-
-  test('PII section stays hidden until captcha is completed', () => {
-    document.querySelector('.membership-type-card').click();
-    const pii = document.getElementById('membership-pii-section');
-    expect(pii.style.display).toBe('none');
-  });
-
-  test('onMembershipCaptchaComplete reveals PII and hides captcha step', () => {
-    document.querySelector('.membership-type-card').click();
-    window.onMembershipCaptchaComplete();
-    expect(document.getElementById('membership-pii-section').style.display).toBe('block');
-    expect(document.getElementById('membership-captcha-step').style.display).toBe('none');
+    test('aria-selected follows the active tab', () => {
+        document.querySelector('[data-tab="renew"]').click();
+        expect(document.querySelector('[data-tab="renew"]').getAttribute('aria-selected')).toBe('true');
+        expect(document.querySelector('[data-tab="new"]').getAttribute('aria-selected')).toBe('false');
   });
 });
 
 describe('family members section', () => {
   beforeEach(() => setupDom());
 
-  test('family section is hidden initially', () => {
-    expect(document.getElementById('family-members-section').style.display).toBe('none');
+    test('is hidden until the family plan is chosen', () => {
+        expect(document.getElementById('family-members-section').hidden).toBe(true);
+        chooseFamily();
+        expect(document.getElementById('family-members-section').hidden).toBe(false);
+    });
+
+    test('hides again when switching back to individual', () => {
+        chooseFamily();
+        const individual = document.querySelector('input[value="individual"]');
+        individual.checked = true;
+        individual.dispatchEvent(new Event('change'));
+        expect(document.getElementById('family-members-section').hidden).toBe(true);
+    });
+
+    test('adding a member appends a row with named fields', () => {
+        chooseFamily();
+        addMembers(1);
+        expect(document.querySelectorAll('.family-member-row')).toHaveLength(1);
+        expect(fieldNames()).toEqual([
+            'family_members[0][first_name]',
+            'family_members[0][last_name]',
+            'family_members[0][email]',
+        ]);
+    });
+
+    test('every label points at its own input', () => {
+        // A bare label with no `for` does not focus its input when tapped.
+        chooseFamily();
+        addMembers(2);
+        const labels = [...document.querySelectorAll('#family-members-container label')];
+        expect(labels).toHaveLength(6);
+        labels.forEach(label => {
+            const target = document.getElementById(label.getAttribute('for'));
+            expect(target).not.toBeNull();
+            expect(target.tagName).toBe('INPUT');
+        });
+        const ids = labels.map(l => l.getAttribute('for'));
+        expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    test('prefills the last name from the primary member', () => {
+        document.getElementById('last_name').value = 'Wheeler';
+        chooseFamily();
+        addMembers(1);
+        const lastName = document.querySelector('input[name="family_members[0][last_name]"]');
+        expect(lastName.value).toBe('Wheeler');
+    });
+
+    test('only the email field is optional', () => {
+        chooseFamily();
+        addMembers(1);
+        expect(document.querySelector('input[name="family_members[0][first_name]"]').required).toBe(true);
+        expect(document.querySelector('input[name="family_members[0][last_name]"]').required).toBe(true);
+        expect(document.querySelector('input[name="family_members[0][email]"]').required).toBe(false);
+    });
+});
+
+describe('family member field indexes are never reused', () => {
+    beforeEach(() => setupDom());
+
+    test('removing a middle row does not make the next row collide with a live one', () => {
+        // The old counter decremented on remove, so this sequence gave two live rows the
+        // same index. Express parses the duplicate name into an array rather than a
+        // string, and the route throws when it trims it — the signup is lost.
+        chooseFamily();
+        addMembers(3);
+        document.querySelectorAll('.family-member-row')[1]
+            .querySelector('.btn-remove').click();
+        addMembers(1);
+
+        const names = fieldNames();
+        expect(new Set(names).size).toBe(names.length);
+        expect(names.filter(n => n.includes('first_name'))).toEqual([
+            'family_members[0][first_name]',
+            'family_members[2][first_name]',
+            'family_members[3][first_name]',
+        ]);
   });
 
-  test('clicking family card shows the family members section', () => {
-    const famCard = document.querySelector('.membership-type-card:has(input[value="family"])');
-    famCard.click();
-    expect(document.getElementById('family-members-section').style.display).toBe('block');
+    test('visible numbering stays sequential after a removal', () => {
+        chooseFamily();
+        addMembers(3);
+        document.querySelectorAll('.family-member-row')[1]
+            .querySelector('.btn-remove').click();
+        const legends = [...document.querySelectorAll('.family-member-legend')].map(l => l.textContent);
+        expect(legends).toEqual(['Family member 1', 'Family member 2']);
+    });
+});
+
+describe('the additional-member cap', () => {
+    beforeEach(() => setupDom({maxFamily: 3}));
+
+    test('stops at max_family_members minus the primary, without an alert', () => {
+        const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {
+        });
+        chooseFamily();
+        addMembers(5);
+        expect(document.querySelectorAll('.family-member-row')).toHaveLength(2);
+        expect(alertSpy).not.toHaveBeenCalled();
+        alertSpy.mockRestore();
   });
 
-  test('clicking individual card after family hides the family members section', () => {
-    const famCard = document.querySelector('.membership-type-card:has(input[value="family"])');
-    const indCard = document.querySelector('.membership-type-card:has(input[value="individual"])');
-    famCard.click();
-    indCard.click();
-    expect(document.getElementById('family-members-section').style.display).toBe('none');
-  });
+    test('swaps the add button for an explanation at the cap', () => {
+        chooseFamily();
+        addMembers(2);
+        expect(document.getElementById('add-family-member').hidden).toBe(true);
+        expect(document.getElementById('family-members-limit').hidden).toBe(false);
+    });
 
-  test('add family member button appends a member row', () => {
-    const famCard = document.querySelector('.membership-type-card:has(input[value="family"])');
-    famCard.click();
-    document.getElementById('add-family-member').click();
-    const rows = document.querySelectorAll('.family-member-row');
-    expect(rows).toHaveLength(1);
-    expect(rows[0].querySelector('input[name*="first_name"]')).not.toBeNull();
+    test('brings the add button back when a row is removed', () => {
+        chooseFamily();
+        addMembers(2);
+        document.querySelector('.btn-remove').click();
+        expect(document.getElementById('add-family-member').hidden).toBe(false);
+        expect(document.getElementById('family-members-limit').hidden).toBe(true);
   });
 });
 
 describe('without family section in dom', () => {
-  test('script does not throw when family section is absent', () => {
+    test('script does not throw when the family section is absent', () => {
     expect(() => setupDom({ includeFamilySection: false })).not.toThrow();
   });
+
+    test('tabs still work without it', () => {
+        setupDom({includeFamilySection: false});
+        document.querySelector('[data-tab="renew"]').click();
+        expect(document.getElementById('tab-renew').hidden).toBe(false);
+    });
 });

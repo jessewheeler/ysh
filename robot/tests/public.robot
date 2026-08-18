@@ -28,13 +28,14 @@ Bios Page Renders Board Members
     Should Be True    ${count} >= 1
     Get Text    .bios-grid    contains    Test Person 1
 
-Membership Form Renders
+Membership Form Renders Every Field Without A Click
+    # The form used to reveal itself a step at a time, so the panel opened on two prices
+    # above a large blank area with nothing indicating a click was expected. Nothing here
+    # may depend on choosing a plan first.
     Navigate To    /membership
     Get Text    .membership-tab-active    contains    Become a Member
     Page Should Contain Text    $16.00
     Page Should Contain Text    $26.00
-    # Personal-info fields are revealed only after a plan is chosen.
-    Click    .membership-type-card:has(input[value="individual"])
     Wait For Elements State    input[name="first_name"]    visible    timeout=3s
     Wait For Elements State    input[name="last_name"]    visible
     # name="email" appears in both the new-member and renew forms; scope to this form.
@@ -44,11 +45,60 @@ Membership Form Renders
     Wait For Elements State    input[name="address_city"]    visible
     Wait For Elements State    input[name="address_state"]    visible
     Wait For Elements State    input[name="address_zip"]    visible
+    Wait For Elements State    .membership-form button[type="submit"]    visible
+
+Membership Page Does Not Scroll Sideways On A Phone
+    # Two separate causes, both predating the form rework: the tab labels are nowrap and
+    # together exceed the panel, and hCaptcha renders a fixed ~360px widget that an fr
+    # track's automatic minimum let stretch the whole grid. 434px of content in a 375px
+    # viewport, which clipped the benefits copy on the right.
+    Set Viewport Size    375    812
+    Navigate To    /membership
+    Wait For Elements State    .membership-form    visible    timeout=5s
+    ${overflow}=    Evaluate JavaScript    ${EMPTY}
+    ...    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    Should Be True    ${overflow} <= 1    Page scrolls ${overflow}px sideways
+    ${tabs_fit}=    Evaluate JavaScript    ${EMPTY}
+    ...    () => {
+    ...        const vw = document.documentElement.clientWidth;
+    ...        return [...document.querySelectorAll('.membership-tab')]
+    ...            .every(tab => tab.getBoundingClientRect().right <= vw + 1);
+    ...    }
+    Should Be True    ${tabs_fit}
+
+Membership Plan Radios Are Visible Controls
+    # They were opacity: 0, which removed the one cue everyone recognises and left the
+    # price cards not reading as controls at all.
+    Navigate To    /membership
+    Wait For Elements State    .membership-type-card input[value="individual"]    visible    timeout=3s
+    Wait For Elements State    .membership-type-card input[value="family"]    visible
+    ${size}=    Evaluate JavaScript    .membership-type-card input[value="individual"]
+    ...    (input) => {
+    ...        const box = input.getBoundingClientRect();
+    ...        return Math.min(box.width, box.height);
+    ...    }
+    Should Be True    ${size} >= 16
+    # No plan is preselected, so the browser has to ask rather than assume a price.
+    ${checked}=    Evaluate JavaScript    ${EMPTY}
+    ...    () => document.querySelectorAll('input[name="membership_type"]:checked').length
+    Should Be Equal As Integers    ${checked}    0
+
+Membership Captcha Sits Directly Above The Submit Button
+    # It used to gate the fields, so anyone who could not solve it never learned a form
+    # existed. Rendered only when a site key is configured, so this checks the ordering
+    # of whatever is present rather than requiring the widget.
+    Navigate To    /membership
+    ${submit_is_last}=    Evaluate JavaScript    .membership-form
+    ...    (form) => {
+    ...        const submit = form.querySelector('button[type="submit"]');
+    ...        const captcha = form.querySelector('.h-captcha');
+    ...        if (!captcha) return submit === form.lastElementChild;
+    ...        return captcha.compareDocumentPosition(submit) === Node.DOCUMENT_POSITION_FOLLOWING;
+    ...    }
+    Should Be True    ${submit_is_last}
 
 Membership Validates Required Fields
     Navigate To    /membership
-    Click    .membership-type-card:has(input[value="individual"])
-    Wait For Elements State    input[name="first_name"]    visible    timeout=3s
     Fill Text    input[name="first_name"]    OnlyFirst
     Evaluate JavaScript    .membership-form
     ...    (form) => {
@@ -60,7 +110,6 @@ Membership Validates Required Fields
 Membership Signup Attempts Stripe
     Navigate To    /membership
     Click    .membership-type-card:has(input[value="individual"])
-    Wait For Elements State    input[name="first_name"]    visible    timeout=3s
     Fill Text    input[name="first_name"]    Robot
     Fill Text    input[name="last_name"]    Tester
     Fill Text    .membership-form input[name="email"]    robot_stripe@example.com
@@ -117,6 +166,49 @@ Family Membership Can Add A Family Member Row
     Click    \#add-family-member
     Wait For Elements State    .family-member-row    visible    timeout=3s
     Wait For Elements State    .family-member-row input[name*="first_name"]    visible
+
+Family Member Rows Never Reuse A Field Index
+    # Add three, remove the middle, add another: the old counter handed the new row the
+    # index of a live one. Express parses the duplicate name into an array rather than a
+    # string, and the route threw when it trimmed it, losing the entire signup.
+    Navigate To    /membership
+    Click    .membership-type-card:has(input[value="family"])
+    Wait For Elements State    \#add-family-member    visible    timeout=3s
+    Click    \#add-family-member
+    Click    \#add-family-member
+    Click    \#add-family-member
+    Get Element Count    .family-member-row    ==    3
+    Click    .family-member-row:nth-child(2) .btn-remove
+    Click    \#add-family-member
+    Get Element Count    .family-member-row    ==    3
+    ${total}=    Evaluate JavaScript    ${EMPTY}
+    ...    () => document.querySelectorAll('#family-members-container input').length
+    ${unique}=    Evaluate JavaScript    ${EMPTY}
+    ...    () => {
+    ...        const inputs = document.querySelectorAll('#family-members-container input');
+    ...        return new Set([...inputs].map(i => i.name)).size;
+    ...    }
+    Should Be Equal As Integers    ${total}    9
+    Should Be Equal As Integers    ${unique}    ${total}
+
+Family Member Labels Focus Their Own Input
+    # The generated rows used bare labels with no `for`, so tapping one did nothing —
+    # worst on a phone, where the label is the easiest target to hit.
+    Navigate To    /membership
+    Click    .membership-type-card:has(input[value="family"])
+    Wait For Elements State    \#add-family-member    visible    timeout=3s
+    Click    \#add-family-member
+    Click    .family-member-row label[for$="last_name"]
+    ${focused}=    Evaluate JavaScript    ${EMPTY}    () => document.activeElement.name
+    Should Contain    ${focused}    last_name
+
+Renew Tab Shows Its Email Field Immediately
+    # The captcha used to gate this field, so anyone who could not solve it never saw
+    # that a renewal form existed.
+    Navigate To    /membership
+    Click    .membership-tab[data-tab="renew"]
+    Wait For Elements State    \#renew_email    visible    timeout=3s
+    Wait For Elements State    \#tab-new    hidden
 
 Family Membership Switching Back To Individual Hides Section
     Navigate To    /membership
