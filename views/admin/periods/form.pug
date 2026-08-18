@@ -46,9 +46,13 @@ block content
             label(for="image") Card Template (PNG or PDF)
             input#image(type="file" name="image" accept="image/png,application/pdf")
             if period && period.card_template_path
+                //- Uploads store a URL or an /uploads/ path; pre-#96 rows store a bare
+                //- filename that lived in public/img/.
+                - const tpl = period.card_template_path
+                - const tplHref = /^(https?:\/\/|\/)/.test(tpl) ? tpl : `/img/${tpl}`
                 p.text-muted(style="margin-top: 0.5rem;")
-                    | Current: #{period.card_template_path} &mdash;
-                    a(href=`/img/${period.card_template_path}` target="_blank") preview
+                    | Current: #{tpl} &mdash;
+                    a(href=tplHref target="_blank") preview
             else
                 p.text-muted Upload a PNG or PDF. PDFs are converted automatically. Leave blank to use the default template.
 

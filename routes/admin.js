@@ -950,39 +950,57 @@ router.post('/bios/:id/delete', async (req, res) => {
   res.redirect('/admin/bios');
 });
 
-// Convert an uploaded card template file (PNG or PDF) to a trimmed PNG
-// saved in public/img/ under the given filename. Returns the filename.
-async function processCardTemplate(file, filename) {
+// Convert an uploaded card template file (PNG or PDF) to a trimmed PNG buffer.
+// The caller stores it through handleUpload — writing it into public/img/ instead
+// meant every deploy replaced it with the committed default (issue #96).
+async function processCardTemplate(file) {
+  if (file.mimetype !== 'application/pdf') return file.buffer;
+
   const {execFile} = require('child_process');
   const {promisify} = require('util');
   const execFileAsync = promisify(execFile);
 
-  const outPath = path.join(__dirname, '..', 'public', 'img', filename);
+  // Both tools want real files, and data/ is the persistent disk on Render.
   const tmpInput = path.join(__dirname, '..', 'data', `tmp-card-${Date.now()}`);
+  const tmpPng = `${tmpInput}.png`;
+  const tmpTrimmed = `${tmpInput}-trimmed.png`;
 
   fs.writeFileSync(tmpInput, file.buffer);
   try {
-    if (file.mimetype === 'application/pdf') {
-      const tmpPng = `${tmpInput}.png`;
+    // A missing binary surfaces as ENOENT, which is indistinguishable from a
+    // missing file further down — so map it to advice here, not around the read.
+    try {
       await execFileAsync('gs', [
         '-dNOPAUSE', '-dBATCH', '-sDEVICE=png16m', '-r300',
         `-sOutputFile=${tmpPng}`, tmpInput,
       ]);
+      const trimArgs = [tmpPng, '-trim', '-bordercolor', 'white', '-border', '20', tmpTrimmed];
       // ImageMagick 7 uses `magick`; IM6 (common on Ubuntu LTS) uses `convert`
       try {
-        await execFileAsync('magick', [tmpPng, '-trim', '-bordercolor', 'white', '-border', '20', outPath]);
+        await execFileAsync('magick', trimArgs);
       } catch (e) {
         if (e.code !== 'ENOENT') throw e;
-        await execFileAsync('convert', [tmpPng, '-trim', '-bordercolor', 'white', '-border', '20', outPath]);
+        await execFileAsync('convert', trimArgs);
       }
-      fs.unlinkSync(tmpPng);
-    } else {
-      fs.copyFileSync(tmpInput, outPath);
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        throw new Error('This server cannot convert PDFs (Ghostscript/ImageMagick missing). Upload a PNG instead.');
+      }
+      throw err;
     }
+    return fs.readFileSync(tmpTrimmed);
   } finally {
-    if (fs.existsSync(tmpInput)) fs.unlinkSync(tmpInput);
+    for (const p of [tmpInput, tmpPng, tmpTrimmed]) {
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    }
   }
-  return filename;
+}
+
+// Store an uploaded card template and return the value for
+// membership_periods.card_template_path — a B2 URL, or /uploads/<name> without B2.
+async function uploadCardTemplate(file) {
+  const buffer = await processCardTemplate(file);
+  return handleUpload({ buffer, originalname: 'card-template.png' }, 'card-templates');
 }
 
 // --- Campaigns (issue #88) ---
@@ -1187,9 +1205,7 @@ router.post('/periods', requireSuperAdmin, async (req, res) => {
     const data = membershipPeriodsService.validatePeriod(req.body);
     const period = await periodsRepo.create(data);
     if (req.file) {
-      const filename = `card-template-${period.id}.png`;
-      await processCardTemplate(req.file, filename);
-      await periodsRepo.setCardTemplate(period.id, filename);
+      await periodsRepo.setCardTemplate(period.id, await uploadCardTemplate(req.file));
     }
     req.session.flash_success = 'Membership period created.';
     res.redirect('/admin/periods');
@@ -1215,9 +1231,8 @@ router.post('/periods/:id/edit', requireSuperAdmin, async (req, res) => {
     const data = membershipPeriodsService.validatePeriod(req.body);
     let card_template_path = existing?.card_template_path || null;
     if (req.file) {
-      const filename = `card-template-${id}.png`;
-      await processCardTemplate(req.file, filename);
-      card_template_path = filename;
+      card_template_path = await uploadCardTemplate(req.file);
+      storage.deleteFile(existing?.card_template_path).catch(() => {});
     }
     await periodsRepo.update(id, {...data, card_template_path});
     req.session.flash_success = 'Membership period updated.';
