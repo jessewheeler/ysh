@@ -205,23 +205,30 @@ class DatabaseManager:
                     phone=None, status='active', membership_year=2026,
                     member_number=None, address_street=None, address_city=None,
                     address_state='MT', address_zip=None, notes=None,
-                    expiry_date=None):
+                    expiry_date=None, membership_type='individual'):
         """Insert a member and return the row ID."""
         if email is None:
             import random
             email = f'test{random.randint(10000, 99999)}@example.com'
         if member_number is None:
-            count = self.conn.execute('SELECT COUNT(*) FROM members').fetchone()[0]
+            # Count within the year, matching services/members.generateMemberNumber. A
+            # total COUNT(*) drifts out of step with it as soon as any row has a
+            # different membership_year (the seeded admin, for one), and the two schemes
+            # then collide on the same number the moment the app creates a member itself.
+            count = self.conn.execute(
+                'SELECT COUNT(*) FROM members WHERE membership_year = ?',
+                (membership_year,),
+            ).fetchone()[0]
             member_number = f'YSH-{membership_year}-{str(count + 1).zfill(4)}'
         cursor = self.conn.execute(
             '''INSERT INTO members
                (member_number, first_name, last_name, email, phone,
                 address_street, address_city, address_state, address_zip,
-                membership_year, status, notes, expiry_date)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                membership_year, status, notes, expiry_date, membership_type)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (member_number, first_name, last_name, email, phone,
              address_street, address_city, address_state, address_zip,
-             membership_year, status, notes, expiry_date),
+             membership_year, status, notes, expiry_date, membership_type),
         )
         self.conn.commit()
         return cursor.lastrowid

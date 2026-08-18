@@ -19,7 +19,7 @@ block content
             input#end_date(type="date" name="end_date" value=(period ? period.end_date : '') required)
             p.text-muted Date stamped on all members activated during this period. Typically July 31 of the following year.
 
-        h3(style="margin-top: 1.5rem;") Pricing
+        h3 Pricing
 
         .form-group
             label(for="individual_dues") Individual Dues
@@ -40,7 +40,7 @@ block content
                 input#electronic_surcharge(type="number" name="electronic_surcharge" step="0.01" min="0" value=(period ? centsToDollars(period.electronic_surcharge_cents) : '0.00') placeholder="1.50")
             p.text-muted Flat fee added to Stripe checkouts only. Cash/check payments are not affected.
 
-        h3(style="margin-top: 1.5rem;") Membership Card Template
+        h3 Membership Card Template
 
         .form-group
             label(for="image") Card Template (PNG or PDF)
@@ -50,7 +50,7 @@ block content
                 //- filename that lived in public/img/.
                 - const tpl = period.card_template_path
                 - const tplHref = /^(https?:\/\/|\/)/.test(tpl) ? tpl : `/img/${tpl}`
-                p.text-muted(style="margin-top: 0.5rem;")
+                p.text-muted.mt-sm
                     | Current: #{tpl} &mdash;
                     a(href=tplHref target="_blank") preview
             else
@@ -58,4 +58,4 @@ block content
 
         .form-actions
             button.btn(type="submit")= period ? 'Save Changes' : 'Create Period'
-            a.btn-outline(href="/admin/periods" style="margin-left: 1rem;") Cancel
+            a.btn-outline(href="/admin/periods") Cancel

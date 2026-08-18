@@ -4,9 +4,6 @@ block page_title
   | Email Log
 
 block content
-  .admin-toolbar
-    a.btn-outline(href="/admin/emails/renewal") Renewal Reminders
-
   if emails.length
     table.admin-table
       thead
@@ -25,12 +22,6 @@ block content
             td= e.status
             td= formatDate(e.created_at)
 
-    if totalPages > 1
-      .pagination
-        if page > 1
-          a(href=`/admin/emails?page=${page - 1}`) &laquo; Prev
-        span Page #{page} of #{totalPages} (#{total} total)
-        if page < totalPages
-          a(href=`/admin/emails?page=${page + 1}`) Next &raquo;
+    +pagination(page, totalPages, total, (n) => `/admin/emails?page=${n}`)
   else
     p.text-muted No emails sent yet.

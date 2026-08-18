@@ -148,3 +148,43 @@ describe('formatDate helper', () => {
     expect(formatDate('2024-01-15')).toBe('2024-01-15');
   });
 });
+
+describe('money helpers', () => {
+  let formatMoney, formatMoneyShort;
+
+  beforeEach(async () => {
+    const res = buildRes();
+    await injectLocals(buildReq(), res, jest.fn());
+    formatMoney = res.locals.formatMoney;
+    formatMoneyShort = res.locals.formatMoneyShort;
+  });
+
+  test('formats cents as exact dollars', () => {
+    expect(formatMoney(0)).toBe('$0.00');
+    expect(formatMoney(2550)).toBe('$25.50');
+  });
+
+  test('groups thousands, which the old toFixed(2) did not', () => {
+    expect(formatMoney(203400)).toBe('$2,034.00');
+    expect(formatMoney(123456789)).toBe('$1,234,567.89');
+  });
+
+  // sumCompletedCents() returns null on an empty payments table.
+  test('treats null and undefined as zero', () => {
+    expect(formatMoney(null)).toBe('$0.00');
+    expect(formatMoney(undefined)).toBe('$0.00');
+  });
+
+  test('short form drops .00 on whole amounts so KPI tiles stay narrow', () => {
+    expect(formatMoneyShort(203400)).toBe('$2,034');
+    expect(formatMoneyShort(0)).toBe('$0');
+  });
+
+  test('short form keeps the cents when there are any', () => {
+    expect(formatMoneyShort(2550)).toBe('$25.50');
+  });
+
+  test('short form treats null as zero', () => {
+    expect(formatMoneyShort(null)).toBe('$0');
+  });
+});

@@ -143,3 +143,80 @@ Needs Attention Export Includes Signals
     Should Contain    ${csv}    Signals
     Should Contain    ${csv}    Stripe reported a failed payment
     Should Contain    ${csv}    declined@example.com
+
+Record Offline Payment Disclosure Reveals The Form
+    [Documentation]    Operates the <details> control itself. The "hidden" assertion first is
+    ...    load-bearing: a test that only fills the form passes just as well when the
+    ...    disclosure is stuck open or absent entirely. Also pins the dues prefill, which the
+    ...    route computed but the template never used.
+    Seed Period
+    ${id}=    Seed Member    first_name=Owen    last_name=Offline    email=owen@example.com    status=pending
+    Login As Admin
+    Navigate To    /admin/members/${id}
+    Wait For Elements State    input#amount    hidden    timeout=10s
+    Click    summary >> text=Record Offline Payment
+    Wait For Elements State    input#amount    visible    timeout=10s
+    ${amount}=    Get Property    input#amount    value
+    Should Match Regexp    ${amount}    ^\\d+\\.\\d{2}$
+    Fill Text    input#amount    25.00
+    Click    form#record-payment button[type="submit"]
+    Flash Success Should Be Visible    recorded
+    Get Text    table#member-payments    contains    25.00
+
+Add Family Member Disclosure Reveals The Form
+    [Documentation]    Same shape as the offline-payment disclosure: assert hidden, operate the
+    ...    control, then submit through it.
+    ${id}=    Seed Member    first_name=Fran    last_name=Primary    email=fran@example.com    membership_type=family
+    Login As Admin
+    Navigate To    /admin/members/${id}
+    Wait For Elements State    input#fm_first_name    hidden    timeout=10s
+    Click    summary >> text=Add Family Member
+    Wait For Elements State    input#fm_first_name    visible    timeout=10s
+    Fill Text    input#fm_first_name    Kid
+    Fill Text    input#fm_last_name    Primary
+    Fill Text    input#fm_email    kid@example.com
+    Click    form#add-family-member button[type="submit"]
+    Flash Success Should Be Visible    Family member Kid Primary added
+    Get Text    .detail-table    contains    Kid Primary
+
+Attach To Family Disclosure Reveals The Form
+    ${primary}=    Seed Member    first_name=Hank    last_name=Household    email=hank@example.com    membership_type=family
+    ${solo}=    Seed Member    first_name=Sam    last_name=Solo    email=sam@example.com
+    Login As Admin
+    Navigate To    /admin/members/${solo}
+    Wait For Elements State    select#primary_member_id    hidden    timeout=10s
+    Click    summary >> text=Attach to Family
+    Wait For Elements State    select#primary_member_id    visible    timeout=10s
+    ${primary_value}=    Convert To String    ${primary}
+    Select Options By    select#primary_member_id    value    ${primary_value}
+    Click    form#attach-family button[type="submit"]
+    Flash Success Should Be Visible    attached to Hank Household's family
+    Get Text    .detail-table    contains    Hank Household
+
+Failed Offline Payment Reopens The Disclosure
+    [Documentation]    A red banner above a collapsed control would be worse than the old
+    ...    always-expanded form, so a validation failure re-opens the panel it came from.
+    ${id}=    Seed Member    first_name=Bad    last_name=Amount    email=bad@example.com
+    Login As Admin
+    Navigate To    /admin/members/${id}
+    Click    summary >> text=Record Offline Payment
+    Wait For Elements State    input#amount    visible    timeout=10s
+    # The input carries min="0.01", so the browser refuses to submit and the server-side
+    # branch under test is never reached. Disable client validation for this submit only.
+    Evaluate JavaScript    form#record-payment    (f) => { f.noValidate = true; }
+    Fill Text    input#amount    0
+    Click    form#record-payment button[type="submit"]
+    Flash Error Should Be Visible    valid payment amount
+    Wait For Elements State    input#amount    visible    timeout=10s
+
+Member Actions Sit On One Row
+    [Documentation]    The buttons used to be wrapped in style="display:inline", which kept them
+    ...    out of the flex line and split them across two ragged rows. Asserts they share a
+    ...    single row at desktop width.
+    ${id}=    Seed Member    first_name=Row    last_name=Aligned    email=row@example.com
+    Login As Admin
+    Set Viewport Size    1440    900
+    Navigate To    /admin/members/${id}
+    ${rows}=    Evaluate JavaScript    ${None}
+    ...    () => new Set([...document.querySelectorAll('.record-actionbar button, .record-actionbar a.btn')].map(el => Math.round(el.getBoundingClientRect().top))).size
+    Should Be Equal As Integers    ${rows}    1

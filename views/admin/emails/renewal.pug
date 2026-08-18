@@ -8,7 +8,7 @@ block content
         a.btn-outline(href="/admin/emails") Back to Email Log
 
     h3 Current Settings
-    table.admin-table(style="margin-bottom:2rem;")
+    table.admin-table.admin-table--kv.mb-lg
         tbody
             tr
                 td
@@ -34,7 +34,7 @@ block content
     else
         p.text-muted No members currently need renewal reminders. Members are eligible when they have an expiry date set within #{daysBefore} days and haven't renewed for the current year.
 
-    hr(style="margin:2rem 0;")
+    hr.rule-lg
     p.text-muted
         | Season dates are managed in
         a(href="/admin/periods")  Membership Periods

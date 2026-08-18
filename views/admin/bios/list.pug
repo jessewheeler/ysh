@@ -22,14 +22,12 @@ block content
           tr
             td
               if bio.photo_path
-                img(src=bio.photo_path alt=bio.name style="width:40px; height:40px; border-radius:50%; object-fit:cover")
+                img.avatar-sm(src=bio.photo_path alt=bio.name)
             td: a(href=`/admin/bios/${bio.id}`)= bio.name
             td= bio.role || '—'
             td= bio.is_visible ? 'Yes' : 'No'
             td= bio.sort_order
             td
-              a.btn-sm(href=`/admin/bios/${bio.id}`) Edit
-              form(method="POST" action=`/admin/bios/${bio.id}/delete` style="display:inline" data-confirm="Delete this bio?")
-                button.btn-sm.btn-danger(type="submit") Delete
+              +rowActions(`/admin/bios/${bio.id}`, `/admin/bios/${bio.id}/delete`, 'Delete this bio?')
   else
     p.text-muted No bios yet.

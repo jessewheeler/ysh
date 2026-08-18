@@ -91,6 +91,28 @@ describe('GET /admin/reports/membership', () => {
     expect(res.text).toContain('Chief Hype Officer');
     expect(res.text).toContain('Board members listed');
   });
+
+  test('keeps the summary a summary and the no-JS fallback in place', async () => {
+    insertAdmin(db, { email: 'admin@ysh.test', first_name: 'Ada', last_name: 'Admin' });
+    const member = insertMember(db, { email: 'member@ysh.test' });
+    await membershipYearsRepo.enroll(member.id, period.id, null);
+
+    const agent = await loginAsAdmin('admin@ysh.test');
+    const res = await agent.get(`/admin/reports/membership?period=${period.id}`).expect(200);
+
+    // The social links moved out to their own list. They used to be extra rows in the
+    // summary table, which is what made it read as a second data table stacked on the
+    // board block whose columns it could never line up with.
+    // Pug emits class before id, so match on the id anywhere in the opening tag.
+    const summary = res.text.match(/<table[^>]*id="report-summary"[\s\S]*?<\/table>/)[0];
+    expect(summary).toContain('Total member count');
+    expect(summary).not.toContain('facebook.com');
+    expect(res.text).toContain('facebook.com');
+
+    // data-auto-submit is JavaScript, and this path has silently died once already under
+    // helmet's script-src-attr 'none'. The button is the fallback; keep it.
+    expect(res.text).toContain('id="apply-period"');
+  });
 });
 
 describe('GET /admin/reports/membership/download', () => {

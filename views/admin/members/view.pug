@@ -4,234 +4,263 @@ block page_title
   | #{member.first_name} #{member.last_name}
 
 block content
-  .admin-grid
+  //- Actions are grouped primary / secondary / destructive in a bar of their own. They
+  //- used to sit in a .form-actions at the foot of the details table, each wrapped in
+  //- style="display:inline" — which kept every button out of the flex line and produced
+  //- two ragged rows. Labels are unchanged; robot selects Delete and Generate Renewal
+  //- Link by class and by text.
+  .record-actionbar
+    .actionbar-group
+      a.btn.btn-compact(href=`/admin/members/${member.id}?edit=1`) Edit
+    .actionbar-sep
+    .actionbar-group
+      form(method="POST" action=`/admin/members/${member.id}/card` data-spinner="Generating…")
+        button.btn-outline.btn-compact(type="submit") Generate Card
+      if !member.primary_member_id
+        form(method="POST" action=`/admin/members/${member.id}/renewal-link` data-spinner="Generating…")
+          button.btn-outline.btn-compact(type="submit") Generate Renewal Link
+      if member.membership_type !== 'family' && !member.primary_member_id
+        form(method="POST" action=`/admin/members/${member.id}/upgrade-to-family` data-confirm=`Upgrade ${member.first_name} ${member.last_name} to a family membership?`)
+          button.btn-outline.btn-compact(type="submit") Upgrade to Family
+    .actionbar-group.actionbar-danger
+      form(method="POST" action=`/admin/members/${member.id}/delete` data-confirm="Delete this member?")
+        button.btn-danger.btn-compact(type="submit") Delete
+
+  //- Full width and outside any disclosure: the URL is ~100 characters, and a robot test
+  //- reads this field's value straight after the redirect.
+  if flash_renewal_link
     .admin-panel
-      h3 Member Details
-      table.detail-table
-        tr
-          th Member Number
-          td= member.member_number
-        tr
-          th Name
-          td= `${member.first_name} ${member.last_name}`
-        tr
-          th Email
-          td= member.email
-        tr
-          th Phone
-          td= member.phone || '—'
-        tr
-          th Address
-          td= [member.address_street, member.address_city, member.address_state, member.address_zip].filter(Boolean).join(', ') || '—'
-        tr
-          th Year
-          td= member.membership_year
-        tr
-          th Join Date
-          td= formatDate(member.join_date)
-        tr
-          th Status
-          td
-            span(class=`badge badge-${member.status}`)= member.status
-            if member.is_lifetime
-              |
-              span.badge.badge-lifetime Lifetime
-        if member.membership_type
-          tr
-            th Membership Type
-            td= member.membership_type === 'family' ? 'Family' : 'Individual'
-        if member.primary_member_id && primaryMember
-          tr
-            th Primary Member
-            td
-              a(href=`/admin/members/${primaryMember.id}`) #{primaryMember.first_name} #{primaryMember.last_name} (#{primaryMember.member_number})
-        else if member.membership_type === 'family'
-          tr
-            th Family Members
-            td
-              if familyMembers.length
-                ul(style="margin: 0 0 0.5rem; padding-left: 1.5rem;")
-                  each fm in familyMembers
-                    li(style="margin-bottom: 0.25rem;")
-                      a(href=`/admin/members/${fm.id}`) #{fm.first_name} #{fm.last_name} (#{fm.member_number})
-                      |
-                      - const confirmMsg = fm.wouldDeleteOnRemove ? `${fm.first_name} ${fm.last_name} shares an email with an existing primary member — removing them will permanently delete their record. Continue?` : `Remove ${fm.first_name} ${fm.last_name} from this family membership?`
-                      form(method="POST" action=`/admin/members/${member.id}/family-members/${fm.id}/remove` style="display:inline" data-confirm=confirmMsg)
-                        button.btn-sm.btn-danger(type="submit" style="padding: 1px 8px; font-size: 0.75rem;")= fm.wouldDeleteOnRemove ? 'Remove (deletes record)' : 'Remove'
-              else
-                span.text-muted No family members yet.
-        tr
-          th Notes
-          td= member.notes || '—'
-        tr
-          th Created
-          td= formatDate(member.created_at)
-        tr
-          th Updated
-          td= formatDate(member.updated_at)
+      h3 Renewal Link
+      p.text-muted Read this out over the phone or paste it into a text. It goes straight to the renewal form — no email is sent.
+      .form-group
+        input#renewal-link.input-mono(type="text" value=flash_renewal_link.url readonly)
+        .form-actions.form-actions--tight
+          button#copy-renewal-link.btn-outline(type="button" data-copy="#renewal-link") Copy link
+          a.btn-outline(href=flash_renewal_link.url target="_blank" rel="noopener") Open
+        p.text-muted.mt-sm Expires #{formatDate(flash_renewal_link.expiresAt)}
 
-      .form-actions
-        a.btn(href=`/admin/members/${member.id}?edit=1`) Edit
-        form(method="POST" action=`/admin/members/${member.id}/card` style="display:inline" data-spinner="Generating…")
-          button.btn-outline(type="submit") Generate Card
-        if !member.primary_member_id
-          form(method="POST" action=`/admin/members/${member.id}/send-renewal` style="display:inline" data-confirm=`Send renewal reminder to ${member.first_name} ${member.last_name}?`)
-            button.btn-outline(type="submit") Send Renewal Reminder
-          form(method="POST" action=`/admin/members/${member.id}/renewal-link` style="display:inline" data-spinner="Generating…")
-            button.btn-outline(type="submit") Generate Renewal Link
-        if member.membership_type !== 'family' && !member.primary_member_id
-          form(method="POST" action=`/admin/members/${member.id}/upgrade-to-family` style="display:inline" data-confirm=`Upgrade ${member.first_name} ${member.last_name} to a family membership?`)
-            button.btn-outline(type="submit") Upgrade to Family
-        form(method="POST" action=`/admin/members/${member.id}/delete` style="display:inline" data-confirm="Delete this member?")
-          button.btn-danger(type="submit") Delete
-
-    if flash_renewal_link
+  //- Wide column for the record and its history tables; a narrow rail for the things
+  //- that are only a few words wide. The old .admin-grid (auto-fit minmax(400px, 1fr))
+  //- gave the near-empty Membership Cards panel half the viewport.
+  .record-layout
+    .record-main
       .admin-panel
-        h3 Renewal Link
-        p.text-muted Read this out over the phone or paste it into a text. It goes straight to the renewal form — no email is sent.
-        .form-group
-          input#renewal-link(type="text" value=flash_renewal_link.url readonly style="font-family: monospace;")
-          .form-actions(style="margin-top: 0.5rem;")
-            button#copy-renewal-link.btn-outline(type="button" data-copy="#renewal-link") Copy link
-            a.btn-outline(href=flash_renewal_link.url target="_blank" rel="noopener" style="margin-left: 0.5rem;") Open
-          p.text-muted(style="margin-top: 0.5rem;") Expires #{formatDate(flash_renewal_link.expiresAt)}
-
-    .admin-panel
-      h3 Membership Cards
-      if cards.length
-        each card in cards
-          .card-row
-            span Year: #{card.year}
-            if card.pdf_path
-              a.btn-sm(href=`/admin/members/${member.id}/card/pdf`) PDF
-            if card.png_path
-              a.btn-sm(href=`/admin/members/${member.id}/card/png`) PNG
-            form(method="POST" action=`/admin/members/${member.id}/email-card` style="display:inline")
-              button.btn-sm(type="submit") Email Card
-      else
-        p.text-muted No cards generated yet.
-
-  if member.membership_type !== 'family' && !member.primary_member_id && familyPrimaries.length
-    .admin-panel
-      h3 Attach to Family
-      form(method="POST" action=`/admin/members/${member.id}/attach-to-family`)
-        .form-group
-          label(for="primary_member_id") Family
-          select#primary_member_id.form-control(name="primary_member_id" required)
-            option(value="" disabled selected) — select a family —
-            each p in familyPrimaries
-              option(value=p.id) #{p.first_name} #{p.last_name} (#{p.member_number})
-        .form-actions
-          button.btn(type="submit") Attach to Family
-
-  if member.membership_type === 'family' && !member.primary_member_id
-    .admin-panel
-      h3 Add Family Member
-      form(method="POST" action=`/admin/members/${member.id}/family-members`)
-        .form-group
-          label(for="fm_first_name") First Name
-          input#fm_first_name.form-control(type="text" name="first_name" required)
-        .form-group
-          label(for="fm_last_name") Last Name
-          input#fm_last_name.form-control(type="text" name="last_name" required)
-        .form-group
-          label(for="fm_email") Email (optional)
-          input#fm_email.form-control(type="email" name="email" placeholder=`Defaults to ${member.email}`)
-        .form-actions
-          button.btn(type="submit") Add Family Member
-
-  .admin-panel
-    h3 Payments
-    if payments.length
-      table.admin-table
-        thead
+        h3 Member Details
+        table.detail-table
           tr
-            th Amount
-            th Status
-            th Method
-            th Description
-            th Date
-        tbody
-          each p in payments
-            tr
-              td $#{(p.amount_cents / 100).toFixed(2)}
-              td
-                span(class=`badge badge-${p.status}`)= p.status
-              td= p.payment_method || 'stripe'
-              td= p.description || '—'
-              td= formatDate(p.created_at)
-    else
-      p.text-muted No payments yet.
-
-  .admin-panel
-    h3 Membership Years
-    if membershipYears.length
-      table.admin-table
-        thead
+            th Member Number
+            td= member.member_number
           tr
-            th Period
-            th Enrolled
-            th Payment
-            th Status
-        tbody
-          each my in membershipYears
+            th Name
+            td= `${member.first_name} ${member.last_name}`
+          tr
+            th Email
+            td= member.email
+          tr
+            th Phone
+            td= member.phone || '—'
+          tr
+            th Address
+            td= [member.address_street, member.address_city, member.address_state, member.address_zip].filter(Boolean).join(', ') || '—'
+          tr
+            th Notes
+            td= member.notes || '—'
+          if member.primary_member_id && primaryMember
             tr
-              td= my.label
-              td= formatDate(my.created_at)
+              th Primary Member
               td
-                if my.payment_id
-                  | $#{(my.amount_cents / 100).toFixed(2)} via #{my.payment_method || 'stripe'} on #{formatDate(my.payment_date)}
+                a(href=`/admin/members/${primaryMember.id}`) #{primaryMember.first_name} #{primaryMember.last_name} (#{primaryMember.member_number})
+          else if member.membership_type === 'family'
+            tr
+              th Family Members
+              td
+                if familyMembers.length
+                  ul.family-member-list
+                    each fm in familyMembers
+                      li
+                        a(href=`/admin/members/${fm.id}`) #{fm.first_name} #{fm.last_name} (#{fm.member_number})
+                        |
+                        - const confirmMsg = fm.wouldDeleteOnRemove ? `${fm.first_name} ${fm.last_name} shares an email with an existing primary member — removing them will permanently delete their record. Continue?` : `Remove ${fm.first_name} ${fm.last_name} from this family membership?`
+                        form.inline-form(method="POST" action=`/admin/members/${member.id}/family-members/${fm.id}/remove` data-confirm=confirmMsg)
+                          button.btn-tiny.btn-danger(type="submit")= fm.wouldDeleteOnRemove ? 'Remove (deletes record)' : 'Remove'
                 else
-                  | —
-              td
-                if my.payment_id
-                  span(class=`badge badge-${my.payment_status}`)= my.payment_status
-                else
-                  | —
-    else
-      p.text-muted No enrollment history.
+                  span.text-muted No family members yet.
 
-  .admin-panel
-    h3 Record Offline Payment
-    form(method="POST" action=`/admin/members/${member.id}/payments`)
-      .form-group
-        label(for="amount") Amount ($)
-        input#amount.form-control(type="number" name="amount" step="0.01" min="0.01" required)
-      .form-group
-        label(for="payment_method") Payment Method
-        select#payment_method.form-control(name="payment_method")
-          option(value="cash") Cash
-          option(value="check") Check
-          option(value="other") Other
-      .form-group
-        label(for="description") Description
-        input#description.form-control(type="text" name="description" placeholder="Membership dues")
-      .form-group
-        label
-          if member.status !== 'active'
-            input(type="checkbox" name="activate_member" checked)
-          else
-            input(type="checkbox" name="activate_member")
-          |  Activate member
-      .form-actions
-        button.btn(type="submit") Record Payment
+        if member.membership_type !== 'family' && !member.primary_member_id && familyPrimaries.length
+          details.disclosure(open=(flash_reopen === 'attach-family'))
+            summary Attach to Family
+            .disclosure-body
+              form#attach-family(method="POST" action=`/admin/members/${member.id}/attach-to-family`)
+                .form-group
+                  label(for="primary_member_id") Family
+                  select#primary_member_id.form-control(name="primary_member_id" required)
+                    option(value="" disabled selected) — select a family —
+                    each p in familyPrimaries
+                      option(value=p.id) #{p.first_name} #{p.last_name} (#{p.member_number})
+                .form-actions
+                  button.btn(type="submit") Attach to Family
 
-  .admin-panel
-    h3 Recent Emails
-    if emails.length
-      table.admin-table
-        thead
+        if member.membership_type === 'family' && !member.primary_member_id
+          details.disclosure(open=(flash_reopen === 'add-family-member'))
+            summary Add Family Member
+            .disclosure-body
+              form#add-family-member(method="POST" action=`/admin/members/${member.id}/family-members`)
+                .form-group
+                  label(for="fm_first_name") First Name
+                  input#fm_first_name.form-control(type="text" name="first_name" required)
+                .form-group
+                  label(for="fm_last_name") Last Name
+                  input#fm_last_name.form-control(type="text" name="last_name" required)
+                .form-group
+                  label(for="fm_email") Email (optional)
+                  input#fm_email.form-control(type="email" name="email" placeholder=`Defaults to ${member.email}`)
+                .form-actions
+                  button.btn(type="submit") Add Family Member
+
+      .admin-panel
+        h3 Payments
+        if payments.length
+          table#member-payments.admin-table
+            thead
+              tr
+                th Amount
+                th Status
+                th Method
+                th Description
+                th Date
+            tbody
+              each p in payments
+                tr
+                  td= formatMoney(p.amount_cents)
+                  td
+                    +badge(p.status, p.status)
+                  td= p.payment_method || 'stripe'
+                  td= p.description || '—'
+                  td= formatDate(p.created_at)
+        else
+          p.text-muted No payments yet.
+
+        details.disclosure(open=(flash_reopen === 'record-payment'))
+          summary Record Offline Payment
+          .disclosure-body
+            form#record-payment(method="POST" action=`/admin/members/${member.id}/payments`)
+              .form-group
+                label(for="amount") Amount ($)
+                input#amount.form-control(type="number" name="amount" step="0.01" min="0.01" required value=defaultPaymentDollars)
+                if currentPeriod && defaultPaymentDollars
+                  small.form-hint Default #{member.membership_type === 'family' ? 'family' : 'individual'} dues for #{currentPeriod.label}.
+              .form-group
+                label(for="payment_method") Payment Method
+                select#payment_method.form-control(name="payment_method")
+                  option(value="cash") Cash
+                  option(value="check") Check
+                  option(value="other") Other
+              .form-group
+                label(for="description") Description
+                input#description.form-control(type="text" name="description" placeholder="Membership dues")
+              .form-group
+                label.checkbox-label
+                  if member.status !== 'active'
+                    input(type="checkbox" name="activate_member" checked)
+                  else
+                    input(type="checkbox" name="activate_member")
+                  |  Activate member
+              .form-actions
+                button.btn(type="submit") Record Payment
+
+      .admin-panel
+        h3 Membership Years
+        if membershipYears.length
+          table.admin-table
+            thead
+              tr
+                th Period
+                th Enrolled
+                th Payment
+                th Status
+            tbody
+              each my in membershipYears
+                tr
+                  td= my.label
+                  td= formatDate(my.created_at)
+                  td
+                    if my.payment_id
+                      | #{formatMoney(my.amount_cents)} via #{my.payment_method || 'stripe'} on #{formatDate(my.payment_date)}
+                    else
+                      | —
+                  td
+                    if my.payment_id
+                      +badge(my.payment_status, my.payment_status)
+                    else
+                      | —
+        else
+          p.text-muted No enrollment history.
+
+      .admin-panel
+        h3 Recent Emails
+        if emails.length
+          table.admin-table
+            thead
+              tr
+                th Subject
+                th Type
+                th Status
+                th Date
+            tbody
+              each e in emails
+                tr
+                  td= e.subject
+                  td= e.email_type
+                  td= e.status
+                  td= formatDate(e.created_at)
+        else
+          p.text-muted No emails sent yet.
+
+    aside.record-rail
+      .admin-panel
+        h3 Snapshot
+        //- Deliberately not .detail-table: robot's Get Text runs in strict mode, so a
+        //- second element matching that selector would break View Member Details.
+        table.snapshot-table
           tr
-            th Subject
-            th Type
             th Status
-            th Date
-        tbody
-          each e in emails
+            td
+              +badge(member.status, member.status)
+              if member.is_lifetime
+                |
+                span.badge.badge-lifetime Lifetime
+          if member.membership_type
             tr
-              td= e.subject
-              td= e.email_type
-              td= e.status
-              td= formatDate(e.created_at)
-    else
-      p.text-muted No emails sent yet.
+              th Type
+              td= member.membership_type === 'family' ? 'Family' : 'Individual'
+          tr
+            th Year
+            td= member.membership_year
+          tr
+            th Joined
+            td= formatDate(member.join_date)
+          tr
+            th Created
+            td= formatDate(member.created_at)
+          tr
+            th Updated
+            td= formatDate(member.updated_at)
+
+      .admin-panel
+        h3 Membership Cards
+        if cards.length
+          each card in cards
+            //- Year on its own line, actions on the next. Side by side in the 320px rail
+            //- both the label and "Email Card" wrapped to two lines, which left the three
+            //- buttons at different heights.
+            .card-row
+              .card-row-year Year #{card.year}
+              .card-row-actions
+                if card.pdf_path
+                  a.btn-sm(href=`/admin/members/${member.id}/card/pdf`) PDF
+                if card.png_path
+                  a.btn-sm(href=`/admin/members/${member.id}/card/png`) PNG
+                form.inline-form(method="POST" action=`/admin/members/${member.id}/email-card`)
+                  button.btn-sm(type="submit") Email
+        else
+          p.text-muted No cards generated yet.

@@ -4,6 +4,9 @@ block page_title
   | Dashboard
 
 block content
+  //- One row of KPIs. The revenue figure is formatted short and .stat-number scales with
+  //- the card (see admin.css) so a long value cannot paint outside its card the way
+  //- "$2034.00" at a fixed 2.25rem did.
   .stats-grid
     a.stat-card(href="/admin/members")
       .stat-number= stats.totalMembers
@@ -22,9 +25,9 @@ block content
         .stat-number= stats.currentPeriodEnrollment
         .stat-label= `Enrolled ${stats.currentPeriodLabel}`
     a.stat-card(href="/admin/payments")
-      .stat-number $#{(stats.totalRevenue / 100).toFixed(2)}
+      .stat-number= formatMoneyShort(stats.totalRevenue)
       .stat-label Total Revenue
-    .stat-card
+    a.stat-card(href="/admin/emails")
       .stat-number= stats.emailsSent
       .stat-label Emails Sent
 
@@ -49,7 +52,7 @@ block content
                 td= formatDate(m.created_at)
       else
         p.text-muted No members yet.
-      p(style="margin-top: 1rem;"): a(href="/admin/members") View all members &rarr;
+      p.mt-md: a(href="/admin/members") View all members &rarr;
 
     .admin-panel
       h3 Recent Payments
@@ -64,11 +67,15 @@ block content
           tbody
             each p in recentPayments
               tr
-                td= p.first_name ? `${p.first_name} ${p.last_name}` : 'N/A'
-                td $#{(p.amount_cents / 100).toFixed(2)}
+                td
+                  if p.member_id && p.first_name
+                    a(href=`/admin/members/${p.member_id}`)= `${p.first_name} ${p.last_name}`
+                  else
+                    | N/A
+                td= formatMoney(p.amount_cents)
                 td
                   span(class=`badge badge-${p.status}`)= p.status
                 td= formatDate(p.created_at)
       else
         p.text-muted No payments yet.
-      p(style="margin-top: 1rem;"): a(href="/admin/payments") View all payments &rarr;
+      p.mt-md: a(href="/admin/payments") View all payments &rarr;

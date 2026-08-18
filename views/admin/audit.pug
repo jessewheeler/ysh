@@ -4,83 +4,6 @@ block page_title
     | Audit Log
 
 block content
-    style.
-        .audit-filters {
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: .75rem;
-        }
-
-        .audit-filters select {
-            padding: .3rem .5rem;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-
-        .audit-meta {
-            color: #666;
-            font-size: .875rem;
-            margin-bottom: .5rem;
-        }
-
-        .audit-ts {
-            white-space: nowrap;
-            font-size: .8rem;
-            color: #555;
-        }
-
-        .audit-json {
-            max-height: 300px;
-            overflow: auto;
-            background: #f8f8f8;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: .5rem;
-            font-size: .75rem;
-            white-space: pre-wrap;
-        }
-
-        .audit-diff {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: .8rem;
-            margin-top: .4rem;
-        }
-
-        .audit-diff th, .audit-diff td {
-            padding: .2rem .5rem;
-            border: 1px solid #e5e7eb;
-        }
-
-        .audit-diff th {
-            background: #f3f4f6;
-            font-weight: 600;
-        }
-
-        .audit-old {
-            color: #991b1b;
-            background: #fff5f5;
-            word-break: break-all;
-        }
-
-        .audit-new {
-            color: #065f46;
-            background: #f0fff4;
-            word-break: break-all;
-        }
-
-        .muted {
-            color: #888;
-            font-size: .85rem;
-        }
-
-        details summary {
-            cursor: pointer;
-            font-size: .85rem;
-            color: #4b5563;
-        }
-
     .audit-filters
         form(method="GET" action="/admin/audit")
             label(for="table-filter") Table:
@@ -116,7 +39,7 @@ block content
                             td
                                 code= entry.record_id
                             td
-                                span(class=`audit-badge audit-badge--${entry.action.toLowerCase()}`)= entry.action
+                                +badge(`audit-${entry.action.toLowerCase()}`, entry.action)
                             td= entry.actor_email || '(system)'
                             td
                                 if entry.action === 'INSERT' && newObj
@@ -129,7 +52,7 @@ block content
                                         pre.audit-json= JSON.stringify(oldObj, null, 2)
                                 else if entry.action === 'UPDATE'
                                     if changedKeys.length === 0
-                                        span.muted (no field changes)
+                                        span.text-muted (no field changes)
                                     else
                                         details
                                             summary #{changedKeys.length} field(s) changed
@@ -149,11 +72,5 @@ block content
                                 else
                                     span —
 
-    if totalPages > 1
-        .pagination
-            if page > 1
-                a(href=`/admin/audit?page=${page - 1}&table=${tableName}`) &laquo; Prev
-            span Page #{page} of #{totalPages}
-            if page < totalPages
-                a(href=`/admin/audit?page=${page + 1}&table=${tableName}`) Next &raquo;
+    +pagination(page, totalPages, null, (n) => `/admin/audit?page=${n}&table=${tableName}`)
 

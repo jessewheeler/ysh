@@ -22,7 +22,7 @@ block content
             input#target_path(type="text" name="target_path" value=(campaign ? campaign.target_path : defaultTargetPath) placeholder=defaultTargetPath)
             p.text-muted A path on this site, starting with "/". Use #{defaultTargetPath} to send people straight to the signup form.
 
-        h3(style="margin-top: 1.5rem;") Attribution Details
+        h3 Attribution Details
 
         .form-group
             label(for="utm_source") Source (utm_source)
@@ -45,4 +45,4 @@ block content
 
         .form-actions
             button.btn(type="submit")= campaign ? 'Save Changes' : 'Create Campaign'
-            a.btn-outline(href=(campaign ? `/admin/campaigns/${campaign.id}` : '/admin/campaigns') style="margin-left: 1rem;") Cancel
+            a.btn-outline(href=(campaign ? `/admin/campaigns/${campaign.id}` : '/admin/campaigns')) Cancel

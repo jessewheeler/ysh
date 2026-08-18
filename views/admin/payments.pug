@@ -21,9 +21,17 @@ block content
       tbody
         each p in payments
           tr
-            td= p.first_name ? `${p.first_name} ${p.last_name}` : 'N/A'
+            td
+              //- Guarded on both: member_id is NOT NULL in the schema, so the only case
+              //- the first_name check covers is a missing member row — exactly the case
+              //- an id-only link would 404 on. Only the name is linked; the number in the
+              //- next cell would be a second tab stop to the same place.
+              if p.member_id && p.first_name
+                a(href=`/admin/members/${p.member_id}`)= `${p.first_name} ${p.last_name}`
+              else
+                | N/A
             td= p.member_number || '—'
-            td $#{(p.amount_cents / 100).toFixed(2)}
+            td= formatMoney(p.amount_cents)
             td
               span(class=`badge badge-${p.status}`)= p.status
             td= p.payment_method || 'stripe'
