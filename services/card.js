@@ -6,6 +6,7 @@ const path = require('path');
 const cardsRepo = require('../db/repos/cards');
 const storage = require('./storage');
 const db = require('../db/database');
+const logger = require('./logger');
 
 // Template-based card design — the background PNG is the official Sea Hawkers
 // membership card for the current season.  Only the member's name is stamped
@@ -33,9 +34,41 @@ const PDF_SCALE = 0.5;
 const PDF_WIDTH = Math.round(CARD_WIDTH * PDF_SCALE);   // 504
 const PDF_HEIGHT = Math.round(CARD_HEIGHT * PDF_SCALE); // 279
 
+// Legacy home for per-period templates: before issue #96 they were written straight
+// into the served static directory, which a deploy wipes.  Rows written back then
+// still hold a bare filename that resolves here.
 const CARD_TEMPLATE_DIR = path.join(__dirname, '..', 'public', 'img');
+const LOCAL_UPLOAD_DIR = path.join(__dirname, '..', 'data', 'uploads');
 
-async function resolveTemplate(memberId) {
+// Reads whatever `membership_periods.card_template_path` holds into a buffer.  Three
+// forms are in play: a B2 URL (what uploads produce now), a `/uploads/<name>` path
+// (the no-B2 local fallback), and a bare filename (pre-#96 rows).
+// A stalled fetch would hang card generation inside the Stripe webhook and the bulk
+// renewal run, defeating the fallback that exists to guarantee a card ships at all.
+const TEMPLATE_FETCH_TIMEOUT_MS = 10000;
+
+// Uploads always get a unique filename, so a path that has been read once cannot
+// change underneath us — worth caching to keep a bulk renewal from re-downloading the
+// same template once per member.
+const templateCache = new Map();
+
+async function loadTemplate(templatePath) {
+  if (templateCache.has(templatePath)) return templateCache.get(templatePath);
+
+  let buffer;
+  if (/^https?:\/\//.test(templatePath)) {
+    const res = await fetch(templatePath, {signal: AbortSignal.timeout(TEMPLATE_FETCH_TIMEOUT_MS)});
+    if (!res.ok) throw new Error(`fetch returned ${res.status}`);
+    buffer = Buffer.from(await res.arrayBuffer());
+  } else {
+    const dir = templatePath.startsWith('/uploads/') ? LOCAL_UPLOAD_DIR : CARD_TEMPLATE_DIR;
+    buffer = fs.readFileSync(path.join(dir, path.basename(templatePath)));
+  }
+  templateCache.set(templatePath, buffer);
+  return buffer;
+}
+
+async function resolveTemplateBuffer(memberId) {
   const row = await db.get(
     `SELECT mp.card_template_path
      FROM membership_years my
@@ -46,15 +79,19 @@ async function resolveTemplate(memberId) {
     memberId
   );
   if (row?.card_template_path) {
-    const templatePath = path.join(CARD_TEMPLATE_DIR, row.card_template_path);
-    // Fall back to the default template if the period's configured template
-    // file is missing — otherwise card generation throws and the renewal
-    // silently ships no card (issue #67).
-    if (fs.existsSync(templatePath)) {
-      return templatePath;
+    try {
+      return await loadTemplate(row.card_template_path);
+    } catch (err) {
+      // Fall back to the default template if the period's configured template is
+      // unreachable — otherwise card generation throws and the renewal silently
+      // ships no card (issue #67).  Warn loudly: a silent fallback is what hid
+      // the deploy-wipes-the-template bug for a whole release cycle (issue #96).
+      logger.warn('Card template unavailable, using default', {
+        memberId, cardTemplatePath: row.card_template_path, error: err.message,
+      });
     }
   }
-  return TEMPLATE_PNG;
+  return fs.readFileSync(TEMPLATE_PNG);
 }
 
 const cardsDir = path.join(__dirname, '..', 'data', 'cards');
@@ -67,8 +104,7 @@ async function generatePNG(member) {
   const canvas = createCanvas(CARD_WIDTH, CARD_HEIGHT);
   const ctx = canvas.getContext('2d');
 
-    const templatePath = await resolveTemplate(member.id);
-    const template = await loadImage(templatePath);
+    const template = await loadImage(await resolveTemplateBuffer(member.id));
     ctx.drawImage(template, 0, 0, CARD_WIDTH, CARD_HEIGHT);
 
     // Stamp member name on the blank "Member Name:" field
@@ -95,7 +131,7 @@ async function generatePNG(member) {
 
 async function generatePDF(member) {
   const filename = `card-${member.id}-${member.membership_year}.pdf`;
-  const templatePath = await resolveTemplate(member.id);
+  const templateBuffer = await resolveTemplateBuffer(member.id);
 
     const buffer = await new Promise((resolve, reject) => {
     const doc = new PDFDocument({
@@ -111,7 +147,7 @@ async function generatePDF(member) {
         pass.on('error', reject);
 
         // Draw official template as background
-        doc.image(templatePath, 0, 0, {width: PDF_WIDTH, height: PDF_HEIGHT});
+        doc.image(templateBuffer, 0, 0, {width: PDF_WIDTH, height: PDF_HEIGHT});
 
         // Stamp member name — PDFKit y is top-of-text, so subtract font ascent
         const pdfFontSize = NAME_FONT_SIZE * PDF_SCALE;

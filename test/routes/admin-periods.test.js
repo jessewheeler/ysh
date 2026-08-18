@@ -1,6 +1,9 @@
 jest.mock('../../db/database', () => require('../helpers/setupDb'));
 
+const fs = require('fs');
+const path = require('path');
 const db = require('../../db/database');
+const storage = require('../../services/storage');
 const {insertAdmin, insertPeriod} = require('../helpers/fixtures');
 
 const mockHandlers = {};
@@ -19,7 +22,14 @@ jest.mock('express', () => {
     return {...realExpress, Router: () => fakeRouter};
 });
 
-jest.mock('../../services/storage', () => ({isConfigured: () => false, uploadFile: jest.fn()}));
+jest.mock('../../services/storage', () => ({
+    isConfigured: jest.fn(() => false),
+    uploadFile: jest.fn(),
+    deleteFile: jest.fn().mockResolvedValue(undefined),
+}));
+
+const mockExecFile = jest.fn((cmd, args, cb) => cb(null, {stdout: '', stderr: ''}));
+jest.mock('child_process', () => ({...jest.requireActual('child_process'), execFile: mockExecFile}));
 
 function mockReq(overrides = {}) {
     return {body: {}, params: {}, session: {}, get: () => null, ...overrides};
@@ -36,6 +46,9 @@ function mockRes() {
 
 beforeEach(() => {
     db.__resetTestDb();
+    jest.clearAllMocks();
+    storage.isConfigured.mockReturnValue(false);
+    mockExecFile.mockImplementation((cmd, args, cb) => cb(null, {stdout: '', stderr: ''}));
     Object.keys(mockHandlers).forEach(k => delete mockHandlers[k]);
     jest.isolateModules(() => {
         require('../../routes/admin');
@@ -170,5 +183,206 @@ describe('POST /periods/:id/edit', () => {
         await mockHandlers['POST /periods/:id/edit'](req, res);
         expect(req.session.flash_error).toBeTruthy();
         expect(res._redirectUrl).toContain('/edit');
+    });
+});
+
+// Templates used to be written into public/img/, which the deploy checkout replaces —
+// so every release silently reverted the card to the committed default (issue #96).
+describe('card template upload', () => {
+    const B2_URL = 'https://f002.backblazeb2.com/file/ysh';
+    const validBody = {
+        label: '2026-27 Season',
+        start_date: '2026-04-01',
+        end_date: '2027-07-31',
+        individual_dues: '16.00',
+        family_dues: '26.00',
+        electronic_surcharge: '1.50',
+    };
+
+    function pngUpload() {
+        return {buffer: Buffer.from('fake-png'), originalname: 'card.png', mimetype: 'image/png'};
+    }
+
+    function session() {
+        return {adminId: 1, adminRole: 'super_admin'};
+    }
+
+    function periodRow(id) {
+        return db.__getCurrentDb().prepare('SELECT * FROM membership_periods WHERE id = ?').get(id);
+    }
+
+    beforeEach(() => {
+        storage.isConfigured.mockReturnValue(true);
+        storage.uploadFile.mockImplementation(async (_buf, _name, folder) => `${B2_URL}/${folder}/uploaded.png`);
+    });
+
+    test('POST /periods stores the storage URL, not a public/img filename', async () => {
+        const req = mockReq({body: validBody, file: pngUpload(), session: session()});
+        await mockHandlers['POST /periods'](req, mockRes());
+
+        const row = db.__getCurrentDb().prepare('SELECT * FROM membership_periods').get();
+        expect(row.card_template_path).toBe(`${B2_URL}/card-templates/uploaded.png`);
+        expect(storage.uploadFile).toHaveBeenCalledWith(expect.any(Buffer), 'card-template.png', 'card-templates');
+    });
+
+    test('POST /periods leaves the served static directory untouched', async () => {
+        const imgDir = path.join(__dirname, '..', '..', 'public', 'img');
+        const before = fs.readdirSync(imgDir);
+
+        const req = mockReq({body: validBody, file: pngUpload(), session: session()});
+        await mockHandlers['POST /periods'](req, mockRes());
+
+        expect(fs.readdirSync(imgDir)).toEqual(before);
+    });
+
+    test('without B2 the template lands on the persistent data/ disk', async () => {
+        storage.isConfigured.mockReturnValue(false);
+        const req = mockReq({body: validBody, file: pngUpload(), session: session()});
+        await mockHandlers['POST /periods'](req, mockRes());
+
+        const stored = db.__getCurrentDb().prepare('SELECT * FROM membership_periods').get().card_template_path;
+        expect(stored).toMatch(/^\/uploads\/\d+-\d+\.png$/);
+        const onDisk = path.join(__dirname, '..', '..', 'data', 'uploads', path.basename(stored));
+        try {
+            expect(fs.readFileSync(onDisk)).toEqual(Buffer.from('fake-png'));
+        } finally {
+            fs.unlinkSync(onDisk);
+        }
+    });
+
+    test('POST /periods/:id/edit replaces the template and deletes the old one', async () => {
+        const p = insertPeriod(db);
+        db.__getCurrentDb()
+            .prepare('UPDATE membership_periods SET card_template_path = ? WHERE id = ?')
+            .run(`${B2_URL}/card-templates/old.png`, p.id);
+
+        const req = mockReq({params: {id: String(p.id)}, body: validBody, file: pngUpload(), session: session()});
+        await mockHandlers['POST /periods/:id/edit'](req, mockRes());
+
+        expect(periodRow(p.id).card_template_path).toBe(`${B2_URL}/card-templates/uploaded.png`);
+        expect(storage.deleteFile).toHaveBeenCalledWith(`${B2_URL}/card-templates/old.png`);
+    });
+
+    test('POST /periods/:id/edit keeps the existing template when no file is uploaded', async () => {
+        const p = insertPeriod(db);
+        db.__getCurrentDb()
+            .prepare('UPDATE membership_periods SET card_template_path = ? WHERE id = ?')
+            .run(`${B2_URL}/card-templates/keep.png`, p.id);
+
+        const req = mockReq({params: {id: String(p.id)}, body: validBody, session: session()});
+        await mockHandlers['POST /periods/:id/edit'](req, mockRes());
+
+        expect(periodRow(p.id).card_template_path).toBe(`${B2_URL}/card-templates/keep.png`);
+        expect(storage.deleteFile).not.toHaveBeenCalled();
+    });
+
+    test('converts a PDF upload before storing it', async () => {
+        // Stand in for gs/magick: write the file each invocation is asked to produce.
+        mockExecFile.mockImplementation((cmd, args, cb) => {
+            const out = cmd === 'gs'
+                ? args.find(a => a.startsWith('-sOutputFile=')).slice('-sOutputFile='.length)
+                : args[args.length - 1];
+            fs.writeFileSync(out, Buffer.from(`converted-by-${cmd}`));
+            cb(null, {stdout: '', stderr: ''});
+        });
+
+        const req = mockReq({
+            body: validBody,
+            file: {buffer: Buffer.from('%PDF-1.4'), originalname: 'card.pdf', mimetype: 'application/pdf'},
+            session: session(),
+        });
+        await mockHandlers['POST /periods'](req, mockRes());
+
+        expect(mockExecFile.mock.calls.map(c => c[0])).toEqual(['gs', 'magick']);
+        expect(storage.uploadFile).toHaveBeenCalledWith(
+            Buffer.from('converted-by-magick'), 'card-template.png', 'card-templates'
+        );
+    });
+
+    test('treats a .pdf reported as octet-stream as a PDF', async () => {
+        mockExecFile.mockImplementation((cmd, args, cb) => {
+            const out = cmd === 'gs'
+                ? args.find(a => a.startsWith('-sOutputFile=')).slice('-sOutputFile='.length)
+                : args[args.length - 1];
+            fs.writeFileSync(out, Buffer.from(`converted-by-${cmd}`));
+            cb(null, {stdout: '', stderr: ''});
+        });
+
+        const req = mockReq({
+            body: validBody,
+            // What some browsers actually send for a PDF.
+            file: {buffer: Buffer.from('%PDF-1.4'), originalname: 'card.pdf', mimetype: 'application/octet-stream'},
+            session: session(),
+        });
+        await mockHandlers['POST /periods'](req, mockRes());
+
+        expect(mockExecFile).toHaveBeenCalled();
+        expect(storage.uploadFile).toHaveBeenCalledWith(
+            Buffer.from('converted-by-magick'), 'card-template.png', 'card-templates'
+        );
+    });
+
+    test('rejects a file that is neither PNG nor PDF', async () => {
+        const req = mockReq({
+            body: validBody,
+            // multer's filter admits .mp4 on every admin upload field, this one included.
+            file: {buffer: Buffer.from('not-an-image'), originalname: 'clip.mp4', mimetype: 'video/mp4'},
+            session: session(),
+        });
+        await mockHandlers['POST /periods'](req, mockRes());
+
+        expect(req.session.flash_error).toContain('PNG or a PDF');
+        expect(storage.uploadFile).not.toHaveBeenCalled();
+        expect(db.__getCurrentDb().prepare('SELECT COUNT(*) c FROM membership_periods').get().c).toBe(0);
+    });
+
+    test('does not create the period when the template upload fails', async () => {
+        storage.uploadFile.mockRejectedValue(new Error('B2 unreachable'));
+        const req = mockReq({body: validBody, file: pngUpload(), session: session()});
+        const res = mockRes();
+        await mockHandlers['POST /periods'](req, res);
+
+        // A period left behind here would be invisible to the admin, who was told the
+        // save failed, and resubmitting would duplicate it — nothing enforces uniqueness.
+        expect(db.__getCurrentDb().prepare('SELECT COUNT(*) c FROM membership_periods').get().c).toBe(0);
+        expect(req.session.flash_error).toBe('B2 unreachable');
+        expect(res._redirectUrl).toBe('/admin/periods/new');
+    });
+
+    test('deletes the replaced template only after the row points at the new one', async () => {
+        const p = insertPeriod(db);
+        db.__getCurrentDb()
+            .prepare('UPDATE membership_periods SET card_template_path = ? WHERE id = ?')
+            .run(`${B2_URL}/card-templates/old.png`, p.id);
+
+        let pathWhenDeleted;
+        storage.deleteFile.mockImplementation(async () => {
+            pathWhenDeleted = periodRow(p.id).card_template_path;
+        });
+
+        const req = mockReq({params: {id: String(p.id)}, body: validBody, file: pngUpload(), session: session()});
+        await mockHandlers['POST /periods/:id/edit'](req, mockRes());
+
+        expect(pathWhenDeleted).toBe(`${B2_URL}/card-templates/uploaded.png`);
+    });
+
+    test('flashes a PNG-instead message when the PDF toolchain is missing', async () => {
+        mockExecFile.mockImplementation((cmd, args, cb) => {
+            const err = new Error(`spawn ${cmd} ENOENT`);
+            err.code = 'ENOENT';
+            cb(err);
+        });
+
+        const req = mockReq({
+            body: validBody,
+            file: {buffer: Buffer.from('%PDF-1.4'), originalname: 'card.pdf', mimetype: 'application/pdf'},
+            session: session(),
+        });
+        const res = mockRes();
+        await mockHandlers['POST /periods'](req, res);
+
+        expect(req.session.flash_error).toContain('Upload a PNG instead');
+        expect(res._redirectUrl).toBe('/admin/periods/new');
+        expect(storage.uploadFile).not.toHaveBeenCalled();
     });
 });

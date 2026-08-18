@@ -41,7 +41,8 @@ jest.mock('pdfkit', () => {
   }));
 });
 
-// Mock fs
+// Mock fs — readFileSync delegates to the real one so template lookups behave
+// like the filesystem does, while still being observable.
 jest.mock('fs', () => {
   const actual = jest.requireActual('fs');
   return {
@@ -49,8 +50,13 @@ jest.mock('fs', () => {
     writeFileSync: jest.fn(),
     existsSync: jest.fn().mockReturnValue(true),
     mkdirSync: jest.fn(),
+    readFileSync: jest.fn((...args) => actual.readFileSync(...args)),
   };
 });
+
+jest.mock('../../services/logger', () => ({
+  info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(),
+}));
 
 // Mock storage — default to not configured (local path)
 jest.mock('../../services/storage', () => ({
@@ -61,9 +67,14 @@ jest.mock('../../services/storage', () => ({
 jest.mock('../../db/database', () => require('../helpers/setupDb'));
 
 const fs = require('fs');
+const actualFs = jest.requireActual('fs');
+const path = require('path');
+const DEFAULT_TEMPLATE = path.join(__dirname, '..', '..', 'public', 'img', 'card-template.png');
 const storage = require('../../services/storage');
+const logger = require('../../services/logger');
+const { loadImage } = require('canvas');
 const db = require('../../db/database');
-const { insertMember, insertCard } = require('../helpers/fixtures');
+const { insertMember, insertCard, insertPeriod, enrollMember } = require('../helpers/fixtures');
 
 let cardService;
 let testMember;
@@ -76,6 +87,7 @@ beforeEach(() => {
   fs.existsSync.mockReturnValue(true);
   fs.writeFileSync.mockImplementation(() => {});
   fs.mkdirSync.mockImplementation(() => {});
+  fs.readFileSync.mockImplementation((...args) => actualFs.readFileSync(...args));
 
     // Default storage: not configured
     storage.isConfigured.mockReturnValue(false);
@@ -263,5 +275,142 @@ describe('generatePDF with B2 configured', () => {
     test('returns B2 URL', async () => {
         const result = await cardService.generatePDF(testMember);
         expect(result).toBe(`${B2_URL}/cards/card-${testMember.id}-2025.pdf`);
+    });
+});
+
+// The period's template used to be read as a bare filename out of public/img/, which
+// a deploy wipes (issue #96).  It now stores whatever handleUpload returned, so the
+// service has to cope with a URL, a local /uploads/ path, and legacy bare filenames.
+describe('card template resolution', () => {
+    const UPLOADED = Buffer.from('uploaded-template');
+
+    function givenTemplate(card_template_path) {
+        const testDb = db.__getCurrentDb();
+        const period = insertPeriod(testDb, {label: '2025-26 Season'});
+        testDb.prepare('UPDATE membership_periods SET card_template_path = ? WHERE id = ?')
+            .run(card_template_path, period.id);
+        enrollMember(testDb, testMember.id, period.id);
+        return period;
+    }
+
+    /** Buffer handed to canvas for the card background. */
+    function templatePassedToCanvas() {
+        return loadImage.mock.calls[0][0];
+    }
+
+    test('fetches the template when the path is a B2 URL', async () => {
+        givenTemplate('https://f002.backblazeb2.com/file/ysh/card-templates/2025.png');
+        global.fetch = jest.fn().mockResolvedValue({
+            ok: true,
+            arrayBuffer: async () => UPLOADED.buffer.slice(UPLOADED.byteOffset, UPLOADED.byteOffset + UPLOADED.length),
+        });
+
+        await cardService.generatePNG(testMember);
+
+        expect(global.fetch).toHaveBeenCalledWith(
+            'https://f002.backblazeb2.com/file/ysh/card-templates/2025.png',
+            expect.objectContaining({signal: expect.any(AbortSignal)})
+        );
+        expect(templatePassedToCanvas()).toEqual(UPLOADED);
+        expect(logger.warn).not.toHaveBeenCalled();
+    });
+
+    test('reads from data/uploads when the path is a local upload', async () => {
+        givenTemplate('/uploads/1234-abcd.png');
+        fs.readFileSync.mockImplementation((p, ...rest) => (
+            String(p).includes('1234-abcd.png') ? UPLOADED : actualFs.readFileSync(p, ...rest)
+        ));
+
+        await cardService.generatePNG(testMember);
+
+        expect(fs.readFileSync).toHaveBeenCalledWith(
+            expect.stringContaining(path.join('data', 'uploads', '1234-abcd.png'))
+        );
+        expect(templatePassedToCanvas()).toEqual(UPLOADED);
+        expect(logger.warn).not.toHaveBeenCalled();
+    });
+
+    test('reads legacy bare filenames from public/img', async () => {
+        givenTemplate('card-template-2.png');
+        // Stubbed rather than leaning on the committed card-template-2.png, which is a
+        // leftover of issue #96 and due to be deleted.
+        fs.readFileSync.mockImplementation((p, ...rest) => (
+            String(p).includes('card-template-2.png') ? UPLOADED : actualFs.readFileSync(p, ...rest)
+        ));
+
+        await cardService.generatePNG(testMember);
+
+        expect(fs.readFileSync).toHaveBeenCalledWith(
+            expect.stringContaining(path.join('public', 'img', 'card-template-2.png'))
+        );
+        expect(logger.warn).not.toHaveBeenCalled();
+    });
+
+    test('falls back to the default template and warns when a fetch fails', async () => {
+        givenTemplate('https://f002.backblazeb2.com/file/ysh/card-templates/gone.png');
+        global.fetch = jest.fn().mockResolvedValue({ok: false, status: 404});
+
+        await cardService.generatePNG(testMember);
+
+        expect(logger.warn).toHaveBeenCalledWith('Card template unavailable, using default', expect.objectContaining({
+            cardTemplatePath: 'https://f002.backblazeb2.com/file/ysh/card-templates/gone.png',
+        }));
+        expect(templatePassedToCanvas()).toEqual(actualFs.readFileSync(DEFAULT_TEMPLATE));
+    });
+
+    test('falls back to the default template and warns when a local file is missing', async () => {
+        givenTemplate('/uploads/never-deployed.png');
+
+        await cardService.generatePNG(testMember);
+
+        expect(logger.warn).toHaveBeenCalled();
+        expect(templatePassedToCanvas()).toEqual(actualFs.readFileSync(DEFAULT_TEMPLATE));
+    });
+
+    test('uses the default template when the period has none configured', async () => {
+        givenTemplate(null);
+
+        await cardService.generatePNG(testMember);
+
+        expect(templatePassedToCanvas()).toEqual(actualFs.readFileSync(DEFAULT_TEMPLATE));
+        expect(logger.warn).not.toHaveBeenCalled();
+    });
+
+    test('bounds the fetch so a stalled B2 cannot hang card generation', async () => {
+        givenTemplate('https://f002.backblazeb2.com/file/ysh/card-templates/slow.png');
+        global.fetch = jest.fn().mockRejectedValue(
+            Object.assign(new Error('The operation was aborted due to timeout'), {name: 'TimeoutError'})
+        );
+
+        await cardService.generatePNG(testMember);
+
+        const [, opts] = global.fetch.mock.calls[0];
+        expect(opts.signal).toBeInstanceOf(AbortSignal);
+        expect(logger.warn).toHaveBeenCalled();
+        expect(templatePassedToCanvas()).toEqual(actualFs.readFileSync(DEFAULT_TEMPLATE));
+    });
+
+    test('reads a template once even when many cards are generated', async () => {
+        givenTemplate('https://f002.backblazeb2.com/file/ysh/card-templates/2025.png');
+        global.fetch = jest.fn().mockResolvedValue({
+            ok: true,
+            arrayBuffer: async () => UPLOADED.buffer.slice(UPLOADED.byteOffset, UPLOADED.byteOffset + UPLOADED.length),
+        });
+
+        await cardService.generatePNG(testMember);
+        await cardService.generatePDF(testMember);
+
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    test('generatePDF draws the resolved template buffer, not a path', async () => {
+        givenTemplate('/uploads/1234-abcd.png');
+        fs.readFileSync.mockImplementation((p, ...rest) => (
+            String(p).includes('1234-abcd.png') ? UPLOADED : actualFs.readFileSync(p, ...rest)
+        ));
+
+        await cardService.generatePDF(testMember);
+
+        expect(mockPdfImage).toHaveBeenCalledWith(UPLOADED, 0, 0, expect.any(Object));
     });
 });

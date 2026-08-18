@@ -33,7 +33,12 @@ async function handleUpload(file, folder) {
     return storage.uploadFile(file.buffer, file.originalname, folder);
   }
   const localName = `${Date.now()}-${Math.round(Math.random() * 1e6)}${path.extname(file.originalname)}`;
-  fs.writeFileSync(path.join(__dirname, '..', 'data', 'uploads', localName), file.buffer);
+  // server.js mkdirs this at boot, but the write is what needs it: data/ is gitignored,
+  // so anything that reaches here without booting the server (Jest, a CLI script) hit
+  // ENOENT and reported it as an upload failure.
+  const dir = path.join(__dirname, '..', 'data', 'uploads');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, localName), file.buffer);
   return `/uploads/${localName}`;
 }
 
@@ -950,39 +955,67 @@ router.post('/bios/:id/delete', async (req, res) => {
   res.redirect('/admin/bios');
 });
 
-// Convert an uploaded card template file (PNG or PDF) to a trimmed PNG
-// saved in public/img/ under the given filename. Returns the filename.
-async function processCardTemplate(file, filename) {
+// Convert an uploaded card template file (PNG or PDF) to a trimmed PNG buffer.
+// The caller stores it through handleUpload — writing it into public/img/ instead
+// meant every deploy replaced it with the committed default (issue #96).
+async function processCardTemplate(file) {
+  // Dispatch on the extension, not file.mimetype: multer's fileFilter (server.js) gates
+  // on the extension and browsers report application/octet-stream for a .pdf often
+  // enough to matter.  Trusting mimetype would upload raw PDF bytes named .png, which
+  // fails loadImage and lands right back in the silent-default behavior of issue #96.
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ext !== '.pdf' && ext !== '.png') {
+    throw new Error('Card template must be a PNG or a PDF.');
+  }
+  if (ext !== '.pdf') return file.buffer;
+
   const {execFile} = require('child_process');
   const {promisify} = require('util');
   const execFileAsync = promisify(execFile);
 
-  const outPath = path.join(__dirname, '..', 'public', 'img', filename);
-  const tmpInput = path.join(__dirname, '..', 'data', `tmp-card-${Date.now()}`);
+  // Both tools want real files, and data/ is the persistent disk on Render.
+  const dataDir = path.join(__dirname, '..', 'data');
+  fs.mkdirSync(dataDir, { recursive: true });
+  const tmpInput = path.join(dataDir, `tmp-card-${Date.now()}`);
+  const tmpPng = `${tmpInput}.png`;
+  const tmpTrimmed = `${tmpInput}-trimmed.png`;
 
   fs.writeFileSync(tmpInput, file.buffer);
   try {
-    if (file.mimetype === 'application/pdf') {
-      const tmpPng = `${tmpInput}.png`;
+    // A missing binary surfaces as ENOENT, which is indistinguishable from a
+    // missing file further down — so map it to advice here, not around the read.
+    try {
       await execFileAsync('gs', [
         '-dNOPAUSE', '-dBATCH', '-sDEVICE=png16m', '-r300',
         `-sOutputFile=${tmpPng}`, tmpInput,
       ]);
+      const trimArgs = [tmpPng, '-trim', '-bordercolor', 'white', '-border', '20', tmpTrimmed];
       // ImageMagick 7 uses `magick`; IM6 (common on Ubuntu LTS) uses `convert`
       try {
-        await execFileAsync('magick', [tmpPng, '-trim', '-bordercolor', 'white', '-border', '20', outPath]);
+        await execFileAsync('magick', trimArgs);
       } catch (e) {
         if (e.code !== 'ENOENT') throw e;
-        await execFileAsync('convert', [tmpPng, '-trim', '-bordercolor', 'white', '-border', '20', outPath]);
+        await execFileAsync('convert', trimArgs);
       }
-      fs.unlinkSync(tmpPng);
-    } else {
-      fs.copyFileSync(tmpInput, outPath);
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        throw new Error('This server cannot convert PDFs (Ghostscript/ImageMagick missing). Upload a PNG instead.');
+      }
+      throw err;
     }
+    return fs.readFileSync(tmpTrimmed);
   } finally {
-    if (fs.existsSync(tmpInput)) fs.unlinkSync(tmpInput);
+    for (const p of [tmpInput, tmpPng, tmpTrimmed]) {
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    }
   }
-  return filename;
+}
+
+// Store an uploaded card template and return the value for
+// membership_periods.card_template_path — a B2 URL, or /uploads/<name> without B2.
+async function uploadCardTemplate(file) {
+  const buffer = await processCardTemplate(file);
+  return handleUpload({ buffer, originalname: 'card-template.png' }, 'card-templates');
 }
 
 // --- Campaigns (issue #88) ---
@@ -1185,11 +1218,13 @@ router.get('/periods/new', requireSuperAdmin, async (req, res) => {
 router.post('/periods', requireSuperAdmin, async (req, res) => {
   try {
     const data = membershipPeriodsService.validatePeriod(req.body);
+    // Store the template first: nothing enforces uniqueness on label or dates, so a
+    // create that survived a failed upload would leave the admin resubmitting a form
+    // they were told had not saved, quietly duplicating the period.
+    const card_template_path = req.file ? await uploadCardTemplate(req.file) : null;
     const period = await periodsRepo.create(data);
-    if (req.file) {
-      const filename = `card-template-${period.id}.png`;
-      await processCardTemplate(req.file, filename);
-      await periodsRepo.setCardTemplate(period.id, filename);
+    if (card_template_path) {
+      await periodsRepo.setCardTemplate(period.id, card_template_path);
     }
     req.session.flash_success = 'Membership period created.';
     res.redirect('/admin/periods');
@@ -1215,11 +1250,14 @@ router.post('/periods/:id/edit', requireSuperAdmin, async (req, res) => {
     const data = membershipPeriodsService.validatePeriod(req.body);
     let card_template_path = existing?.card_template_path || null;
     if (req.file) {
-      const filename = `card-template-${id}.png`;
-      await processCardTemplate(req.file, filename);
-      card_template_path = filename;
+      card_template_path = await uploadCardTemplate(req.file);
     }
     await periodsRepo.update(id, {...data, card_template_path});
+    // Only after the row points at the replacement — a delete before the update would
+    // strand the old row on a template that no longer exists if the update threw.
+    if (req.file) {
+      storage.deleteFile(existing?.card_template_path).catch(() => {});
+    }
     req.session.flash_success = 'Membership period updated.';
     res.redirect('/admin/periods');
   } catch (err) {
