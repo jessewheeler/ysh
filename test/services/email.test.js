@@ -76,6 +76,102 @@ describe('sendWelcomeEmail', () => {
     expect(log).toBeDefined();
     expect(log.error).toContain('MailerSend error');
   });
+
+    // Issue #73: the membership card rides along with the welcome instead of arriving
+    // in its own email.
+    describe('card attachments', () => {
+        function seedB2Card(member, year = 2025) {
+            insertCard(db.__getCurrentDb(), {
+                member_id: member.id,
+                pdf_path: `https://b2.example.com/cards/card-${member.id}-${year}.pdf`,
+                png_path: `https://b2.example.com/cards/card-${member.id}-${year}.png`,
+                year,
+            });
+        }
+
+        function mockB2Fetch() {
+            const fakeBuffer = Buffer.from('card-data');
+            global.fetch = jest.fn().mockImplementation((url) => {
+                if (String(url).startsWith('https://b2.example.com')) {
+                    return Promise.resolve({ok: true, arrayBuffer: () => Promise.resolve(fakeBuffer.buffer)});
+                }
+                return Promise.resolve({ok: true, status: 202});
+            });
+        }
+
+        function sentBody() {
+            const call = global.fetch.mock.calls.find(([url]) => String(url).includes('api.mailersend.com'));
+            return JSON.parse(call[1].body);
+        }
+
+        test('attaches the member\'s own card and says so in the body', async () => {
+            seedB2Card(testMember);
+            mockB2Fetch();
+
+            await emailService.sendWelcomeEmail(testMember, [testMember]);
+
+            const body = sentBody();
+            expect(body.attachments.map(a => a.filename)).toEqual([
+                'YSH-Membership-Card-2025.pdf',
+                'YSH-Membership-Card-2025.png',
+            ]);
+            expect(body.html).toContain('attached to this email');
+            expect(body.html).not.toContain('separate email');
+        });
+
+        test('attaches one distinctly-named set per family member sharing the address', async () => {
+            const testDb = db.__getCurrentDb();
+            const spouse = insertMember(testDb, {
+                email: 'member@test.com',
+                first_name: 'Jane',
+                last_name: 'Doe',
+                member_number: 'YSH-2025-0002',
+                membership_year: 2025,
+                status: 'active',
+                primary_member_id: testMember.id,
+            });
+            seedB2Card(testMember);
+            seedB2Card(spouse);
+            mockB2Fetch();
+
+            await emailService.sendWelcomeEmail(testMember, [testMember, spouse]);
+
+            const body = sentBody();
+            expect(body.attachments.map(a => a.filename)).toEqual([
+                'YSH-Membership-Card-2025-john-doe.pdf',
+                'YSH-Membership-Card-2025-john-doe.png',
+                'YSH-Membership-Card-2025-jane-doe.pdf',
+                'YSH-Membership-Card-2025-jane-doe.png',
+            ]);
+            expect(body.html).toContain('John Doe, Jane Doe');
+        });
+
+        test('still sends, with card-to-follow copy, when no card exists', async () => {
+            await emailService.sendWelcomeEmail(testMember, [testMember]);
+
+            const body = getFetchBody();
+            expect(body.attachments).toBeUndefined();
+            expect(body.html).toContain('will follow shortly');
+            const log = await db.get("SELECT * FROM emails_log WHERE email_type = 'welcome'");
+            expect(log.status).toBe('sent');
+        });
+
+        test('never attaches a prior-year card', async () => {
+            // The member has rolled over to 2026 but only the 2025 card exists.
+            seedB2Card(testMember, 2025);
+            mockB2Fetch();
+
+            await emailService.sendWelcomeEmail({...testMember, membership_year: 2026}, [
+                {...testMember, membership_year: 2026},
+            ]);
+
+            const b2Calls = global.fetch.mock.calls.filter(([url]) => String(url).startsWith('https://b2.example.com'));
+            expect(b2Calls).toHaveLength(0);
+            const body = sentBody();
+            expect(body.attachments).toBeUndefined();
+            expect(body.html).toContain('will follow shortly');
+        });
+    });
 });
 
 describe('sendPaymentConfirmation', () => {

@@ -42,13 +42,14 @@ Both functions upsert a `membership_cards` row (one row per member per year).
 
 Requires `MAILERSEND_API_KEY` and `FROM_EMAIL` in the environment. All emails are wrapped in a branded HTML template (navy header, white body, gray footer). Every send is logged to the `emails_log` table regardless of success or failure.
 
-| Function                  | Signature                                | Description                                                                            |
-|---------------------------|------------------------------------------|----------------------------------------------------------------------------------------|
-| `sendWelcomeEmail`        | `(member) => Promise`                    | Sent after payment. Includes membership details.                                       |
-| `sendPaymentConfirmation` | `(member, stripeSession) => Promise`     | Receipt with amount, date, member number.                                              |
-| `sendCardEmail`           | `(member) => Promise`                    | Looks up the latest card for the member and attaches both the PDF and PNG.             |
-| `sendBlastEmail`          | `(member, subject, bodyHtml) => Promise` | Sends an admin-composed email to a single member. Called in a loop by the blast route. |
-| `sendContactEmail`        | `({ name, email, message }) => Promise`  | Forwards a contact form submission to the site's contact email (from `site_settings`). |
+| Function                  | Signature                                | Description                                                                                                                                                                                                                                                                         |
+|---------------------------|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `sendWelcomeEmail`        | `(member, cardMembers = []) => Promise`  | Sent after payment. Membership details plus the current-year card (PDF + PNG) for every member in `cardMembers` — the primary and any family sub-members sharing their address (issue #73). Best-effort: a missing card downgrades the copy to "card will follow", it never throws. |
+| `sendPaymentConfirmation` | `(member, stripeSession) => Promise`     | Receipt with amount, date, member number.                                                                                                                                                                                                                                           |
+| `sendCardEmail`           | `(member) => Promise`                    | Standalone card delivery for admin ad-hoc resends and family sub-members with their own address. Throws when no current-year card row exists.                                                                                                                                       |
+| `buildCardAttachments`    | `(member, { labelWithName }) => Promise` | Base64 PDF/PNG attachments for the member's current-year card. Throws when there is no card row; returns `[]` when the assets can't be fetched. `labelWithName` suffixes filenames with a name slug so a family email's attachments don't collide.                                  |
+| `sendBlastEmail`          | `(member, subject, bodyHtml) => Promise` | Sends an admin-composed email to a single member. Called in a loop by the blast route.                                                                                                                                                                                              |
+| `sendContactEmail`        | `({ name, email, message }) => Promise`  | Forwards a contact form submission to the site's contact email (from `site_settings`).                                                                                                                                                                                              |
 
 Internal helpers:
 - `emailWrapper(bodyHtml)` -- Wraps content in the branded HTML template.

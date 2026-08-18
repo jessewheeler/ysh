@@ -123,10 +123,13 @@ describe('renewal when card generation fails', () => {
     expect(card2026).toBeUndefined();
   });
 
-  test('no card email is sent when the current-year card was not generated', async () => {
-    // Fix target: the webhook must not deliver a card email (which would attach
-    // the stale 2025 card) when the 2026 card failed to generate.
+    test('no card is delivered when the current-year card was not generated', async () => {
+        // Fix target: the webhook must not deliver a card (which would attach the stale
+        // 2025 card) when the 2026 card failed to generate. The card now rides along with
+        // the welcome email (issue #73), so the guard is an empty card-member list there.
     await renew();
     expect(emailService.sendCardEmail).not.toHaveBeenCalled();
+        expect(emailService.sendWelcomeEmail).toHaveBeenCalledTimes(1);
+        expect(emailService.sendWelcomeEmail.mock.calls[0][1]).toEqual([]);
   });
 });

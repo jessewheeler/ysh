@@ -87,12 +87,17 @@ describe('POST /webhook — checkout.session.completed', () => {
 
     expect(res.json).toHaveBeenCalledWith({ received: true });
 
-    // The welcome + card emails must reflect the new year, not the stale 2025.
+      // The welcome email must reflect the new year, not the stale 2025, and it carries
+      // the card itself — no separate card email for a lone member (issue #73).
     expect(emailService.sendWelcomeEmail).toHaveBeenCalledTimes(1);
     expect(emailService.sendWelcomeEmail.mock.calls[0][0].membership_year).toBe(2026);
 
-    expect(emailService.sendCardEmail).toHaveBeenCalledTimes(1);
-    expect(emailService.sendCardEmail.mock.calls[0][0].membership_year).toBe(2026);
+      const cardMembers = emailService.sendWelcomeEmail.mock.calls[0][1];
+      expect(cardMembers).toHaveLength(1);
+      expect(cardMembers[0].membership_year).toBe(2026);
+
+      expect(emailService.sendCardEmail).not.toHaveBeenCalled();
+      expect(emailService.sendPaymentConfirmation).toHaveBeenCalledTimes(1);
 
     // Card generation likewise sees the updated year.
     expect(cardService.generatePDF.mock.calls[0][0].membership_year).toBe(2026);
@@ -124,6 +129,89 @@ describe('POST /webhook — checkout.session.completed', () => {
  * these branches existed, payments.status = 'failed' was declared in the schema but
  * never written by any code path.
  */
+// Issue #73: a family sharing the primary's address used to receive a card email per
+// member on top of the welcome and the receipt.
+describe('family card consolidation', () => {
+    function seedFamily(testDb, subMemberEmails) {
+        const primary = insertMember(testDb, {
+            email: 'primary@test.com',
+            first_name: 'Pat',
+            last_name: 'Primary',
+            status: 'pending',
+            membership_year: 2025,
+            membership_type: 'family',
+        });
+        const subs = subMemberEmails.map((email, i) => insertMember(testDb, {
+            email,
+            first_name: `Sub${i}`,
+            last_name: 'Primary',
+            status: 'pending',
+            membership_year: 2025,
+            membership_type: 'family',
+            primary_member_id: primary.id,
+        }));
+        const period = insertPeriod(testDb, {
+            label: '2026-27 Season',
+            start_date: '2026-04-01',
+            end_date: '2027-07-31',
+        });
+        stripeService.constructWebhookEvent.mockReturnValue(
+            checkoutCompletedEvent({
+                id: 'cs_test_family',
+                payment_intent: 'pi_test_family',
+                amount_total: 4000,
+                metadata: {
+                    member_id: String(primary.id),
+                    period_id: String(period.id),
+                    membership_type: 'family',
+                },
+            })
+        );
+        return {primary, subs};
+    }
+
+    test('sends one welcome carrying every card when the family shares an address', async () => {
+        const testDb = getTestDb();
+        const {primary, subs} = seedFamily(testDb, ['primary@test.com', 'primary@test.com']);
+
+        await mockHandlers['POST /webhook'](mockReq(), mockRes());
+
+        expect(emailService.sendWelcomeEmail).toHaveBeenCalledTimes(1);
+        const [recipient, cardMembers] = emailService.sendWelcomeEmail.mock.calls[0];
+        expect(recipient.id).toBe(primary.id);
+        expect(cardMembers.map(m => m.id).sort()).toEqual([primary.id, ...subs.map(s => s.id)].sort());
+        expect(emailService.sendCardEmail).not.toHaveBeenCalled();
+        expect(emailService.sendPaymentConfirmation).toHaveBeenCalledTimes(1);
+    });
+
+    test('a sub-member with their own address still gets their own card email', async () => {
+        const testDb = getTestDb();
+        const {primary, subs} = seedFamily(testDb, ['primary@test.com', 'kid@test.com']);
+        const [shared, ownAddress] = subs;
+
+        await mockHandlers['POST /webhook'](mockReq(), mockRes());
+
+        const cardMembers = emailService.sendWelcomeEmail.mock.calls[0][1];
+        expect(cardMembers.map(m => m.id).sort()).toEqual([primary.id, shared.id].sort());
+
+        expect(emailService.sendCardEmail).toHaveBeenCalledTimes(1);
+        expect(emailService.sendCardEmail.mock.calls[0][0].id).toBe(ownAddress.id);
+    });
+
+    test('a failing send does not abort the remaining sends', async () => {
+        const testDb = getTestDb();
+        seedFamily(testDb, ['kid@test.com']);
+        emailService.sendWelcomeEmail.mockRejectedValueOnce(new Error('mailersend down'));
+
+        const res = mockRes();
+        await mockHandlers['POST /webhook'](mockReq(), res);
+
+        expect(res.json).toHaveBeenCalledWith({received: true});
+        expect(emailService.sendPaymentConfirmation).toHaveBeenCalledTimes(1);
+        expect(emailService.sendCardEmail).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe('POST /webhook — checkout.session.expired', () => {
   async function fire(session) {
     stripeService.constructWebhookEvent.mockReturnValue({

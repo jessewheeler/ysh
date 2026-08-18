@@ -345,7 +345,9 @@ describe('Renewal — full lifecycle (reminder → renew → webhook)', () => {
 
     // Confirmation emails reflect the renewed year (the bug this suite guards against).
     expect(emailService.sendWelcomeEmail.mock.calls[0][0].membership_year).toBe(2026);
-    expect(emailService.sendCardEmail.mock.calls[0][0].membership_year).toBe(2026);
+      // The card now rides along with the welcome rather than in its own email (issue #73).
+      expect(emailService.sendWelcomeEmail.mock.calls[0][1][0].membership_year).toBe(2026);
+      expect(emailService.sendCardEmail).not.toHaveBeenCalled();
 
     // The renewal token is no longer usable.
     expect(await membersRepo.findByRenewalToken(token)).toBeUndefined();

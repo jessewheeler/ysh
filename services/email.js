@@ -153,7 +153,39 @@ async function sendEmail({ to, toName, subject, html, email_type, member_id, att
   }
 }
 
-async function sendWelcomeEmail(member) {
+async function sendWelcomeEmail(member, cardMembers = []) {
+    // Card attachments ride along with the welcome rather than arriving in their own
+    // email (issue #73). Best-effort: a member whose card failed to generate still gets
+    // welcomed, just without the file.
+    const withCards = [];
+    const attachments = [];
+    const labelWithName = cardMembers.length > 1;
+    for (const cardMember of cardMembers) {
+        let memberAttachments = [];
+        try {
+            memberAttachments = await buildCardAttachments(cardMember, {labelWithName});
+        } catch (err) {
+            logger.error('Failed to build card attachments for welcome email', {
+                memberId: cardMember.id,
+                error: err.message,
+            });
+        }
+        if (memberAttachments.length > 0) {
+            withCards.push(cardMember);
+            attachments.push(...memberAttachments);
+        }
+    }
+
+    let cardParagraph;
+    if (withCards.length > 1) {
+        const names = escapeHtml(withCards.map(m => `${m.first_name} ${m.last_name}`).join(', '));
+        cardParagraph = `<p>Your ${escapeHtml(member.membership_year)} membership cards are attached to this email as PDF and PNG, one set per member — ${names}. Look for us at the Red Door Lounge on game days!</p>`;
+    } else if (withCards.length === 1) {
+        cardParagraph = `<p>Your ${escapeHtml(member.membership_year)} membership card is attached to this email in both PDF and PNG formats. Look for us at the Red Door Lounge on game days!</p>`;
+    } else {
+        cardParagraph = '<p>Your membership card will follow shortly in a separate email. Look for us at the Red Door Lounge on game days!</p>';
+    }
+
   const html = `
     <h2 style="color:#002a5c;">Welcome to the Yellowstone Sea Hawkers!</h2>
     <p>Hi ${escapeHtml(member.first_name)},</p>
@@ -163,7 +195,7 @@ async function sendWelcomeEmail(member) {
       <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Season:</td><td>${escapeHtml(member.membership_year)}</td></tr>
       <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Status:</td><td style="color:#69be28; font-weight:bold;">Active</td></tr>
     </table>
-    <p>Your membership card will be sent in a separate email. Look for us at the Red Door Lounge on game days!</p>
+    ${cardParagraph}
     <p style="color:#69be28; font-weight:bold; font-size:18px;">Go Hawks!</p>
   `;
   await sendEmail({
@@ -173,6 +205,7 @@ async function sendWelcomeEmail(member) {
     html,
     email_type: 'welcome',
     member_id: member.id,
+      attachments: attachments.length > 0 ? attachments : undefined,
   });
 }
 
@@ -212,23 +245,36 @@ async function getCardBuffer(cardPath) {
   return null;
 }
 
-async function sendCardEmail(member) {
-  // Look up the card for the member's CURRENT membership year — never fall back
-  // to an older card, or a renewal whose new-year card failed to generate would
-  // silently ship last season's card (see issue #67).
+function nameSlug(member) {
+    return `${member.first_name || ''}-${member.last_name || ''}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || `member-${member.id}`;
+}
+
+/**
+ * Base64 PDF/PNG attachments for a member's CURRENT-year card.
+ *
+ * Current year only — never fall back to an older card, or a renewal whose new-year
+ * card failed to generate would silently ship last season's card (see issue #67).
+ * Returns [] when the card row exists but neither asset could be fetched.
+ * Throws when there is no card row at all, so callers can decide whether that is fatal.
+ */
+async function buildCardAttachments(member, {labelWithName = false} = {}) {
   const card = await cardsRepo.findByMemberAndYear(member.id, member.membership_year);
 
   if (!card) {
     throw new Error(`No ${member.membership_year} card found for member ${member.id}`);
   }
 
+    const suffix = labelWithName ? `-${nameSlug(member)}` : '';
   const attachments = [];
   if (card.pdf_path) {
     const buf = await getCardBuffer(card.pdf_path);
     if (buf) {
       attachments.push({
         content: buf.toString('base64'),
-        filename: `YSH-Membership-Card-${member.membership_year}.pdf`,
+          filename: `YSH-Membership-Card-${member.membership_year}${suffix}.pdf`,
         type: 'application/pdf',
         disposition: 'attachment',
       });
@@ -239,12 +285,20 @@ async function sendCardEmail(member) {
     if (buf) {
       attachments.push({
         content: buf.toString('base64'),
-        filename: `YSH-Membership-Card-${member.membership_year}.png`,
+          filename: `YSH-Membership-Card-${member.membership_year}${suffix}.png`,
         type: 'image/png',
         disposition: 'attachment',
       });
     }
   }
+    return attachments;
+}
+
+// Standalone card delivery. The signup/renewal webhook folds the card into the welcome
+// email instead (issue #73); this remains for admin ad-hoc resends and for family
+// sub-members who supplied their own address.
+async function sendCardEmail(member) {
+    const attachments = await buildCardAttachments(member);
 
   const html = `
     <h2 style="color:#002a5c;">Your Membership Card</h2>
@@ -345,6 +399,7 @@ module.exports = {
   sendWelcomeEmail,
   sendPaymentConfirmation,
   sendCardEmail,
+    buildCardAttachments,
   sendBlastEmail,
   sendOtpEmail,
   sendContactEmail,
