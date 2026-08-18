@@ -307,7 +307,10 @@ describe('card template resolution', () => {
 
         await cardService.generatePNG(testMember);
 
-        expect(global.fetch).toHaveBeenCalledWith('https://f002.backblazeb2.com/file/ysh/card-templates/2025.png');
+        expect(global.fetch).toHaveBeenCalledWith(
+            'https://f002.backblazeb2.com/file/ysh/card-templates/2025.png',
+            expect.objectContaining({signal: expect.any(AbortSignal)})
+        );
         expect(templatePassedToCanvas()).toEqual(UPLOADED);
         expect(logger.warn).not.toHaveBeenCalled();
     });
@@ -329,6 +332,11 @@ describe('card template resolution', () => {
 
     test('reads legacy bare filenames from public/img', async () => {
         givenTemplate('card-template-2.png');
+        // Stubbed rather than leaning on the committed card-template-2.png, which is a
+        // leftover of issue #96 and due to be deleted.
+        fs.readFileSync.mockImplementation((p, ...rest) => (
+            String(p).includes('card-template-2.png') ? UPLOADED : actualFs.readFileSync(p, ...rest)
+        ));
 
         await cardService.generatePNG(testMember);
 
@@ -366,6 +374,33 @@ describe('card template resolution', () => {
 
         expect(templatePassedToCanvas()).toEqual(actualFs.readFileSync(DEFAULT_TEMPLATE));
         expect(logger.warn).not.toHaveBeenCalled();
+    });
+
+    test('bounds the fetch so a stalled B2 cannot hang card generation', async () => {
+        givenTemplate('https://f002.backblazeb2.com/file/ysh/card-templates/slow.png');
+        global.fetch = jest.fn().mockRejectedValue(
+            Object.assign(new Error('The operation was aborted due to timeout'), {name: 'TimeoutError'})
+        );
+
+        await cardService.generatePNG(testMember);
+
+        const [, opts] = global.fetch.mock.calls[0];
+        expect(opts.signal).toBeInstanceOf(AbortSignal);
+        expect(logger.warn).toHaveBeenCalled();
+        expect(templatePassedToCanvas()).toEqual(actualFs.readFileSync(DEFAULT_TEMPLATE));
+    });
+
+    test('reads a template once even when many cards are generated', async () => {
+        givenTemplate('https://f002.backblazeb2.com/file/ysh/card-templates/2025.png');
+        global.fetch = jest.fn().mockResolvedValue({
+            ok: true,
+            arrayBuffer: async () => UPLOADED.buffer.slice(UPLOADED.byteOffset, UPLOADED.byteOffset + UPLOADED.length),
+        });
+
+        await cardService.generatePNG(testMember);
+        await cardService.generatePDF(testMember);
+
+        expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
     test('generatePDF draws the resolved template buffer, not a path', async () => {

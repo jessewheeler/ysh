@@ -43,14 +43,29 @@ const LOCAL_UPLOAD_DIR = path.join(__dirname, '..', 'data', 'uploads');
 // Reads whatever `membership_periods.card_template_path` holds into a buffer.  Three
 // forms are in play: a B2 URL (what uploads produce now), a `/uploads/<name>` path
 // (the no-B2 local fallback), and a bare filename (pre-#96 rows).
+// A stalled fetch would hang card generation inside the Stripe webhook and the bulk
+// renewal run, defeating the fallback that exists to guarantee a card ships at all.
+const TEMPLATE_FETCH_TIMEOUT_MS = 10000;
+
+// Uploads always get a unique filename, so a path that has been read once cannot
+// change underneath us — worth caching to keep a bulk renewal from re-downloading the
+// same template once per member.
+const templateCache = new Map();
+
 async function loadTemplate(templatePath) {
+  if (templateCache.has(templatePath)) return templateCache.get(templatePath);
+
+  let buffer;
   if (/^https?:\/\//.test(templatePath)) {
-    const res = await fetch(templatePath);
+    const res = await fetch(templatePath, {signal: AbortSignal.timeout(TEMPLATE_FETCH_TIMEOUT_MS)});
     if (!res.ok) throw new Error(`fetch returned ${res.status}`);
-    return Buffer.from(await res.arrayBuffer());
+    buffer = Buffer.from(await res.arrayBuffer());
+  } else {
+    const dir = templatePath.startsWith('/uploads/') ? LOCAL_UPLOAD_DIR : CARD_TEMPLATE_DIR;
+    buffer = fs.readFileSync(path.join(dir, path.basename(templatePath)));
   }
-  const dir = templatePath.startsWith('/uploads/') ? LOCAL_UPLOAD_DIR : CARD_TEMPLATE_DIR;
-  return fs.readFileSync(path.join(dir, path.basename(templatePath)));
+  templateCache.set(templatePath, buffer);
+  return buffer;
 }
 
 async function resolveTemplateBuffer(memberId) {

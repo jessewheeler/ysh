@@ -299,6 +299,73 @@ describe('card template upload', () => {
         );
     });
 
+    test('treats a .pdf reported as octet-stream as a PDF', async () => {
+        mockExecFile.mockImplementation((cmd, args, cb) => {
+            const out = cmd === 'gs'
+                ? args.find(a => a.startsWith('-sOutputFile=')).slice('-sOutputFile='.length)
+                : args[args.length - 1];
+            fs.writeFileSync(out, Buffer.from(`converted-by-${cmd}`));
+            cb(null, {stdout: '', stderr: ''});
+        });
+
+        const req = mockReq({
+            body: validBody,
+            // What some browsers actually send for a PDF.
+            file: {buffer: Buffer.from('%PDF-1.4'), originalname: 'card.pdf', mimetype: 'application/octet-stream'},
+            session: session(),
+        });
+        await mockHandlers['POST /periods'](req, mockRes());
+
+        expect(mockExecFile).toHaveBeenCalled();
+        expect(storage.uploadFile).toHaveBeenCalledWith(
+            Buffer.from('converted-by-magick'), 'card-template.png', 'card-templates'
+        );
+    });
+
+    test('rejects a file that is neither PNG nor PDF', async () => {
+        const req = mockReq({
+            body: validBody,
+            // multer's filter admits .mp4 on every admin upload field, this one included.
+            file: {buffer: Buffer.from('not-an-image'), originalname: 'clip.mp4', mimetype: 'video/mp4'},
+            session: session(),
+        });
+        await mockHandlers['POST /periods'](req, mockRes());
+
+        expect(req.session.flash_error).toContain('PNG or a PDF');
+        expect(storage.uploadFile).not.toHaveBeenCalled();
+        expect(db.__getCurrentDb().prepare('SELECT COUNT(*) c FROM membership_periods').get().c).toBe(0);
+    });
+
+    test('does not create the period when the template upload fails', async () => {
+        storage.uploadFile.mockRejectedValue(new Error('B2 unreachable'));
+        const req = mockReq({body: validBody, file: pngUpload(), session: session()});
+        const res = mockRes();
+        await mockHandlers['POST /periods'](req, res);
+
+        // A period left behind here would be invisible to the admin, who was told the
+        // save failed, and resubmitting would duplicate it — nothing enforces uniqueness.
+        expect(db.__getCurrentDb().prepare('SELECT COUNT(*) c FROM membership_periods').get().c).toBe(0);
+        expect(req.session.flash_error).toBe('B2 unreachable');
+        expect(res._redirectUrl).toBe('/admin/periods/new');
+    });
+
+    test('deletes the replaced template only after the row points at the new one', async () => {
+        const p = insertPeriod(db);
+        db.__getCurrentDb()
+            .prepare('UPDATE membership_periods SET card_template_path = ? WHERE id = ?')
+            .run(`${B2_URL}/card-templates/old.png`, p.id);
+
+        let pathWhenDeleted;
+        storage.deleteFile.mockImplementation(async () => {
+            pathWhenDeleted = periodRow(p.id).card_template_path;
+        });
+
+        const req = mockReq({params: {id: String(p.id)}, body: validBody, file: pngUpload(), session: session()});
+        await mockHandlers['POST /periods/:id/edit'](req, mockRes());
+
+        expect(pathWhenDeleted).toBe(`${B2_URL}/card-templates/uploaded.png`);
+    });
+
     test('flashes a PNG-instead message when the PDF toolchain is missing', async () => {
         mockExecFile.mockImplementation((cmd, args, cb) => {
             const err = new Error(`spawn ${cmd} ENOENT`);

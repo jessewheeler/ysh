@@ -954,7 +954,15 @@ router.post('/bios/:id/delete', async (req, res) => {
 // The caller stores it through handleUpload — writing it into public/img/ instead
 // meant every deploy replaced it with the committed default (issue #96).
 async function processCardTemplate(file) {
-  if (file.mimetype !== 'application/pdf') return file.buffer;
+  // Dispatch on the extension, not file.mimetype: multer's fileFilter (server.js) gates
+  // on the extension and browsers report application/octet-stream for a .pdf often
+  // enough to matter.  Trusting mimetype would upload raw PDF bytes named .png, which
+  // fails loadImage and lands right back in the silent-default behavior of issue #96.
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ext !== '.pdf' && ext !== '.png') {
+    throw new Error('Card template must be a PNG or a PDF.');
+  }
+  if (ext !== '.pdf') return file.buffer;
 
   const {execFile} = require('child_process');
   const {promisify} = require('util');
@@ -1203,9 +1211,13 @@ router.get('/periods/new', requireSuperAdmin, async (req, res) => {
 router.post('/periods', requireSuperAdmin, async (req, res) => {
   try {
     const data = membershipPeriodsService.validatePeriod(req.body);
+    // Store the template first: nothing enforces uniqueness on label or dates, so a
+    // create that survived a failed upload would leave the admin resubmitting a form
+    // they were told had not saved, quietly duplicating the period.
+    const card_template_path = req.file ? await uploadCardTemplate(req.file) : null;
     const period = await periodsRepo.create(data);
-    if (req.file) {
-      await periodsRepo.setCardTemplate(period.id, await uploadCardTemplate(req.file));
+    if (card_template_path) {
+      await periodsRepo.setCardTemplate(period.id, card_template_path);
     }
     req.session.flash_success = 'Membership period created.';
     res.redirect('/admin/periods');
@@ -1232,9 +1244,13 @@ router.post('/periods/:id/edit', requireSuperAdmin, async (req, res) => {
     let card_template_path = existing?.card_template_path || null;
     if (req.file) {
       card_template_path = await uploadCardTemplate(req.file);
-      storage.deleteFile(existing?.card_template_path).catch(() => {});
     }
     await periodsRepo.update(id, {...data, card_template_path});
+    // Only after the row points at the replacement — a delete before the update would
+    // strand the old row on a template that no longer exists if the update threw.
+    if (req.file) {
+      storage.deleteFile(existing?.card_template_path).catch(() => {});
+    }
     req.session.flash_success = 'Membership period updated.';
     res.redirect('/admin/periods');
   } catch (err) {
