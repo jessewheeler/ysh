@@ -99,11 +99,18 @@ router.post('/membership', requireCaptcha('/membership'), async (req, res) => {
         ? req.body.family_members
         : (req.body.family_members ? [req.body.family_members] : []);
 
+        // Two rows sharing a field index arrive as an array rather than a string, and
+        // calling .trim() on that throws — which the catch below turns into "Something
+        // went wrong", losing the whole signup. The form no longer produces duplicate
+        // indexes (see public/js/membership.js), but a malformed post shouldn't be able
+        // to take a payment flow down.
+        const text = v => (Array.isArray(v) ? v[0] : v);
+
       familyMembers = familyData
         .map(fm => ({
-          first_name: fm.first_name?.trim(),
-          last_name: fm.last_name?.trim(),
-          email: fm.email?.trim() || ''
+            first_name: text(fm?.first_name)?.trim(),
+            last_name: text(fm?.last_name)?.trim(),
+            email: text(fm?.email)?.trim() || ''
         }))
         .filter(fm => fm.first_name && fm.last_name);
 

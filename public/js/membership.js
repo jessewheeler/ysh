@@ -1,124 +1,135 @@
 (function () {
   // ── Tab switching ──────────────────────────────────────────────────────────
   const tabBtns = document.querySelectorAll('.membership-tab');
-  const tabNew = document.getElementById('tab-new');
-  const tabRenew = document.getElementById('tab-renew');
+    const panels = {
+        new: document.getElementById('tab-new'),
+        renew: document.getElementById('tab-renew'),
+    };
 
   function switchTab(name) {
-    tabBtns.forEach(b => b.classList.toggle('membership-tab-active', b.dataset.tab === name));
-    if (tabNew) tabNew.style.display = name === 'new' ? 'block' : 'none';
-    if (tabRenew) tabRenew.style.display = name === 'renew' ? 'block' : 'none';
-
-    if (name === 'renew') {
-      const captchaStep = document.getElementById('renewal-captcha-step');
-      const emailSection = document.getElementById('renewal-email-section');
-      const hasCaptcha = captchaStep && captchaStep.querySelector('.h-captcha');
-      if (captchaStep && captchaStep.style.display === 'none') {
-        if (hasCaptcha) {
-          reveal(captchaStep);
-        } else {
-          if (emailSection) reveal(emailSection);
-        }
-      }
-    }
+      tabBtns.forEach(btn => {
+          const active = btn.dataset.tab === name;
+          btn.classList.toggle('membership-tab-active', active);
+          btn.setAttribute('aria-selected', String(active));
+      });
+      Object.keys(panels).forEach(key => {
+          if (panels[key]) panels[key].hidden = key !== name;
+      });
   }
 
   tabBtns.forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
-  // ── Shared reveal helper ───────────────────────────────────────────────────
-  function reveal(el) {
-    el.style.display = 'block';
-    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('membership-reveal')));
-  }
-
-  // ── New Member tab — card picker ──────────────────────────────────────────
-  const typeCards = document.querySelectorAll('.membership-type-card');
-  const captchaStep = document.getElementById('membership-captcha-step');
-  const piiSection = document.getElementById('membership-pii-section');
-  const hasCaptcha = captchaStep && captchaStep.querySelector('.h-captcha');
-
-  typeCards.forEach(card => {
-    card.addEventListener('click', () => {
-      typeCards.forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
-      const radio = card.querySelector('input[type="radio"]');
-      if (radio) {
-        radio.checked = true;
-        radio.dispatchEvent(new Event('change'));
-      }
-
-      if (captchaStep && captchaStep.style.display === 'none') {
-        if (hasCaptcha) {
-          reveal(captchaStep);
-        } else {
-          if (piiSection) reveal(piiSection);
-        }
-      }
-    });
-  });
-
-  // hCaptcha callbacks
-  window.onMembershipCaptchaComplete = function () {
-    if (captchaStep) captchaStep.style.display = 'none';
-    if (piiSection) reveal(piiSection);
-  };
-
-  window.onRenewalCaptchaComplete = function () {
-    const renewalCaptchaStep = document.getElementById('renewal-captcha-step');
-    const renewalEmailSection = document.getElementById('renewal-email-section');
-    if (renewalCaptchaStep) renewalCaptchaStep.style.display = 'none';
-    if (renewalEmailSection) reveal(renewalEmailSection);
-  };
-
-  // ── Family members section ─────────────────────────────────────────────────
+    // ── Family members ─────────────────────────────────────────────────────────
   const familySection = document.getElementById('family-members-section');
   if (!familySection) return;
 
-  const familyContainer = document.getElementById('family-members-container');
+    const container = document.getElementById('family-members-container');
   const addBtn = document.getElementById('add-family-member');
+    const limitNote = document.getElementById('family-members-limit');
   const radios = document.querySelectorAll('input[name="membership_type"]');
   const primaryLastName = document.getElementById('last_name');
-  const maxFamilyMembers = parseInt(familySection.dataset.max, 10) || 6;
+    const maxAdditional = (parseInt(familySection.dataset.max, 10) || 6) - 1;
 
-  let familyMemberCount = 0;
+    // Field names are indexed, and the index must never be reused: a counter that
+    // decremented on remove could hand the same index to two live rows (add three,
+    // remove the middle, add another), and Express then parses that name into an array
+    // instead of a string, which throws when the route trims it. This only ever counts
+    // up; the server compacts the gaps a removal leaves behind.
+    let nextIndex = 0;
 
-  radios.forEach(radio => {
-    radio.addEventListener('change', () => {
-      familySection.style.display = radio.value === 'family' ? 'block' : 'none';
-    });
-  });
-
-  addBtn.addEventListener('click', () => {
-    if (familyMemberCount >= maxFamilyMembers - 1) {
-      alert('Maximum ' + (maxFamilyMembers - 1) + ' additional family members allowed.');
-      return;
+    function rowCount() {
+        return container.querySelectorAll('.family-member-row').length;
     }
 
-    const index = familyMemberCount;
-    const currentLastName = primaryLastName ? primaryLastName.value : '';
+    function syncAddButton() {
+        const atLimit = rowCount() >= maxAdditional;
+        addBtn.hidden = atLimit;
+        if (limitNote) limitNote.hidden = !atLimit;
+    }
+
+    function field(rowId, index, name, label, type, value) {
+        const group = document.createElement('div');
+        group.className = 'form-group';
+
+        const id = rowId + '-' + name;
+        const labelEl = document.createElement('label');
+        // A bare label with no `for` doesn't focus its input when tapped — a real
+        // annoyance on a phone, where the label is the easiest thing to hit.
+        labelEl.setAttribute('for', id);
+        labelEl.textContent = label;
+
+        const input = document.createElement('input');
+        input.type = type;
+        input.id = id;
+        input.name = 'family_members[' + index + '][' + name + ']';
+        if (value) input.value = value;
+        if (type !== 'email') input.required = true;
+
+        group.append(labelEl, input);
+        return group;
+    }
+
+    function addRow() {
+        if (rowCount() >= maxAdditional) return;
+
+        const index = nextIndex++;
+        const rowId = 'family-member-' + index;
+
     const row = document.createElement('div');
     row.className = 'family-member-row';
-    row.style.cssText = 'border: 1px solid #ddd; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; position: relative;';
-    row.innerHTML =
-      '<button type="button" class="remove-family-member" style="position: absolute; top: 0.5rem; right: 0.5rem; background: #dc3545; color: white; border: none; border-radius: 3px; padding: 0.25rem 0.5rem; cursor: pointer;">Remove</button>' +
-      '<div class="form-group"><label>First Name</label><input type="text" name="family_members[' + index + '][first_name]" required></div>' +
-      '<div class="form-group"><label>Last Name</label><input type="text" name="family_members[' + index + '][last_name]" value="' + currentLastName.replace(/"/g, '&quot;') + '" required></div>' +
-      '<div class="form-group"><label>Email (optional)</label><input type="email" name="family_members[' + index + '][email]"></div>';
+        row.id = rowId;
 
-    row.querySelector('.remove-family-member').addEventListener('click', () => {
+        const head = document.createElement('div');
+        head.className = 'family-member-head';
+
+        const legend = document.createElement('span');
+        legend.className = 'family-member-legend';
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn-remove';
+        remove.textContent = 'Remove';
+        remove.addEventListener('click', () => {
       row.remove();
-      familyMemberCount--;
-      updateAddButtonVisibility();
+            renumber();
+            syncAddButton();
+            addBtn.focus();
     });
 
-    familyContainer.appendChild(row);
-    familyMemberCount++;
-    updateAddButtonVisibility();
-  });
+        head.append(legend, remove);
+        row.appendChild(head);
+        row.appendChild(field(rowId, index, 'first_name', 'First Name', 'text'));
+        row.appendChild(field(rowId, index, 'last_name', 'Last Name', 'text',
+            primaryLastName ? primaryLastName.value : ''));
+        row.appendChild(field(rowId, index, 'email', 'Email (optional)', 'email'));
 
-  function updateAddButtonVisibility() {
-    addBtn.style.display = familyMemberCount >= maxFamilyMembers - 1 ? 'none' : 'inline-block';
+        container.appendChild(row);
+        renumber();
+        syncAddButton();
+
+        const firstInput = row.querySelector('input');
+        if (firstInput) firstInput.focus();
+    }
+
+    // Visible numbering counts positions, not field indexes, so removing the second of
+    // three rows leaves "Family member 1" and "Family member 2" rather than a gap.
+    function renumber() {
+        container.querySelectorAll('.family-member-row').forEach((row, i) => {
+            const legend = row.querySelector('.family-member-legend');
+            if (legend) legend.textContent = 'Family member ' + (i + 1);
+        });
   }
+
+    addBtn.addEventListener('click', addRow);
+
+    radios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (!radio.checked) return;
+            familySection.hidden = radio.value !== 'family';
+        });
+    });
+
+    syncAddButton();
 })();

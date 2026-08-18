@@ -875,10 +875,16 @@ footer {
   padding-bottom: 3rem;
 }
 
+/* minmax(0, …) rather than a bare fr: an fr track's automatic minimum is min-content,
+   so one wide child (the hCaptcha widget renders at a fixed ~360px) stretched the whole
+   track past the viewport and scrolled the page sideways. */
 .membership-layout {
   display: grid;
-  grid-template-columns: 5fr 7fr;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
   gap: 2rem;
+    /* The form is a good deal taller than the benefits panel now that every field is
+       present, and stretching the panel to match left a long empty navy column. */
+    align-items: start;
 }
 
 .membership-benefits {
@@ -1026,69 +1032,47 @@ footer {
   margin-bottom: 1.75rem;
 }
 
+/* The radio is visible and native. It used to be opacity: 0 with a tick that appeared
+   only once the card was already chosen, which removed the one cue everybody
+   recognises — and left two price quotes that didn't look like controls at all. */
 .membership-type-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
-  padding: 1.1rem 1.1rem 1rem;
+    padding: 1.1rem;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
-  position: relative;
-  display: block;
 }
 
 .membership-type-card:hover {
   border-color: #002a5c;
 }
 
-.membership-type-card.selected {
+.membership-type-card:has(input[type="radio"]:checked) {
   border-color: #002a5c;
   background: rgba(0, 42, 92, 0.03);
 }
 
+.membership-type-card:has(input[type="radio"]:focus-visible) {
+    outline: 3px solid #69be28;
+    outline-offset: 2px;
+}
+
 .membership-type-card input[type="radio"] {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-  pointer-events: none;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: #002a5c;
+    cursor: pointer;
 }
 
-.card-check {
-  position: absolute;
-  top: 0.7rem;
-  right: 0.7rem;
-  width: 18px;
-  height: 18px;
-  background: #002a5c;
-  border-radius: 50%;
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
-
-.membership-type-card.selected .card-check {
+.card-type-text {
   display: flex;
-}
-
-.card-check::after {
-  content: '✓';
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-@keyframes membershipFadeSlide {
-  from { opacity: 0; transform: translateY(-10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.membership-reveal {
-  animation: membershipFadeSlide 0.35s ease both;
-}
-
-#membership-captcha-step {
-  margin-top: 1.5rem;
+    flex-direction: column;
+    gap: 0.15rem;
 }
 
 .card-type-name {
@@ -1122,10 +1106,19 @@ footer {
 }
 
 /* Label optional hint */
+/* Sized against a 1rem field label ("Phone (optional)"), where 0.875rem reads as
+   smaller. */
 .label-optional {
   font-weight: 400;
   color: #6b6b6b;
   font-size: 0.875rem;
+}
+
+/* In a section heading that same size is *larger* than the 0.72rem heading it sits in,
+   so the hint outgrew the label it was qualifying. Match the heading and let weight
+   alone carry the distinction. */
+.form-section-heading .label-optional {
+    font-size: inherit;
 }
 
 /* Full-width button */
@@ -1134,6 +1127,88 @@ footer {
   display: block;
   margin-top: 1.5rem;
   text-align: center;
+}
+
+/* Fieldsets group the form's sections for screen readers. The border and padding a
+   fieldset brings by default would draw boxes the design doesn't want. */
+.form-fieldset {
+    border: 0;
+    padding: 0;
+    margin: 0 0 1.75rem;
+    min-width: 0;
+}
+
+.form-fieldset > legend.form-section-heading {
+    width: 100%;
+}
+
+.form-hint {
+    font-size: 0.9rem;
+    color: #6b6b6b;
+    margin-bottom: 1rem;
+    line-height: 1.55;
+}
+
+/* The widget itself is a fixed-width iframe that a small phone can't fit alongside the
+   panel padding, so it scrolls inside its own box rather than the page scrolling. */
+.membership-captcha {
+    margin-top: 1.75rem;
+    overflow-x: auto;
+}
+
+/* === Family member rows === */
+/* Built by public/js/membership.js. These lived in a 200-character inline cssText,
+   including a red that appears nowhere else in the palette. */
+.family-member-row {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 1rem 1rem 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.family-member-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.family-member-legend {
+    font-weight: 700;
+    color: #002a5c;
+    font-size: 0.95rem;
+}
+
+/* A text button, not a filled red block: removing a row you just added is a minor,
+   reversible action and shouldn't out-shout "Continue to Payment". */
+.btn-remove {
+    background: none;
+    border: none;
+    padding: 0.25rem 0.25rem;
+    color: #b3261e;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.btn-remove:hover {
+    color: #7d1a13;
+}
+
+.btn-add-family {
+    margin-bottom: 1rem;
+}
+
+.renew-family-heading {
+    margin-top: 1.75rem;
+}
+
+.renew-submit {
+    margin-top: 2rem;
+    text-align: right;
 }
 
 /* === Responsive === */
@@ -1245,7 +1320,7 @@ footer {
   }
 
   .membership-layout {
-    grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1302,6 +1377,16 @@ footer {
   .membership-form-panel {
     padding: 2rem 1.5rem 2.5rem;
   }
+
+    /* Both labels at their desktop size total more than the panel is wide, and nowrap
+       pushed the second one off-screen. Splitting the row evenly and letting the text
+       wrap keeps both tabs reachable without a sideways scroll. */
+    .membership-tab {
+        flex: 1;
+        padding: 0.6rem 0.5rem 0.7rem;
+        font-size: 0.9rem;
+        white-space: normal;
+    }
 
   .form-grid-2 {
     grid-template-columns: 1fr;
