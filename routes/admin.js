@@ -33,7 +33,12 @@ async function handleUpload(file, folder) {
     return storage.uploadFile(file.buffer, file.originalname, folder);
   }
   const localName = `${Date.now()}-${Math.round(Math.random() * 1e6)}${path.extname(file.originalname)}`;
-  fs.writeFileSync(path.join(__dirname, '..', 'data', 'uploads', localName), file.buffer);
+  // server.js mkdirs this at boot, but the write is what needs it: data/ is gitignored,
+  // so anything that reaches here without booting the server (Jest, a CLI script) hit
+  // ENOENT and reported it as an upload failure.
+  const dir = path.join(__dirname, '..', 'data', 'uploads');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, localName), file.buffer);
   return `/uploads/${localName}`;
 }
 
@@ -969,7 +974,9 @@ async function processCardTemplate(file) {
   const execFileAsync = promisify(execFile);
 
   // Both tools want real files, and data/ is the persistent disk on Render.
-  const tmpInput = path.join(__dirname, '..', 'data', `tmp-card-${Date.now()}`);
+  const dataDir = path.join(__dirname, '..', 'data');
+  fs.mkdirSync(dataDir, { recursive: true });
+  const tmpInput = path.join(dataDir, `tmp-card-${Date.now()}`);
   const tmpPng = `${tmpInput}.png`;
   const tmpTrimmed = `${tmpInput}-trimmed.png`;
 
