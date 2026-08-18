@@ -25,9 +25,7 @@ block content
       label(for="image") Photo
       input#image(type="file" name="image" accept="image/*")
       if bio && bio.photo_path
-        .image-preview
-          img(src=bio.photo_path alt="Current photo" style="max-height:120px; margin-top:0.5rem; border-radius:50%")
-          input(type="hidden" name="existing_photo" value=bio.photo_path)
+        +imagePreview(bio.photo_path, 'existing_photo', 'Current photo', true)
     .form-grid
       .form-group
         label(for="sort_order") Sort Order

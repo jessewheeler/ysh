@@ -7,13 +7,13 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  color: #333;
+  color: var(--text);
   line-height: 1.6;
   overflow-anchor: none;
 }
 
 a {
-  color: #002a5c;
+  color: var(--navy);
   text-decoration: none;
 }
 
@@ -27,7 +27,7 @@ a:focus-visible,
 button:focus-visible,
 [tabindex]:focus-visible,
 summary:focus-visible {
-  outline: 3px solid #69be28;
+  outline: 3px solid var(--green);
   outline-offset: 2px;
 }
 
@@ -53,13 +53,53 @@ img {
   --nav-scroll-offset: 88px;
 }
 
+/* === Design tokens ===
+   style.css loads before admin.css, so both stylesheets resolve these. Every brand
+   colour, card radius, shadow and touch-target size used to be a repeated hex/px
+   literal — 73 colour literals alone — which is how the admin ended up with several
+   spellings of the same navy and no single place to adjust a shadow. Values are
+   unchanged from what they replaced; this is a naming pass, not a restyle. */
+:root {
+  --navy: #002a5c;
+  --navy-dark: #001d42;
+  --green: #69be28;
+  --green-light: #7ed136;
+  --danger: #dc3545;
+  --danger-dark: #c82333;
+
+  --surface: #fff;
+  --page-bg: #f0f2f5;
+
+  --text: #333;
+  --text-muted: #666;
+  --text-subtle: #6c757d;
+  --text-faint: #999;
+
+  --border: #e0e0e0;
+  --rule: #eee;
+
+  --radius-card: 8px;
+  --radius-control: 4px;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-card-hover: 0 3px 8px rgba(0,0,0,0.14);
+
+  /* Minimum touch targets: base control, search/pagination, small button. */
+  --tap-target: 44px;
+  --tap-target-md: 40px;
+  --tap-target-sm: 36px;
+
+  /* Readable measure for form fields. Pages themselves are not capped — admin pages run
+     the full content width and constrain their inputs instead. */
+  --measure-form: 26rem;
+}
+
 [id] {
   scroll-margin-top: var(--nav-scroll-offset);
 }
 
 /* === Navbar === */
 .navbar {
-  background: #002a5c;
+  background: var(--navy);
   display: flex;
   align-items: center;
   padding: 0 2rem;
@@ -105,7 +145,7 @@ img {
   justify-content: center;
   background: none;
   border: none;
-  color: #fff;
+  color: var(--surface);
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
@@ -131,7 +171,7 @@ img {
 }
 
 .nav-menu a {
-  color: #fff;
+  color: var(--surface);
   padding: 1.25rem 1.25rem;
   display: flex;
   align-items: center;
@@ -169,7 +209,7 @@ img {
 .dropdown-caret {
   background: none;
   border: none;
-  color: #fff;
+  color: var(--surface);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -211,7 +251,7 @@ img {
   position: absolute;
   top: 100%;
   left: 0;
-  background: #002a5c;
+  background: var(--navy);
   list-style: none;
   min-width: 220px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -235,7 +275,7 @@ img {
 
 .dropdown-menu a {
   padding: 0.875rem 1.5rem;
-  min-height: 44px;
+  min-height: var(--tap-target);
 }
 
 /* === Sections === */
@@ -253,7 +293,7 @@ img {
 }
 
 .section h2 {
-  color: #002a5c;
+  color: var(--navy);
   font-size: 2.25rem;
   margin-bottom: 2rem;
   text-align: center;
@@ -267,8 +307,8 @@ img {
 
 /* === Hero === */
 .hero {
-  background: #002a5c;
-  color: #fff;
+  background: var(--navy);
+  color: var(--surface);
   text-align: center;
   padding: 7rem 2rem;
   position: relative;
@@ -311,7 +351,7 @@ img {
   z-index: 10;
   background: rgba(0, 42, 92, 0.85);
   padding: 3rem 2rem;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   max-width: 900px;
   margin: 0 auto;
 }
@@ -343,42 +383,42 @@ img {
    actual Seahawks lockup, so the brand green stays at full strength. */
 .btn {
   display: inline-block;
-  background: #69be28;
-  color: #002a5c;
+  background: var(--green);
+  color: var(--navy);
   padding: 0.75rem 1.75rem;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   font-weight: 700;
   border: none;
   cursor: pointer;
   font-size: 1rem;
   line-height: 1.5;
-  min-height: 44px;
+  min-height: var(--tap-target);
   text-align: center;
 }
 
 .btn:hover {
-  background: #7ed136;
+  background: var(--green-light);
   text-decoration: none;
-  color: #002a5c;
+  color: var(--navy);
 }
 
 .btn-outline {
   display: inline-block;
-  border: 2px solid #002a5c;
-  color: #002a5c;
+  border: 2px solid var(--navy);
+  color: var(--navy);
   background: transparent;
   padding: 0.625rem 1.75rem;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   font-weight: 600;
   font-size: 1rem;
   line-height: 1.5;
-  min-height: 44px;
+  min-height: var(--tap-target);
   text-align: center;
 }
 
 .btn-outline:hover {
-  background: #002a5c;
-  color: #fff;
+  background: var(--navy);
+  color: var(--surface);
   text-decoration: none;
 }
 
@@ -418,8 +458,8 @@ img {
 }
 
 .card {
-  background: #fff;
-  border-radius: 8px;
+  background: var(--surface);
+  border-radius: var(--radius-card);
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -441,7 +481,7 @@ img {
 }
 
 .card-body h3 {
-  color: #002a5c;
+  color: var(--navy);
   margin-bottom: 0.75rem;
 }
 
@@ -453,7 +493,7 @@ img {
 
 /* === Blockquote === */
 blockquote {
-  border-left: 5px solid #002a5c;
+  border-left: 5px solid var(--navy);
   padding: 1.25rem 1.75rem;
   margin: 0 0 2rem;
   font-style: italic;
@@ -476,7 +516,7 @@ blockquote {
   width: 100%;
   height: 220px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   transition: transform 0.2s ease;
 }
 
@@ -500,8 +540,8 @@ blockquote {
   display: block;
   max-width: 800px;
   margin: 0 auto;
-  background: #fff;
-  border-radius: 8px;
+  background: var(--surface);
+  border-radius: var(--radius-card);
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   color: inherit;
@@ -518,7 +558,7 @@ blockquote {
 .video-card-media {
   position: relative;
   aspect-ratio: 16 / 9;
-  background: #002a5c;
+  background: var(--navy);
 }
 
 .video-card-media img {
@@ -537,7 +577,7 @@ blockquote {
   height: 76px;
   border-radius: 50%;
   background: rgba(0, 42, 92, 0.88);
-  border: 3px solid #fff;
+  border: 3px solid var(--surface);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -549,16 +589,16 @@ blockquote {
   content: '';
   border-style: solid;
   border-width: 13px 0 13px 21px;
-  border-color: transparent transparent transparent #fff;
+  border-color: transparent transparent transparent var(--surface);
   margin-left: 5px;
 }
 
 .video-card:hover .video-card-play {
-  background: #69be28;
+  background: var(--green);
 }
 
 .video-card:hover .video-card-play::after {
-  border-left-color: #002a5c;
+  border-left-color: var(--navy);
 }
 
 .video-card-body {
@@ -579,7 +619,7 @@ blockquote {
 .video-card-title {
   font-size: 1.15rem;
   font-weight: 700;
-  color: #002a5c;
+  color: var(--navy);
   line-height: 1.4;
 }
 
@@ -608,7 +648,7 @@ blockquote {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 600;
-  color: #002a5c;
+  color: var(--navy);
   font-size: 1rem;
 }
 
@@ -617,11 +657,11 @@ blockquote {
   width: 100%;
   padding: 0.875rem 1rem;
   border: 1px solid #ccc;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   font-size: 1rem;
   font-family: inherit;
   line-height: 1.5;
-  min-height: 44px;
+  min-height: var(--tap-target);
 }
 
 .form-group textarea {
@@ -632,7 +672,7 @@ blockquote {
 .form-group input:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #002a5c;
+  border-color: var(--navy);
   box-shadow: 0 0 0 3px rgba(0, 42, 92, 0.1);
 }
 
@@ -647,9 +687,9 @@ blockquote {
 .bio-card {
   display: block;
   width: 100%;
-  background: #fff;
+  background: var(--surface);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   padding: 2rem 1.5rem;
   text-align: center;
   font-family: inherit;
@@ -667,7 +707,7 @@ blockquote {
 }
 
 .bio-card:focus-visible {
-  outline: 3px solid #69be28;
+  outline: 3px solid var(--green);
   outline-offset: 2px;
 }
 
@@ -680,13 +720,13 @@ blockquote {
 }
 
 .bio-card h3 {
-  color: #002a5c;
+  color: var(--navy);
   margin-bottom: 0.5rem;
   font-size: 1.25rem;
 }
 
 /* Green reads as "you can act on this" everywhere else, so a role label uses the
-   darker text green — #69be28 on white is only 2.33:1 in any case. */
+   darker text green — var(--green) on white is only 2.33:1 in any case. */
 .bio-role {
   color: #4a7d1d;
   font-weight: 600;
@@ -719,8 +759,8 @@ blockquote {
 
 .bio-modal-dialog {
   position: relative;
-  background: #fff;
-  border-radius: 8px;
+  background: var(--surface);
+  border-radius: var(--radius-card);
   padding: 2.5rem;
   max-width: 560px;
   width: 100%;
@@ -743,7 +783,7 @@ blockquote {
 }
 
 .bio-modal-close:hover {
-  color: #002a5c;
+  color: var(--navy);
 }
 
 .bio-modal-photo {
@@ -755,7 +795,7 @@ blockquote {
 }
 
 .bio-modal-name {
-  color: #002a5c;
+  color: var(--navy);
   margin-bottom: 0.5rem;
   font-size: 1.5rem;
 }
@@ -777,8 +817,8 @@ blockquote {
 
 /* === Footer === */
 footer {
-  background: #002a5c;
-  color: #fff;
+  background: var(--navy);
+  color: var(--surface);
   padding: 4rem 2rem 1.5rem;
 }
 
@@ -810,13 +850,13 @@ footer {
 }
 
 .footer-section a {
-  color: #69be28;
+  color: var(--green);
   padding: 0.25rem 0;
   display: inline-block;
 }
 
 .footer-section a:hover {
-  color: #fff;
+  color: var(--surface);
 }
 
 .footer-bottom {
@@ -829,7 +869,7 @@ footer {
 }
 
 .footer-bottom a {
-  color: #69be28;
+  color: var(--green);
 }
 
 .social-links {
@@ -839,7 +879,7 @@ footer {
 }
 
 .social-link svg {
-    fill: #69be28;
+    fill: var(--green);
     width: 28px;
     height: 28px;
     transition: fill 0.2s;
@@ -847,7 +887,7 @@ footer {
 }
 
 .social-link:hover svg {
-    fill: #fff;
+    fill: var(--surface);
 }
 
 /* === Flash Messages === */
@@ -888,8 +928,8 @@ footer {
 }
 
 .membership-benefits {
-  background: #002a5c;
-  color: #fff;
+  background: var(--navy);
+  color: var(--surface);
   border-radius: 10px;
   padding: 3rem 2.5rem;
   display: flex;
@@ -898,7 +938,7 @@ footer {
 }
 
 .membership-benefits h2 {
-  color: #fff;
+  color: var(--surface);
   font-size: 1.65rem;
   margin-bottom: 0.4rem;
   text-align: left;
@@ -926,8 +966,8 @@ footer {
 .benefit-icon {
   width: 26px;
   height: 26px;
-  background: #69be28;
-  color: #fff;
+  background: var(--green);
+  color: var(--surface);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -968,14 +1008,14 @@ footer {
 
 /* Form panel */
 .membership-form-panel {
-  background: #fff;
+  background: var(--surface);
   border-radius: 10px;
   padding: 2.5rem 2.5rem 3rem;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
 }
 
 .membership-form-panel h2 {
-  color: #002a5c;
+  color: var(--navy);
   font-size: 1.65rem;
   margin-bottom: 1.75rem;
   text-align: left;
@@ -986,7 +1026,7 @@ footer {
   display: flex;
   gap: 0;
   margin-bottom: 1.75rem;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid var(--border);
 }
 
 .membership-tab {
@@ -1004,12 +1044,12 @@ footer {
 }
 
 .membership-tab:hover {
-  color: #002a5c;
+  color: var(--navy);
 }
 
 .membership-tab-active {
-  color: #002a5c;
-  border-bottom-color: #002a5c;
+  color: var(--navy);
+  border-bottom-color: var(--navy);
 }
 
 /* Form section heading */
@@ -1021,7 +1061,7 @@ footer {
   color: #6b6b6b;
   margin-bottom: 0.875rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--rule);
 }
 
 /* Membership type cards */
@@ -1039,24 +1079,24 @@ footer {
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-card);
     padding: 1.1rem;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .membership-type-card:hover {
-  border-color: #002a5c;
+  border-color: var(--navy);
 }
 
 .membership-type-card:has(input[type="radio"]:checked) {
-  border-color: #002a5c;
+  border-color: var(--navy);
   background: rgba(0, 42, 92, 0.03);
 }
 
 .membership-type-card:has(input[type="radio"]:focus-visible) {
-    outline: 3px solid #69be28;
+    outline: 3px solid var(--green);
     outline-offset: 2px;
 }
 
@@ -1065,7 +1105,7 @@ footer {
     height: 22px;
     margin: 0;
     flex-shrink: 0;
-    accent-color: #002a5c;
+    accent-color: var(--navy);
     cursor: pointer;
 }
 
@@ -1077,7 +1117,7 @@ footer {
 
 .card-type-name {
   font-weight: 700;
-  color: #002a5c;
+  color: var(--navy);
   font-size: 0.875rem;
   margin-bottom: 0.25rem;
   text-transform: uppercase;
@@ -1087,7 +1127,7 @@ footer {
 .card-type-price {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #002a5c;
+  color: var(--navy);
   margin-bottom: 0.2rem;
   line-height: 1.2;
 }
@@ -1176,7 +1216,7 @@ footer {
 
 .family-member-legend {
     font-weight: 700;
-    color: #002a5c;
+    color: var(--navy);
     font-size: 0.95rem;
 }
 
@@ -1238,7 +1278,7 @@ footer {
     top: 100%;
     left: 0;
     right: 0;
-    background: #002a5c;
+    background: var(--navy);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     /* Not calc(100vh - 100%): the percentage resolves against .navbar, whose height is
        content-derived, so the max-height would be indeterminate and the scroll would
@@ -1423,8 +1463,8 @@ footer {
 
 .hw-modal-dialog {
   position: relative;
-  background: #fff;
-  border-radius: 8px;
+  background: var(--surface);
+  border-radius: var(--radius-card);
   padding: 2rem;
   max-width: 360px;
   width: 90%;
@@ -1432,14 +1472,14 @@ footer {
 }
 
 .hw-modal-dialog h3 {
-  color: #002a5c;
+  color: var(--navy);
   margin-bottom: 1rem;
 }
 
 .hw-modal-dialog address {
   font-style: normal;
   line-height: 1.8;
-  color: #333;
+  color: var(--text);
   font-size: 1rem;
 }
 
@@ -1456,7 +1496,7 @@ footer {
 }
 
 .hw-modal-close:hover {
-  color: #002a5c;
+  color: var(--navy);
 }
 
 /* === Man Crush Monday === */
@@ -1473,12 +1513,12 @@ footer {
     margin: 0 auto;
     padding: 1.75rem 2rem;
     background: #f8f8f8;
-    border-left: 5px solid #69be28;
+    border-left: 5px solid var(--green);
     border-radius: 0 8px 8px 0;
 }
 
 .mcm-curator h3 {
-    color: #002a5c;
+    color: var(--navy);
     margin-bottom: 0.75rem;
 }
 
@@ -1489,7 +1529,7 @@ footer {
 }
 
 .mcm-wall-heading {
-    color: #002a5c;
+    color: var(--navy);
     text-align: center;
     margin-bottom: 2rem;
 }
@@ -1503,7 +1543,7 @@ footer {
 /* Brass frame: a gradient border painted under a transparent border box. */
 .mcm-frame {
     border: 10px solid transparent;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     background-image: linear-gradient(#f4efe2, #f4efe2),
     linear-gradient(145deg, #d9b45e 0%, #f3e2a8 25%, #b8912f 55%, #f0dc9c 80%, #c9a141 100%);
     background-origin: border-box;
@@ -1521,7 +1561,7 @@ footer {
     width: 100%;
     aspect-ratio: 4 / 5;
     object-fit: cover;
-    background: #002a5c;
+    background: var(--navy);
     border: 1px solid rgba(0, 0, 0, 0.25);
 }
 
@@ -1564,7 +1604,7 @@ footer {
 
 .mcm-frame--signing {
     background-image: linear-gradient(#f4efe2, #f4efe2),
-    linear-gradient(145deg, #69be28 0%, #b7e78c 30%, #4f9418 60%, #a4dd76 85%, #69be28 100%);
+    linear-gradient(145deg, var(--green) 0%, #b7e78c 30%, #4f9418 60%, #a4dd76 85%, var(--green) 100%);
 }
 
 .mcm-frame--signing .mcm-plaque {
@@ -1581,7 +1621,7 @@ footer {
 
 .mcm-end {
     font-style: italic;
-    color: #002a5c;
+    color: var(--navy);
 }
 
 @media (prefers-reduced-motion: no-preference) {

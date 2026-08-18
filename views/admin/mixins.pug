@@ -1,0 +1,68 @@
+//- Shared admin markup components.
+//-
+//- Included once from views/admin/layout.pug. Pug makes mixins declared in a file that
+//- the layout includes visible inside every extending template's `block content`, so no
+//- page needs its own include.
+//-
+//- Each mixin here replaced several hand-rolled copies of the same markup that had
+//- drifted apart — different button classes, different pagination glyphs, four separate
+//- ways of turning a status into a badge. Prefer extending a mixin over reintroducing a
+//- local variant.
+//-
+//- No mixin emits a hidden _csrf input: public/js/admin.js injects one into every POST
+//- form that lacks it.
+
+//- A POST action that needs confirming, rendered as a single button.
+//- `data-confirm` is read by public/js/admin.js — inline onclick cannot be used here
+//- because helmet sends script-src-attr 'none'.
+mixin confirmForm(action, confirmText, label, danger)
+  form.inline-form(method="POST" action=action data-confirm=confirmText)
+    button(type="submit" class=danger ? 'btn-sm btn-danger' : 'btn-sm')= label
+
+//- The Edit + Delete cell that ends most admin list rows.
+mixin rowActions(editHref, deleteAction, confirmText, deleteLabel)
+  .row-actions
+    a.btn-sm(href=editHref) Edit
+    +confirmForm(deleteAction, confirmText, deleteLabel || 'Delete', true)
+
+//- Pager shared by the members, emails, audit and contact-submission lists.
+//- hrefFor is a function of the target page number, so each caller keeps its own query
+//- string handling (members/list.pug passes its qs() helper straight through).
+mixin pagination(page, totalPages, total, hrefFor)
+  if totalPages > 1
+    .pagination
+      if page > 1
+        a(href=hrefFor(page - 1)) &laquo; Prev
+      span
+        | Page #{page} of #{totalPages}
+        if total !== undefined && total !== null
+          |  (#{total} total)
+      if page < totalPages
+        a(href=hrefFor(page + 1)) Next &raquo;
+
+//- Existing-image thumbnail plus the hidden field that preserves it across a submit.
+mixin imagePreview(src, fieldName, alt, round)
+  .image-preview(class=round ? 'image-preview--round' : null)
+    img(src=src alt=alt || 'Current image')
+    input(type="hidden" name=fieldName value=src)
+
+//- Submit + Cancel footer. .form-actions already supplies the gap, so callers must not
+//- add margins to the cancel link.
+mixin formActions(submitLabel, cancelHref, cancelLabel)
+  .form-actions
+    button.btn(type="submit")= submitLabel
+    if cancelHref
+      a.btn-outline(href=cancelHref)= cancelLabel || 'Cancel'
+
+//- Status pill. `kind` is the badge-* suffix; the .badge-* scale lives in admin.css.
+mixin badge(kind, label)
+  span(class=`badge badge-${kind}`)= label
+
+//- Toolbar row: a primary "new" action and an optional CSV export.
+mixin toolbarActions(newHref, newLabel, exportHref, exportLabel)
+  .admin-toolbar
+    .toolbar-actions
+      if newHref
+        a.btn(href=newHref)= newLabel
+      if exportHref
+        a.btn-outline(href=exportHref)= exportLabel || 'Export CSV'

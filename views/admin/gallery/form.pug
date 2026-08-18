@@ -12,9 +12,7 @@ block content
       label(for="image") Image File#{image ? '' : ' *'}
       input#image(type="file" name="image" accept="image/*")
       if image && image.filename
-        .image-preview
-          img(src=image.filename alt="Current image" style="max-height:120px; margin-top:0.5rem")
-          input(type="hidden" name="existing_image" value=image.filename)
+        +imagePreview(image.filename, 'existing_image', 'Current image')
     .form-group
       label(for="alt_text") Alt Text
       input#alt_text(type="text" name="alt_text" value=(image ? image.alt_text : ''))

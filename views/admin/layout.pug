@@ -1,3 +1,5 @@
+include mixins
+
 doctype html
 html(lang="en")
   head
@@ -12,7 +14,7 @@ html(lang="en")
       aside.admin-sidebar
         .sidebar-brand
           a(href="/admin/dashboard")
-            img(src="/img/logo.png" alt="YSH" style="height:40px")
+            img.sidebar-logo(src="/img/logo.png" alt="YSH")
             span YSH Admin
         nav.sidebar-nav
           a(href="/admin/dashboard" class=(currentPath === '/admin/dashboard' ? 'active' : '')) Dashboard
@@ -32,7 +34,7 @@ html(lang="en")
             a(href="/admin/audit" class=(currentPath && currentPath.startsWith('/admin/audit') ? 'active' : '')) Audit Log
           hr
           a(href="/") View Site
-          form(method="POST" action="/admin/logout" style="display:inline")
+          form.inline-form(method="POST" action="/admin/logout")
             button.sidebar-logout(type="submit") Logout
 
       main.admin-main

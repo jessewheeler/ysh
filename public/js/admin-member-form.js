@@ -9,7 +9,9 @@
 
     radios.forEach(function (radio) {
         radio.addEventListener('change', function () {
-            familySection.style.display = radio.value === 'family' ? 'block' : 'none';
+            // Matches membership.js: toggle the attribute the markup ships with,
+            // rather than layering an inline display over it.
+            familySection.hidden = radio.value !== 'family';
         });
     });
 

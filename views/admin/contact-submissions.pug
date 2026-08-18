@@ -38,10 +38,4 @@ block content
                             else
                                 span.badge.badge-active Sent
 
-        if totalPages > 1
-            .pagination(style="margin-top: 1rem;")
-                if page > 1
-                    a.btn-outline(href=`/admin/contact-submissions?page=${page - 1}`) &larr; Previous
-                span.text-muted(style="margin: 0 0.75rem;")= `Page ${page} of ${totalPages} (${total} total)`
-                if page < totalPages
-                    a.btn-outline(href=`/admin/contact-submissions?page=${page + 1}`) Next &rarr;
+        +pagination(page, totalPages, total, (n) => `/admin/contact-submissions?page=${n}`)

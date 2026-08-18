@@ -1,9 +1,9 @@
 /* === Admin Layout === */
 .admin-body {
   margin: 0;
-  background: #f0f2f5;
+  background: var(--page-bg);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  color: #333;
+  color: var(--text);
   line-height: 1.6;
 }
 
@@ -15,8 +15,8 @@
 /* === Sidebar === */
 .admin-sidebar {
   width: 240px;
-  background: #002a5c;
-  color: #fff;
+  background: var(--navy);
+  color: var(--surface);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -31,7 +31,7 @@
 }
 
 .sidebar-brand a {
-  color: #fff;
+  color: var(--surface);
   text-decoration: none;
   display: flex;
   align-items: center;
@@ -53,20 +53,20 @@
   padding: 0.75rem 1.25rem;
   font-size: 0.95rem;
   transition: all 0.15s ease;
-  min-height: 44px;
+  min-height: var(--tap-target);
   display: flex;
   align-items: center;
 }
 
 .sidebar-nav a:hover {
   background: rgba(255,255,255,0.1);
-  color: #fff;
+  color: var(--surface);
   text-decoration: none;
 }
 
 .sidebar-nav a.active {
   background: rgba(105,190,40,0.2);
-  color: #69be28;
+  color: var(--green);
   font-weight: 600;
 }
 
@@ -85,13 +85,13 @@
   cursor: pointer;
   text-align: left;
   width: 100%;
-  min-height: 44px;
+  min-height: var(--tap-target);
   transition: all 0.15s ease;
 }
 
 .sidebar-logout:hover {
   background: rgba(255,255,255,0.1);
-  color: #fff;
+  color: var(--surface);
 }
 
 /* === Main Area === */
@@ -103,9 +103,9 @@
 }
 
 .admin-topbar {
-  background: #fff;
+  background: var(--surface);
   padding: 1.25rem 2rem;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -113,7 +113,7 @@
 
 .admin-page-title {
   font-size: 1.5rem;
-  color: #002a5c;
+  color: var(--navy);
   margin: 0;
   font-weight: 600;
 }
@@ -125,7 +125,7 @@
   font-size: 1.2rem;
   cursor: pointer;
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
 }
 
 .admin-content {
@@ -147,44 +147,64 @@
 }
 
 /* === Stats Grid === */
+/* robot/resources/admin.resource waits for .stats-grid to become visible as its
+   "login finished" signal, and admin_auth.robot counts exactly 7 .stat-card elements. */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  /* 160px floor rather than 180px, which combined with the tighter card padding leaves
+     real room for the value. The overflow fix proper is on .stat-number below — a bigger
+     floor alone only moves the width at which a long figure spills again. */
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
 
 .stat-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 1.75rem;
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  /* Was 1.75rem all round, which left only ~124px of content inside a 180px track. */
+  padding: 1.5rem 1rem;
   text-align: center;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-card);
+  min-width: 0;                 /* grid items floor at min-content without this */
+  container-type: inline-size;  /* lets .stat-number size off the card, not the viewport */
+  display: flex;
+  flex-direction: column;
 }
 
 a.stat-card {
-  display: block;
   text-decoration: none;
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 a.stat-card:hover {
-  box-shadow: 0 3px 8px rgba(0,0,0,0.14);
+  box-shadow: var(--shadow-card-hover);
   transform: translateY(-1px);
 }
 
 .stat-number {
-  font-size: 2.25rem;
+  /* 2.25rem is the design size, and 24cqi reaches it at ~150px of content width, so a
+     roomy card looks exactly as it did. A narrow card — or a long value like $1,234,567 —
+     scales the type down instead of painting outside the card, which is what a fixed
+     2.25rem "$2034.00" used to do in a 180px track with 1.75rem of padding. */
+  font-size: clamp(1.25rem, 24cqi, 2.25rem);
   font-weight: 700;
-  color: #002a5c;
+  color: var(--navy);
   line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;      /* seatbelt: nothing escapes the card */
 }
 
 .stat-label {
-  color: #666;
+  color: var(--text-muted);
   font-size: 0.875rem;
-  margin-top: 0.5rem;
+  line-height: 1.25;
   font-weight: 500;
+  margin-top: auto;             /* labels sit on the card floor... */
+  padding-top: 0.5rem;
+  min-height: 2.5em;            /* ...and every card reserves two lines, so the two-line
+                                   "Enrolled 2026-2027 Season" stops making its
+                                   one-line siblings look misaligned */
 }
 
 /* === Admin Grid === */
@@ -196,15 +216,15 @@ a.stat-card:hover {
 }
 
 .admin-panel {
-  background: #fff;
-  border-radius: 8px;
+  background: var(--surface);
+  border-radius: var(--radius-card);
   padding: 1.75rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-card);
   margin-bottom: 1.5rem;
 }
 
 .admin-panel h3 {
-  color: #002a5c;
+  color: var(--navy);
   margin-bottom: 1.25rem;
   font-size: 1.1rem;
   font-weight: 600;
@@ -219,16 +239,16 @@ a.stat-card:hover {
 
 .admin-table th {
   background: #f8f8f8;
-  color: #002a5c;
+  color: var(--navy);
   padding: 0.875rem 1rem;
   text-align: left;
   font-weight: 600;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid var(--border);
 }
 
 .admin-table td {
   padding: 0.875rem 1rem;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--rule);
   vertical-align: middle;
 }
 
@@ -241,7 +261,7 @@ a.stat-card:hover {
 }
 
 .admin-table a:hover {
-  color: #69be28;
+  color: var(--green);
 }
 
 .detail-table {
@@ -252,7 +272,7 @@ a.stat-card:hover {
 .detail-table th {
   text-align: left;
   padding: 0.75rem 1rem 0.75rem 0;
-  color: #666;
+  color: var(--text-muted);
   font-weight: 600;
   width: 160px;
   vertical-align: top;
@@ -335,15 +355,15 @@ a.stat-card:hover {
 .search-form input {
   padding: 0.625rem 0.875rem;
   border: 1px solid #ccc;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   font-size: 0.9rem;
   line-height: 1.5;
-  min-height: 40px;
+  min-height: var(--tap-target-md);
 }
 
 .search-form input:focus {
   outline: none;
-  border-color: #002a5c;
+  border-color: var(--navy);
   box-shadow: 0 0 0 3px rgba(0,42,92,0.1);
 }
 
@@ -361,10 +381,10 @@ a.stat-card:hover {
 .search-form-wide select {
   padding: 0.625rem 0.875rem;
   border: 1px solid #ccc;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   font-size: 0.9rem;
-  min-height: 40px;
-  background: #fff;
+  min-height: var(--tap-target-md);
+  background: var(--surface);
 }
 
 .toolbar-actions {
@@ -388,35 +408,35 @@ a.stat-card:hover {
   padding: 0.4rem 0.9rem;
   border: 1px solid #ccc;
   border-radius: 999px;
-  background: #fff;
-  color: #333;
+  background: var(--surface);
+  color: var(--text);
   font-size: 0.875rem;
   font-weight: 500;
   text-decoration: none;
 }
 
 .view-pill:hover {
-  border-color: #002a5c;
-  color: #002a5c;
+  border-color: var(--navy);
+  color: var(--navy);
 }
 
 .view-pill-active,
 .view-pill-active:hover {
-  background: #002a5c;
-  border-color: #002a5c;
-  color: #fff;
+  background: var(--navy);
+  border-color: var(--navy);
+  color: var(--surface);
 }
 
 .pill-count {
   font-size: 0.75rem;
-  color: #666;
+  color: var(--text-muted);
   background: #f0f0f0;
   border-radius: 999px;
   padding: 0.05rem 0.5rem;
 }
 
 .view-pill-active .pill-count {
-  color: #fff;
+  color: var(--surface);
   background: rgba(255,255,255,0.2);
 }
 
@@ -428,7 +448,7 @@ a.stat-card:hover {
 }
 
 .admin-table th .sort-link:hover {
-  color: #69be28;
+  color: var(--green);
 }
 
 .sort-indicator {
@@ -450,7 +470,7 @@ a.stat-card:hover {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 600;
-  color: #333;
+  color: var(--text);
   font-size: 0.9rem;
 }
 
@@ -466,11 +486,11 @@ a.stat-card:hover {
   width: 100%;
   padding: 0.75rem 0.875rem;
   border: 1px solid #ccc;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   font-size: 0.9rem;
   font-family: inherit;
   line-height: 1.5;
-  min-height: 44px;
+  min-height: var(--tap-target);
 }
 
 .admin-content .form-group textarea {
@@ -492,9 +512,13 @@ a.stat-card:hover {
   margin: 0;
 }
 
+/* `small` is inline, so once the field above it was capped at --measure-form the hint
+   flowed into the space beside the input instead of under it — and margin-top did
+   nothing on an inline box either. */
 .admin-content .form-group .form-hint {
+  display: block;
   font-size: 0.8rem;
-  color: #6c757d;
+  color: var(--text-subtle);
   margin-top: 0.25rem;
 }
 
@@ -502,7 +526,7 @@ a.stat-card:hover {
 .admin-content .form-group select:focus,
 .admin-content .form-group textarea:focus {
   outline: none;
-  border-color: #002a5c;
+  border-color: var(--navy);
   box-shadow: 0 0 0 3px rgba(0,42,92,0.1);
 }
 
@@ -547,65 +571,65 @@ a.stat-card:hover {
    in this file kept a white label on a darker green — 3:1, the contrast failure the
    navy label exists to fix — so admin buttons regressed on hover only. */
 
-/* Needs its own color now that the duplicated .btn no longer sets #fff here: it would
+/* Needs its own color now that the duplicated .btn no longer sets var(--surface) here: it would
    otherwise inherit the navy label from style.css and render navy on navy. Currently
    unused in views/, kept because the class reads as an obvious thing to reach for. */
 .btn-primary {
-  background: #002a5c;
-  color: #fff;
+  background: var(--navy);
+  color: var(--surface);
 }
 
 .btn-primary:hover {
-  background: #001d42;
-  color: #fff;
+  background: var(--navy-dark);
+  color: var(--surface);
 }
 
 .btn-sm {
   display: inline-block;
   padding: 0.5rem 0.875rem;
   font-size: 0.875rem;
-  border-radius: 4px;
-  background: #002a5c;
-  color: #fff;
+  border-radius: var(--radius-control);
+  background: var(--navy);
+  color: var(--surface);
   border: none;
   cursor: pointer;
   text-decoration: none;
   line-height: 1.5;
-  min-height: 36px;
+  min-height: var(--tap-target-sm);
   font-weight: 600;
   margin: 0.2rem;
 }
 
 .btn-sm:hover {
-  background: #001d42;
+  background: var(--navy-dark);
   text-decoration: none;
-  color: #fff;
+  color: var(--surface);
 }
 
 .btn-danger {
-  background: #dc3545;
-  color: #fff;
+  background: var(--danger);
+  color: var(--surface);
   border: none;
   padding: 0.75rem 1.75rem;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   cursor: pointer;
   font-size: 1rem;
   font-weight: 600;
   line-height: 1.5;
-  min-height: 44px;
+  min-height: var(--tap-target);
   text-decoration: none;
 }
 
 .btn-danger:hover {
-  background: #c82333;
+  background: var(--danger-dark);
   text-decoration: none;
-  color: #fff;
+  color: var(--surface);
 }
 
 .btn-sm.btn-danger {
   padding: 0.5rem 0.875rem;
   font-size: 0.875rem;
-  min-height: 36px;
+  min-height: var(--tap-target-sm);
 }
 
 /* A submit button that has to sit inline beside real links — used for actions that
@@ -617,7 +641,7 @@ a.stat-card:hover {
   padding: 0;
   margin: 0;
   font: inherit;
-  color: #002a5c;
+  color: var(--navy);
   text-decoration: none;
   cursor: pointer;
 }
@@ -637,10 +661,10 @@ a.stat-card:hover {
 }
 
 .pagination a {
-  color: #002a5c;
+  color: var(--navy);
   text-decoration: none;
   padding: 0.5rem 0.75rem;
-  min-height: 40px;
+  min-height: var(--tap-target-md);
   display: inline-flex;
   align-items: center;
   font-weight: 500;
@@ -648,7 +672,7 @@ a.stat-card:hover {
 
 .pagination a:hover {
   text-decoration: underline;
-  color: #69be28;
+  color: var(--green);
 }
 
 /* === Gallery Admin === */
@@ -659,11 +683,18 @@ a.stat-card:hover {
 }
 
 .gallery-admin-card {
-  background: #fff;
-  border-radius: 8px;
+  background: var(--surface);
+  border-radius: var(--radius-card);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-card);
   padding: 0.75rem;
+}
+
+.gallery-admin-thumb {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: var(--radius-control);
 }
 
 .gallery-admin-info {
@@ -679,12 +710,38 @@ a.stat-card:hover {
 
 /* === Card Row === */
 .card-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
   padding: 0.5rem 0;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--rule);
   font-size: 0.9rem;
+}
+
+.card-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.card-row-year {
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+/* All three actions on one line at a matching height. .btn-sm's 0.2rem margin fought the
+   gap and, in the narrow rail, a wrapped label made one button taller than its siblings —
+   so labels stay on one line and the buttons share an explicit height. */
+.card-row-actions {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.card-row-actions .btn-sm {
+  margin: 0;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* === Login === */
@@ -693,14 +750,14 @@ a.stat-card:hover {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: #002a5c;
+  background: var(--navy);
   margin: 0;
 }
 
 .admin-login-card {
-  background: #fff;
+  background: var(--surface);
   padding: 2.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   width: 100%;
   max-width: 380px;
   text-align: center;
@@ -708,13 +765,13 @@ a.stat-card:hover {
 }
 
 .admin-login-card h2 {
-  color: #002a5c;
+  color: var(--navy);
   margin-bottom: 1.5rem;
 }
 
 /* === Utility === */
 .text-muted {
-  color: #999;
+  color: var(--text-faint);
   font-size: 0.9rem;
 }
 
@@ -723,7 +780,7 @@ a.stat-card:hover {
   background: #d1ecf1;
   color: #0c5460;
   border: 1px solid #bee5eb;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   padding: 0.6rem 1rem;
   margin-bottom: 1rem;
   font-size: 0.9rem;
@@ -746,7 +803,7 @@ a.stat-card:hover {
 
 .draft-discard-btn:hover {
   background: #0c5460;
-  color: #fff;
+  color: var(--surface);
 }
 
 /* === Responsive === */
@@ -792,6 +849,10 @@ a.stat-card:hover {
     grid-template-columns: 1fr 1fr;
   }
 
+  .stat-card {
+    padding: 1.25rem 0.875rem;
+  }
+
   .admin-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -835,4 +896,614 @@ a.stat-card:hover {
   .form-actions .btn-danger {
     width: 100%;
   }
+}
+
+/* === Shared components ===
+   These back the mixins in views/admin/mixins.pug. Several of the classes below were
+   already in use by templates that carried the layout inline because no rule existed —
+   .admin-actions was referenced by three pages and defined nowhere. */
+
+/* .admin-actions was the second, undefined spelling of .admin-toolbar. Aliased rather
+   than deleted so a stray usage still lands somewhere sane. */
+.admin-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Wraps a single-button POST so it sits inline next to a sibling link. Was
+   style="display:inline" on seven forms; inline-flex keeps the button in the parent's
+   flex line instead of dropping out of it. */
+.inline-form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.image-preview img {
+  max-height: 120px;
+  margin-top: 0.5rem;
+  border-radius: var(--radius-control);
+}
+
+.image-preview--round img {
+  border-radius: 50%;
+}
+
+.avatar-sm {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.sidebar-logo {
+  height: 40px;
+}
+
+.login-logo {
+  height: 60px;
+  margin-bottom: 1rem;
+}
+
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  margin-bottom: 1rem;
+}
+
+/* admins.pug's own spelling of .form-grid. */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.qr-block {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.qr-image {
+  border: 1px solid #ddd;
+  background: var(--surface);
+}
+
+.empty-state {
+  color: var(--text-muted);
+  padding: 1.5rem 0;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* One-time code: wide tracking makes six digits scannable as a group. */
+.input-otp {
+  text-align: center;
+  font-size: 1.5rem;
+  letter-spacing: 0.5rem;
+}
+
+.input-mono {
+  font-family: monospace;
+}
+
+/* Key/value variant of .admin-table: a label column and a value column, no thead. */
+.admin-table--kv th {
+  width: 14rem;
+  background: none;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Section headings inside admin content. Replaced eight identical inline
+   style="margin-top: 1.5rem" attributes. */
+.admin-content h2,
+.admin-content h3 {
+  margin-top: 1.5rem;
+}
+
+.admin-content h2:first-child,
+.admin-content h3:first-child,
+.admin-panel h3 {
+  margin-top: 0;
+}
+
+.page-footnote {
+  margin-top: 1.5rem;
+}
+
+/* Readable measures. Deliberately scoped to opt-in classes rather than set on
+   .admin-content: the members and payments tables want the full width, and capping
+   them all would trade one layout complaint for another. */
+.admin-content .form-group--narrow input,
+.admin-content .form-group--narrow select {
+  max-width: var(--measure-form);
+}
+
+.form-grid--narrow {
+  max-width: 54rem;
+}
+
+/* === Audit Log ===
+   Moved out of a `style.` block inside views/admin/audit.pug, which also leaked a bare
+   `details summary` rule to every page that template rendered — it would now fight the
+   disclosure component below. Values carried over as they were, with the colour
+   literals mapped onto the tokens where they matched. */
+.audit-filters {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.audit-filters select {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: var(--radius-control);
+}
+
+.audit-meta {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.audit-ts {
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.audit-json {
+  max-height: 300px;
+  overflow: auto;
+  background: #f8f8f8;
+  border: 1px solid #ddd;
+  border-radius: var(--radius-control);
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+}
+
+.audit-diff {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin-top: 0.4rem;
+}
+
+.audit-diff th,
+.audit-diff td {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.audit-diff th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+
+.audit-old {
+  color: #991b1b;
+  background: #fff5f5;
+  word-break: break-all;
+}
+
+.audit-new {
+  color: #065f46;
+  background: #f0fff4;
+  word-break: break-all;
+}
+
+/* The audit table's JSON/diff toggles are plain <details>, not the disclosure
+   component, so they keep a quiet text-link affordance. */
+.audit-diff-toggle > summary,
+.admin-table details > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+/* INSERT/UPDATE/DELETE pills. The template asked for .audit-badge--insert and friends,
+   which were defined in neither stylesheet nor in the template's own style block, so
+   every audit action rendered as bare unstyled text. Folded into the .badge-* scale. */
+.badge-audit-insert {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.badge-audit-update {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.badge-audit-delete {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* Tight variant for an action row that sits directly under its input. */
+.form-actions--tight {
+  margin-top: 0.5rem;
+}
+
+.mt-sm {
+  margin-top: 0.5rem;
+}
+
+.member-family-section {
+  margin-top: 2rem;
+}
+
+.mt-md {
+  margin-top: 1rem;
+}
+
+.mb-lg {
+  margin-bottom: 2rem;
+}
+
+.rule-lg {
+  margin: 2rem 0;
+}
+
+/* === Member Record Page ===
+   One record with a sane column system, rather than a stack of equal panels. The
+   previous layout reused .admin-grid (auto-fit, minmax(400px, 1fr)), which on a wide
+   screen handed the two-line Membership Cards panel half the viewport. */
+.record-layout {
+  display: grid;
+  /* minmax(0, 1fr), not 1fr: the 5-column payment tables would otherwise force the
+     column wider than its share and blow out the grid. No max-width — the record uses
+     the full content width, and the rail stays a fixed 320px so the extra room goes to
+     the tables that want it. */
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.record-main > .admin-panel:last-child,
+.record-rail > .admin-panel:last-child {
+  margin-bottom: 0;
+}
+
+.snapshot-table {
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+.snapshot-table th {
+  text-align: left;
+  padding: 0.4rem 0.75rem 0.4rem 0;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+.snapshot-table td {
+  padding: 0.4rem 0;
+  vertical-align: baseline;
+}
+
+.family-member-list {
+  margin: 0 0 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.family-member-list li {
+  margin-bottom: 0.25rem;
+}
+
+/* The rail is dropped before the 768px mobile breakpoint: below this the main column is
+   already too tight for the payment tables to sit beside a 320px rail. */
+@media (max-width: 1080px) {
+  .record-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* === Action bar === */
+.record-actionbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 1.5rem;
+}
+
+.actionbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Each action is its own POST form. They used to carry style="display:inline", which
+   left them outside the flex layout — the actual cause of the two ragged button rows. */
+.record-actionbar form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.actionbar-sep {
+  width: 1px;
+  align-self: stretch;
+  background: #e5e5e5;
+}
+
+.actionbar-danger {
+  margin-left: auto;
+}
+
+/* .btn is 0.75rem/1.75rem padding; .btn-outline is 0.625rem plus a 2px border. Side by
+   side they read as two different sizes even though both clear 44px. One toolbar size. */
+.btn-compact {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.9rem;
+  min-height: var(--tap-target-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* min-height is only a floor: .btn-outline's 2px border pushed its content box to 42px
+   while the borderless .btn and .btn-danger settled at 40px, so the row sat a pixel out
+   of alignment. Take the border back out of the block padding. A robot test measures the
+   button tops, so this stays honest. */
+.btn-outline.btn-compact {
+  padding-block: calc(0.5rem - 2px);
+}
+
+/* Inline "Remove" beside a family member's name. */
+.btn-tiny {
+  padding: 1px 8px;
+  font-size: 0.75rem;
+  min-height: 0;
+  line-height: 1.5;
+  border-radius: var(--radius-control);
+}
+
+@media (max-width: 768px) {
+  .record-actionbar,
+  .actionbar-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* The shared 768px rule widens .btn and .btn-danger but not .btn-outline. */
+  .record-actionbar form,
+  .record-actionbar .btn-compact {
+    width: 100%;
+  }
+
+  .actionbar-sep {
+    display: none;
+  }
+
+  .actionbar-danger {
+    margin-left: 0;
+    margin-top: 0.25rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--rule);
+  }
+}
+
+/* === Disclosure ===
+   Button-driven reveal for the forms that used to sit permanently expanded beneath the
+   record. Native <details>: no JS, so helmet's script-src-attr 'none' cannot break it,
+   it works before admin.js parses, and Enter/Space plus the expanded-state announcement
+   come for free. */
+.disclosure {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+  padding-top: 1.25rem;
+}
+
+.disclosure > summary {
+  display: inline-flex;          /* also suppresses the Chromium marker */
+  align-items: center;
+  gap: 0.5rem;
+  width: max-content;
+  list-style: none;              /* Firefox */
+  cursor: pointer;
+  border: 2px solid var(--navy);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--navy);
+  padding: 0.5rem 1.1rem;
+  min-height: var(--tap-target-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  user-select: none;
+}
+
+.disclosure > summary::-webkit-details-marker {
+  display: none;                 /* Safari */
+}
+
+.disclosure > summary::marker {
+  content: '';
+}
+
+.disclosure > summary:hover {
+  background: var(--navy);
+  color: var(--surface);
+}
+
+/* summary is not a <button>, so it inherits none of the .btn focus treatment. */
+.disclosure > summary:focus-visible {
+  outline: 3px solid rgba(0,42,92,0.35);
+  outline-offset: 2px;
+}
+
+.disclosure > summary::after {
+  content: '+';
+  font-weight: 700;
+  line-height: 1;
+}
+
+.disclosure[open] > summary::after {
+  content: '\2013';
+}
+
+.disclosure-body {
+  margin-top: 1.25rem;
+  max-width: 480px;
+}
+
+/* .form-actions carries margin-top: 2rem for full-page forms — too much inside a
+   three-field disclosure. */
+.disclosure-body .form-actions {
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 768px) {
+  .disclosure > summary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .disclosure-body {
+    max-width: none;
+  }
+}
+
+/* === Reports === */
+/* No max-width: the report, member record and campaign pages all run the full content
+   width. Readability comes from capping the *fields* (.form-group--narrow) rather than
+   the page, so wide tables keep the room they need. */
+.report-page {
+  display: flow-root;
+}
+
+/* Admin flashes are styled to sit flush under the topbar — no radius, a bottom rule
+   only — so the report's pre-flight warnings rendered as a full-bleed band that ignored
+   the card grid entirely. This turns that same element into a card in the panels'
+   language. The .flash.flash-error classes stay because robot locates the warnings by
+   them. */
+.report-notice {
+  border-radius: var(--radius-card);
+  border: 1px solid #f5c6cb;
+  box-shadow: var(--shadow-card);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* These are a pre-submit checklist, not a failure: mostly "add an email to this bio".
+   Amber reads as "look before you send" where the red read as "something broke". */
+.report-notice--caution {
+  background: #fff8e6;
+  color: #6b4e00;
+  border-color: #f0d9a0;
+  border-left: 4px solid #e0a12b;
+}
+
+.report-notice-title {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #6b4e00;
+}
+
+.report-notice-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.report-notice-list li {
+  margin-bottom: 0.25rem;
+}
+
+.report-notice-list li:last-child {
+  margin-bottom: 0;
+}
+
+.report-subhead {
+  color: var(--navy);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 2rem 0 0.5rem;
+}
+
+.report-subhead + .text-muted {
+  margin-bottom: 0.75rem;
+}
+
+/* #report-summary has to stay a <table> with that id — the tests locate it by tag and
+   id — so it is restyled rather than restructured: no header fill, no rules, no hover.
+   A figure with a caption, which stops it reading as a second data table stacked on the
+   board block whose columns it could never line up with. */
+.summary-table {
+  width: auto;
+  border-collapse: collapse;
+  margin-bottom: 0.5rem;
+}
+
+/* No text-transform here. Browser library's Get Text returns *rendered* text, so
+   uppercasing these labels broke the two robot tests that assert on "Total member count"
+   and "Board members listed". The quiet-label effect comes from size, weight and colour
+   instead. */
+.summary-table th {
+  text-align: left;
+  padding: 0 1.5rem 0.5rem 0;
+  color: var(--text-subtle);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+.summary-table td {
+  padding: 0 0 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+  vertical-align: baseline;
+}
+
+.report-links {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.report-links dt {
+  color: var(--text-subtle);
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+.report-links dd {
+  margin: 0.125rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.flash-list {
+  margin: 0.5rem 0 0 1.25rem;
 }

@@ -4,48 +4,46 @@ block page_title
     | Campaigns
 
 block content
-    .admin-actions(style="margin-bottom: 1rem;")
+    .admin-actions
         a.btn(href="/admin/campaigns/new") + New Campaign
-        a.btn-outline(href="/admin/campaigns.csv" style="margin-left: 0.5rem;") Export .csv
+        a.btn-outline(href="/admin/campaigns.csv") Export .csv
 
-    if campaigns.length === 0
-        p.text-muted
-            | No campaigns yet. Create one to get a trackable link and QR code for a flyer,
-            | a Facebook post, or the Council newsletter.
-    else
-        table#campaigns-table.admin-table
-            thead
-                tr
-                    th Name
-                    th Code
-                    th Source / Medium
-                    th Visits
-                    th Signups
-                    th Contacts
-                    th Conversion
-                    th Status
-                    th
-            tbody
-                each c in campaigns
+    .admin-panel
+        if campaigns.length === 0
+            p.text-muted
+                | No campaigns yet. Create one to get a trackable link and QR code for a flyer,
+                | a Facebook post, or the Council newsletter.
+        else
+            table#campaigns-table.admin-table
+                thead
                     tr
-                        td: a(href=`/admin/campaigns/${c.id}`)= c.name
-                        td: code= c.utm_campaign
-                        td.text-muted= [c.utm_source, c.utm_medium].filter(Boolean).join(' / ') || '—'
-                        td= c.visit_count
-                        td= c.signup_count
-                        td= c.contact_count
-                        td= conversionRate(c)
-                        td
-                            if c.is_active
-                                span.badge.badge-active Active
-                            else
-                                span.badge.badge-expired Inactive
-                        td
-                            a.btn-sm(href=`/admin/campaigns/${c.id}/edit`) Edit
-                            form(method="POST" action=`/admin/campaigns/${c.id}/toggle` style="display:inline" data-confirm=(c.is_active ? 'Deactivate this campaign? Links already in print will stop being attributed.' : 'Reactivate this campaign?'))
-                                button(type="submit" class=c.is_active ? 'btn-sm btn-danger' : 'btn-sm')= c.is_active ? 'Deactivate' : 'Reactivate'
+                        th Name
+                        th Code
+                        th Source / Medium
+                        th Visits
+                        th Signups
+                        th Contacts
+                        th Conversion
+                        th Status
+                        th
+                tbody
+                    each c in campaigns
+                        tr
+                            td: a(href=`/admin/campaigns/${c.id}`)= c.name
+                            td: code= c.utm_campaign
+                            td.text-muted= [c.utm_source, c.utm_medium].filter(Boolean).join(' / ') || '—'
+                            td= c.visit_count
+                            td= c.signup_count
+                            td= c.contact_count
+                            td= conversionRate(c)
+                            td
+                                +badge(c.is_active ? 'active' : 'expired', c.is_active ? 'Active' : 'Inactive')
+                            td
+                                .row-actions
+                                    a.btn-sm(href=`/admin/campaigns/${c.id}/edit`) Edit
+                                    +confirmForm(`/admin/campaigns/${c.id}/toggle`, c.is_active ? 'Deactivate this campaign? Links already in print will stop being attributed.' : 'Reactivate this campaign?', c.is_active ? 'Deactivate' : 'Reactivate', c.is_active)
 
-    p.text-muted(style="margin-top: 1.5rem;")
+    p.text-muted.page-footnote
         | Visits count one per visitor per campaign, exclude known bots, and are pruned after two
         | years. Signups and contact submissions are attributed on a first-touch basis — whichever
         | campaign brought someone here first keeps the credit.

@@ -464,10 +464,16 @@ router.get('/members/:id', async (req, res, next) => {
       familyPrimaries = await memberRepo.listFamilyPrimaries();
     }
 
+    // Prefills the offline-payment amount. duesForType returns undefined when a period
+    // has no dues set for the type, and centsToDollars(undefined) yields the string
+    // "NaN" — which would render as value="NaN" and fail number validation silently.
     const currentPeriod = await periodsRepo.getCurrent();
     const {duesForType, centsToDollars} = membershipPeriodsService;
-    const defaultPaymentDollars = currentPeriod
-        ? centsToDollars(duesForType(currentPeriod, member.membership_type))
+    const duesCents = currentPeriod
+        ? duesForType(currentPeriod, member.membership_type)
+        : null;
+    const defaultPaymentDollars = Number.isFinite(duesCents)
+        ? centsToDollars(duesCents)
         : '';
 
     res.render('admin/members/view', {
@@ -672,6 +678,7 @@ router.post('/members/:id/payments', async (req, res) => {
   const dollars = parseFloat(amount);
   if (!amount || isNaN(dollars) || dollars <= 0) {
     req.session.flash_error = 'A valid payment amount is required.';
+    req.session.flash_reopen = 'record-payment';
     return res.redirect(`/admin/members/${req.params.id}`);
   }
 
@@ -768,11 +775,13 @@ router.post('/members/:id/attach-to-family', async (req, res) => {
   const {primary_member_id} = req.body;
   if (!primary_member_id) {
     req.session.flash_error = 'Please select a family to attach to.';
+    req.session.flash_reopen = 'attach-family';
     return res.redirect(`/admin/members/${req.params.id}`);
   }
   const primary = await memberRepo.findById(primary_member_id);
   if (!primary || primary.membership_type !== 'family' || primary.primary_member_id) {
     req.session.flash_error = 'Invalid primary member selected.';
+    req.session.flash_reopen = 'attach-family';
     return res.redirect(`/admin/members/${req.params.id}`);
   }
   try {
@@ -780,6 +789,7 @@ router.post('/members/:id/attach-to-family', async (req, res) => {
     req.session.flash_success = `${member.first_name} ${member.last_name} attached to ${primary.first_name} ${primary.last_name}'s family.`;
   } catch (e) {
     req.session.flash_error = e.message;
+    req.session.flash_reopen = 'attach-family';
   }
   res.redirect(`/admin/members/${req.params.id}`);
 });
@@ -798,6 +808,7 @@ router.post('/members/:id/family-members', async (req, res) => {
   const {first_name, last_name, email} = req.body;
   if (!first_name?.trim() || !last_name?.trim()) {
     req.session.flash_error = 'First and last name are required.';
+    req.session.flash_reopen = 'add-family-member';
     return res.redirect(`/admin/members/${req.params.id}`);
   }
   try {
@@ -811,6 +822,7 @@ router.post('/members/:id/family-members', async (req, res) => {
     req.session.flash_success = `Family member ${first_name.trim()} ${last_name.trim()} added.`;
   } catch (e) {
     req.session.flash_error = e.message;
+    req.session.flash_reopen = 'add-family-member';
   }
   res.redirect(`/admin/members/${req.params.id}`);
 });

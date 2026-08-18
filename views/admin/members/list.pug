@@ -84,13 +84,7 @@ block content
             td
               a.btn-sm(href=`/admin/members/${m.id}`) Edit
 
-    if totalPages > 1
-      .pagination
-        if page > 1
-          a(href=`/admin/members${qs({page: page - 1})}`) &laquo; Prev
-        span Page #{page} of #{totalPages} (#{total} total)
-        if page < totalPages
-          a(href=`/admin/members${qs({page: page + 1})}`) Next &raquo;
+    +pagination(page, totalPages, total, (n) => `/admin/members${qs({page: n})}`)
   else
     if view === 'needs-attention' && !search && !status && !periodId && !signal
       p.text-muted No members need attention right now.

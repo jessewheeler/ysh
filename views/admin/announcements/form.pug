@@ -18,9 +18,7 @@ block content
       label(for="image") Image
       input#image(type="file" name="image" accept="image/*")
       if announcement && announcement.image_path
-        .image-preview
-          img(src=announcement.image_path alt="Current image" style="max-height:120px; margin-top:0.5rem")
-          input(type="hidden" name="existing_image" value=announcement.image_path)
+        +imagePreview(announcement.image_path, 'existing_image', 'Current image')
     .form-group
       label(for="link_url") Link URL
       input#link_url(type="url" name="link_url" value=(announcement ? announcement.link_url : ''))

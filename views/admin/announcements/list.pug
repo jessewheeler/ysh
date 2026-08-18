@@ -22,8 +22,6 @@ block content
             td= ann.is_published ? 'Yes' : 'No'
             td= ann.sort_order
             td
-              a.btn-sm(href=`/admin/announcements/${ann.id}`) Edit
-              form(method="POST" action=`/admin/announcements/${ann.id}/delete` style="display:inline" data-confirm="Delete this announcement?")
-                button.btn-sm.btn-danger(type="submit") Delete
+              +rowActions(`/admin/announcements/${ann.id}`, `/admin/announcements/${ann.id}/delete`, 'Delete this announcement?')
   else
     p.text-muted No announcements yet.
