@@ -17,8 +17,10 @@ block content
     if rows.length === 0
         p.empty-state No audit entries found.
     else
+        //- --scroll opts out of the mobile card layout in admin.css: the Changes cell holds
+        //- a nested table.audit-diff inside a <details>, which does not stack sensibly.
         .table-responsive
-            table.admin-table
+            table.admin-table.admin-table--scroll
                 thead
                     tr
                         th When

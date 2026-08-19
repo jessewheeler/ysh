@@ -210,4 +210,26 @@ document.addEventListener('DOMContentLoaded', function () {
       select.form.submit();
     });
   });
+
+  // Column labels for the mobile card layout. Below 768px admin.css turns every row of a
+  // list table into a card and renders these as td::before, because a 5-to-9 column table
+  // on a phone otherwise overflows the document and scrolls the whole page sideways.
+  //
+  // Done here rather than as data-label in the templates: there are eighteen of these
+  // tables, and the heading is already in the thead. Runs at every width — the attribute is
+  // inert until the media query applies, so there is no resize listener and no reflow.
+  document.querySelectorAll('table.admin-table:not(.admin-table--scroll):not(.admin-table--kv)').forEach(function (table) {
+    var labels = Array.prototype.map.call(table.querySelectorAll(':scope > thead > tr > th'), function (th) {
+      // members/list.pug's sortTh appends ' \u25b2' / ' \u25bc' to the active column.
+      return th.textContent.replace(/[\u25b2\u25bc]/g, '').trim();
+    });
+    if (!labels.length) return;
+
+    table.querySelectorAll(':scope > tbody > tr').forEach(function (row) {
+      Array.prototype.forEach.call(row.children, function (cell, i) {
+        if (cell.colSpan > 1) return;   // the colspan empty-state rows have no column
+        if (labels[i]) cell.setAttribute('data-label', labels[i]);
+      });
+    });
+  });
 });
