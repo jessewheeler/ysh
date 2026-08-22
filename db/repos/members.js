@@ -95,6 +95,63 @@ async function activate(id) {
     return result;
 }
 
+/**
+ * Flip a member to expired. Mirrors activate() exactly, including the audit row, so
+ * the change is attributable and reversible from /admin/audit.
+ */
+async function markExpired(id) {
+    const actor = getActor();
+    const old = await db.get('SELECT * FROM members WHERE id = ?', id);
+    const result = await db.run(
+        "UPDATE members SET status = 'expired', updated_at = datetime('now'), updated_by = ? WHERE id = ?",
+        actor.id || null, id
+  );
+    const row = await db.get('SELECT * FROM members WHERE id = ?', id);
+    await auditLog.insert({
+        tableName: 'members',
+        recordId: id,
+        action: 'UPDATE',
+        actor,
+        oldValues: old,
+        newValues: row
+    });
+    return result;
+}
+
+/**
+ * Members whose membership has lapsed: still carrying status='active' but with no
+ * membership_years row for any period that is still open.
+ *
+ * Enrollment is the signal, not expiry_date. Most of the roster has a NULL expiry_date
+ * because it predates expiry tracking, and expiry_date records the period a member last
+ * paid for, so it can sit in the future while they have not paid for the open season.
+ * See docs/needs-attention-signals.md.
+ *
+ * Two NOT EXISTS, not one: a family sub-member is covered either by its own enrollment
+ * row (the current signup path) or by its primary's (older backfills in db/migrate.js
+ * enrolled primaries only). Same "enrolled, or their primary is enrolled" rule that
+ * membershipYears.listMembersByPeriod uses. For a primary, primary_member_id is NULL so
+ * the second subquery matches nothing and the clause is a no-op.
+ *
+ * `today` is computed in JS and bound: end_date is TEXT, and comparing it against
+ * date('now') breaks on PostgreSQL (text vs date). This caused the PR #69 revert.
+ */
+async function findLapsed(today = isoDate()) {
+  return await db.all(
+    `SELECT m.* FROM members m
+      WHERE m.status = 'active'
+        AND m.is_lifetime = 0
+        AND NOT EXISTS (SELECT 1 FROM membership_years my
+                          JOIN membership_periods mp ON mp.id = my.membership_period_id
+                         WHERE my.member_id = m.id AND mp.end_date >= ?)
+        AND NOT EXISTS (SELECT 1 FROM membership_years my2
+                          JOIN membership_periods mp2 ON mp2.id = my2.membership_period_id
+                         WHERE my2.member_id = m.primary_member_id AND mp2.end_date >= ?)
+      ORDER BY m.id ASC`,
+    today, today
+  );
+}
+
 async function countAll() {
   const row = await db.get('SELECT COUNT(*) as c FROM members');
   return row ? row.c : 0;
@@ -214,7 +271,10 @@ async function search({ search, view, currentPeriodId, status, periodId, sort, d
     clauses.push("(status = 'active' AND (is_lifetime = 1 OR expiry_date IS NULL OR expiry_date >= ?))");
     params.push(isoDate());
   } else if (status === 'expired') {
-    clauses.push("(status != 'cancelled' AND is_lifetime = 0 AND expiry_date IS NOT NULL AND expiry_date < ?)");
+    // Matches a materialized status as well as the derived date test. Without the first
+    // arm, a member the expiry job flips to 'expired' who has a NULL expiry_date (most of
+    // the legacy roster) would not show under this filter at all.
+    clauses.push("(status = 'expired' OR (status != 'cancelled' AND is_lifetime = 0 AND expiry_date IS NOT NULL AND expiry_date < ?))");
     params.push(isoDate());
   } else if (status === 'pending' || status === 'cancelled') {
     clauses.push('status = ?');
@@ -594,6 +654,8 @@ module.exports = {
   update,
   deleteById,
   activate,
+  markExpired,
+  findLapsed,
   countAll,
   countActive,
   countByYear,

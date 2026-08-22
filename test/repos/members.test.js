@@ -550,3 +550,144 @@ describe('Family Membership Functions', () => {
     });
   });
 });
+
+describe('findLapsed', () => {
+  test('returns an active member with no enrollment and a NULL expiry_date', async () => {
+    // The 106-of-172 production regression: most of the roster predates expiry tracking.
+    const testDb = db.__getCurrentDb();
+    insertPeriod(testDb, { end_date: isoDate(30) });
+    const m = insertMember(testDb, { email: 'lapsed@a.com', status: 'active', expiry_date: null });
+
+    const rows = await memberRepo.findLapsed();
+    expect(rows.map(r => r.id)).toEqual([m.id]);
+  });
+
+  test('returns an active member with no enrollment even when expiry_date is in the future', async () => {
+    // expiry_date records the period last paid for, so it can sit in the future while
+    // the member has not paid for the season now open. Enrollment wins.
+    const testDb = db.__getCurrentDb();
+    insertPeriod(testDb, { end_date: isoDate(30) });
+    const m = insertMember(testDb, { email: 'f@a.com', status: 'active', expiry_date: isoDate(200) });
+
+    const rows = await memberRepo.findLapsed();
+    expect(rows.map(r => r.id)).toEqual([m.id]);
+  });
+
+  test('excludes a member enrolled in a period that is still open', async () => {
+    const testDb = db.__getCurrentDb();
+    const period = insertPeriod(testDb, { end_date: isoDate(30) });
+    const m = insertMember(testDb, { email: 'ok@a.com', status: 'active' });
+    enrollMember(testDb, m.id, period.id);
+
+    expect(await memberRepo.findLapsed()).toEqual([]);
+  });
+
+  test('returns a member enrolled only in a period that has ended', async () => {
+    const testDb = db.__getCurrentDb();
+    const oldPeriod = insertPeriod(testDb, { start_date: '2023-04-01', end_date: isoDate(-1) });
+    insertPeriod(testDb, { end_date: isoDate(30) });
+    const m = insertMember(testDb, { email: 'old@a.com', status: 'active' });
+    enrollMember(testDb, m.id, oldPeriod.id);
+
+    const rows = await memberRepo.findLapsed();
+    expect(rows.map(r => r.id)).toEqual([m.id]);
+  });
+
+  test('excludes lifetime members', async () => {
+    const testDb = db.__getCurrentDb();
+    insertPeriod(testDb, { end_date: isoDate(30) });
+    insertMember(testDb, { email: 'life@a.com', status: 'active', is_lifetime: true });
+
+    expect(await memberRepo.findLapsed()).toEqual([]);
+  });
+
+  test.each(['pending', 'cancelled', 'expired'])('excludes %s members', async status => {
+    const testDb = db.__getCurrentDb();
+    insertPeriod(testDb, { end_date: isoDate(30) });
+    insertMember(testDb, { email: `${status}@a.com`, status });
+
+    expect(await memberRepo.findLapsed()).toEqual([]);
+  });
+
+  test('excludes a family sub-member enrolled on its own row', async () => {
+    const testDb = db.__getCurrentDb();
+    const period = insertPeriod(testDb, { end_date: isoDate(30) });
+    const primary = insertMember(testDb, { email: 'p@a.com', status: 'active' });
+    const sub = insertMember(testDb, { email: 'p@a.com', status: 'active', primary_member_id: primary.id });
+    enrollMember(testDb, sub.id, period.id);
+
+    const rows = await memberRepo.findLapsed();
+    expect(rows.map(r => r.id)).toEqual([primary.id]);
+  });
+
+  test('excludes a family sub-member with no row of its own when its primary is enrolled', async () => {
+    // Older db/migrate.js backfills enrolled primaries only, so legacy sub-members have
+    // no row. Expiring them while the primary stays active would be wrong.
+    const testDb = db.__getCurrentDb();
+    const period = insertPeriod(testDb, { end_date: isoDate(30) });
+    const primary = insertMember(testDb, { email: 'p@a.com', status: 'active' });
+    insertMember(testDb, { email: 'p@a.com', status: 'active', primary_member_id: primary.id });
+    enrollMember(testDb, primary.id, period.id);
+
+    expect(await memberRepo.findLapsed()).toEqual([]);
+  });
+
+  test('returns both primary and sub-member when the family is genuinely lapsed', async () => {
+    const testDb = db.__getCurrentDb();
+    const oldPeriod = insertPeriod(testDb, { start_date: '2023-04-01', end_date: isoDate(-1) });
+    insertPeriod(testDb, { end_date: isoDate(30) });
+    const primary = insertMember(testDb, { email: 'p@a.com', status: 'active' });
+    const sub = insertMember(testDb, { email: 'p@a.com', status: 'active', primary_member_id: primary.id });
+    enrollMember(testDb, primary.id, oldPeriod.id);
+
+    const rows = await memberRepo.findLapsed();
+    expect(rows.map(r => r.id).sort()).toEqual([primary.id, sub.id].sort());
+  });
+});
+
+describe('markExpired', () => {
+  test('flips status to expired and writes an audit row', async () => {
+    const testDb = db.__getCurrentDb();
+    const m = insertMember(testDb, { email: 'x@a.com', status: 'active' });
+
+    await memberRepo.markExpired(m.id);
+
+    const row = await db.get('SELECT * FROM members WHERE id = ?', m.id);
+    expect(row.status).toBe('expired');
+
+    const audit = testDb.prepare(
+      "SELECT * FROM audit_log WHERE table_name = 'members' AND record_id = ? AND action = 'UPDATE'"
+    ).all(String(m.id));
+    expect(audit).toHaveLength(1);
+    expect(JSON.parse(audit[0].old_values).status).toBe('active');
+    expect(JSON.parse(audit[0].new_values).status).toBe('expired');
+  });
+});
+
+describe("search status='expired' filter", () => {
+  test('includes a member whose status is expired but whose expiry_date is NULL', async () => {
+    // The expiry job flips status without touching expiry_date, and most of the legacy
+    // roster has none. The purely date-derived filter made those members invisible.
+    const testDb = db.__getCurrentDb();
+    insertMember(testDb, { email: 'flipped@a.com', status: 'expired', expiry_date: null });
+
+    const { members } = await memberRepo.search({ status: 'expired' });
+    expect(members.map(m => m.email)).toEqual(['flipped@a.com']);
+  });
+
+  test('still includes an active member whose expiry_date has passed', async () => {
+    const testDb = db.__getCurrentDb();
+    insertMember(testDb, { email: 'stale@a.com', status: 'active', expiry_date: isoDate(-1) });
+
+    const { members } = await memberRepo.search({ status: 'expired' });
+    expect(members.map(m => m.email)).toEqual(['stale@a.com']);
+  });
+
+  test('excludes a cancelled member with a past expiry_date', async () => {
+    const testDb = db.__getCurrentDb();
+    insertMember(testDb, { email: 'gone@a.com', status: 'cancelled', expiry_date: isoDate(-1) });
+
+    const { members } = await memberRepo.search({ status: 'expired' });
+    expect(members).toEqual([]);
+  });
+});
