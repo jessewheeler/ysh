@@ -29,21 +29,20 @@ describe('recordOfflinePayment', () => {
     expect(payments[0].payment_method).toBe('check');
   });
 
-  test('activates member when activateMember is true', async () => {
+  test('returns the new payment id so the caller can link an enrollment to it', async () => {
     const testDb = db.__getCurrentDb();
-    const m = insertMember(testDb, { email: 'a@a.com', status: 'pending' });
+    const m = insertMember(testDb, { email: 'a@a.com' });
 
-    await paymentsService.recordOfflinePayment({
+    const paymentId = await paymentsService.recordOfflinePayment({
       memberId: m.id,
       amountCents: 2500,
-      activateMember: true,
     });
 
-    const updatedMember = await memberRepo.findById(m.id);
-    expect(updatedMember.status).toBe('active');
+    const payments = await paymentRepo.findByMemberId(m.id);
+    expect(paymentId).toBe(payments[0].id);
   });
 
-  test('does not activate when activateMember is falsy', async () => {
+  test('never activates on its own — that belongs to services/activation', async () => {
     const testDb = db.__getCurrentDb();
     const m = insertMember(testDb, { email: 'a@a.com', status: 'pending' });
 
@@ -52,8 +51,7 @@ describe('recordOfflinePayment', () => {
       amountCents: 2500,
     });
 
-    const updatedMember = await memberRepo.findById(m.id);
-    expect(updatedMember.status).toBe('pending');
+    expect((await memberRepo.findById(m.id)).status).toBe('pending');
   });
 });
 

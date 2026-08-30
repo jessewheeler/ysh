@@ -162,6 +162,14 @@ Where admin activation currently reads `membership_expiry_date`, use `getCurrent
 **enroll** the member(s) via `membershipYears.enroll(...)`. Prefill the offline-payment amount (already
 a dollar input) with the current period's dues for the member's type (**no surcharge** — cash/check).
 
+> **Shipped differently, then fixed.** The first cut of this inlined the sequence in the route and
+> gated it on `member.status !== 'active'`, so an offline **renewal** — the common case, a member who
+> is still active when they pay — recorded the payment and skipped the family cascade, the expiry and
+> the membership year. The sequence now lives in `services/activation.js` and every path shares it:
+> the webhook, the offline-payment form, admin member create/edit, and
+> `scripts/repair-offline-renewals.js` for members the old behavior already left behind. See
+> **Activating a member** in `CLAUDE.md`.
+
 ## Public UI
 
 `views/membership.pug` and `views/renew.pug`: render dues from the current period and show the flat

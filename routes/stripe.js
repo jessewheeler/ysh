@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { activateMember, findMemberById } = require('../services/members');
 const paymentsService = require('../services/payments');
+const activation = require('../services/activation');
 const logger = require('../services/logger');
 
 router.post('/webhook', async (req, res) => {
@@ -19,117 +19,43 @@ router.post('/webhook', async (req, res) => {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     const memberId = session.metadata?.member_id;
-    const membershipType = session.metadata?.membership_type || 'individual';
 
     if (memberId) {
       // 1. Complete payment
       await paymentsService.completeStripePayment(session.id, session.payment_intent);
 
-      // 2. Activate primary member
-      await activateMember(memberId);
-      const primaryMember = await findMemberById(memberId);
-
-      // 3. Get and activate family members
-      const memberRepo = require('../db/repos/members');
-      let familyMembers = [];
-      if (membershipType === 'family') {
-        familyMembers = await memberRepo.findFamilyMembers(memberId);
-        for (const fm of familyMembers) {
-          await activateMember(fm.id);
-        }
-      }
-
-        // 4. Resolve period, set expiry_date + membership_year, enroll members, clear renewal token
+      // 2. Resolve the period paid for. metadata.period_id is what checkout priced
+      //    against; getCurrent() only covers sessions created before that was stamped.
+      let period = null;
+      let paymentId = null;
       try {
-          const periodsRepo = require('../db/repos/membershipPeriods');
-          const membershipYearsRepo = require('../db/repos/membershipYears');
-          const paymentsRepo = require('../db/repos/payments');
-
-          const metaPeriodId = session.metadata?.period_id;
-          const period = metaPeriodId
-              ? await periodsRepo.get(parseInt(metaPeriodId))
-              : await periodsRepo.getCurrent();
-
-          const completedPayment = await paymentsRepo.findByStripeSession(session.id);
-          const paymentId = completedPayment ? completedPayment.id : null;
-
-        const allIds = [memberId, ...familyMembers.map(fm => fm.id)];
-        for (const id of allIds) {
-            if (period) {
-                await memberRepo.setExpiryDate(id, period.end_date);
-                await memberRepo.setMembershipYear(id, new Date(period.start_date).getFullYear());
-                await membershipYearsRepo.enroll(id, period.id, paymentId);
-          }
-        }
-        await memberRepo.clearRenewalToken(memberId);
+        const periodsRepo = require('../db/repos/membershipPeriods');
+        const paymentsRepo = require('../db/repos/payments');
+        const metaPeriodId = session.metadata?.period_id;
+        period = metaPeriodId
+          ? await periodsRepo.get(parseInt(metaPeriodId))
+          : await periodsRepo.getCurrent();
+        const completedPayment = await paymentsRepo.findByStripeSession(session.id);
+        paymentId = completedPayment ? completedPayment.id : null;
       } catch (e) {
-        logger.error('Error setting expiry date or clearing renewal token', {error: e.message});
+        logger.error('Error resolving membership period for webhook', { error: e.message });
       }
 
-      // 4b. Re-fetch members so cards/emails reflect the updated membership_year + expiry_date
-      const refreshedPrimary = await findMemberById(memberId) || primaryMember;
-      const refreshedFamily = await Promise.all(
-        familyMembers.map(async fm => (await findMemberById(fm.id)) || fm)
-      );
-
-      // 5. Generate cards for all members. Track which members got a card so we
-      //    never email a stale prior-year card when generation fails (issue #67).
-      const allMembers = [refreshedPrimary, ...refreshedFamily];
-      const cardGenerated = new Set();
-      for (const member of allMembers) {
-        try {
-          const { generatePDF, generatePNG } = require('../services/card');
-          await generatePDF(member);
-          await generatePNG(member);
-          cardGenerated.add(member.id);
-        } catch (e) {
-          logger.error('Card generation error', {
-            memberNumber: member.member_number,
-            error: e.message,
-            stack: e.stack
-          });
-        }
-      }
-
-        // 6. Send emails. Cards ride along with the welcome instead of arriving in their
-        //    own message (issue #73) — a family sharing one address used to get a card
-        //    email per member on top of the welcome and the receipt.
-        const emailService = require('../services/email');
-
-        const cardReady = allMembers.filter(m => {
-            if (cardGenerated.has(m.id)) return true;
-            logger.warn('Skipping card delivery — no card generated', {
-                memberNumber: m.member_number,
-                membershipYear: m.membership_year,
-            });
-            return false;
+      // 3. Activate the member and their family for that period, then send cards + email.
+      //    Log-and-continue: the payment has already been marked complete, so a DB hiccup
+      //    here must not 500 the handler and send Stripe into a retry loop.
+      try {
+        const { primary, members } = await activation.activateForPeriod({
+          memberId,
+          period,
+          paymentId,
         });
-
-        const sameAddress = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
-        const primaryCards = cardReady.filter(m => sameAddress(m.email, refreshedPrimary.email));
-        // Sub-members who supplied their own address can't ride along on the primary's email.
-        const ownAddressCards = cardReady.filter(m => !sameAddress(m.email, refreshedPrimary.email));
-
-        // Each send is isolated: one bad address must not drop the rest.
-        const sends = [
-            () => emailService.sendWelcomeEmail(refreshedPrimary, primaryCards),
-            () => emailService.sendPaymentConfirmation(refreshedPrimary, session),
-            ...ownAddressCards.map(m => () => emailService.sendCardEmail(m)),
-        ];
-        for (const send of sends) {
-            try {
-                await send();
-            } catch (e) {
-                logger.error('Email send error', {error: e.message, stack: e.stack});
-            }
+        await activation.deliverActivation({ primary, members, receipt: session });
+      } catch (e) {
+        logger.error('Error activating member from webhook', {
+          error: e.message, stack: e.stack, memberId, sessionId: session.id,
+        });
       }
-
-      // 7. Push to Sender. Last, and non-throwing — a Sender outage must never fail a
-      //    paid signup. Covers renewals too; they land on this same webhook. One call
-      //    per unique email: family sub-members share the primary's address, and
-      //    Sender keys on email, so syncing each would clobber the primary's name.
-      const senderService = require('../services/sender');
-      await senderService.syncMembersSafe(allMembers);
     }
   } else if (event.type === 'checkout.session.expired') {
     // Abandoned checkout. Wrapped so a DB error still returns 2xx — Stripe retries on
