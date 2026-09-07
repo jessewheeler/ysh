@@ -122,6 +122,14 @@ class DatabaseManager:
         ).fetchone()
         return row['campaign_id'] if row else None
 
+    def get_member_id_by_email(self, email):
+        """Return a member's row ID by email — the way to reach a family sub-member the
+        test created through the UI rather than through seed_member."""
+        row = self.conn.execute(
+            'SELECT id FROM members WHERE email = ? ORDER BY id LIMIT 1', (email,)
+        ).fetchone()
+        return row['id'] if row else None
+
     def seed_admin(self, email=None, first_name=None, last_name=None, role='super_admin'):
         """Insert a test admin into members and return the row ID."""
         email = email or self.ADMIN_EMAIL

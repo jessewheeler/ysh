@@ -9,6 +9,7 @@ const dashboardService = require('../services/dashboard');
 const contentService = require('../services/content');
 const adminService = require('../services/admin');
 const paymentsService = require('../services/payments');
+const activation = require('../services/activation');
 const memberRepo = require('../db/repos/members');
 const paymentRepo = require('../db/repos/payments');
 const emailLogRepo = require('../db/repos/emailLog');
@@ -383,14 +384,16 @@ router.post('/members', async (req, res) => {
         membershipType: 'family'
       });
 
-      // Activate all members if status is active
+      // Activate all members if status is active. Goes through the activation service so
+      // an admin-created active family lands with the same expiry, membership year and
+      // period enrollment a paid signup gets. No cards or email — nobody paid here.
       const primaryRecord = await memberRepo.findByEmail(email);
       if (status === 'active' && primaryRecord) {
-        await memberRepo.activate(primaryRecord.id);
-        const family = await memberRepo.findFamilyMembers(primaryRecord.id);
-        for (const fm of family) {
-          await memberRepo.activate(fm.id);
-        }
+        await activation.activateForPeriod({
+          memberId: primaryRecord.id,
+          period: await periodsRepo.getCurrent(),
+          membershipYear: year,
+        });
       }
 
       // Sender only ever sees the primary here — family members share their email.
@@ -411,6 +414,14 @@ router.post('/members', async (req, res) => {
         membership_year: year, join_date: normalizedJoinDate, status: status || 'pending',
         is_lifetime: req.body.is_lifetime === 'on', notes,
       });
+
+      if (status === 'active') {
+        await activation.activateForPeriod({
+          memberId: created.lastInsertRowid,
+          period: await periodsRepo.getCurrent(),
+          membershipYear: year,
+        });
+      }
 
       await require('../services/sender').syncMemberSafe(created.lastInsertRowid);
 
@@ -497,12 +508,25 @@ router.post('/members/:id', async (req, res) => {
   const { first_name, last_name, email, phone, address_street, address_city, address_state, address_zip, membership_year, join_date, status, notes } = req.body;
   const normalizedJoinDate = join_date?.trim() || undefined;
   try {
+    const before = await memberRepo.findById(req.params.id);
     await memberRepo.update(req.params.id, {
       first_name, last_name, email, phone,
       address_street, address_city, address_state, address_zip,
       membership_year, join_date: normalizedJoinDate, status,
       is_lifetime: req.body.is_lifetime === 'on', notes,
     });
+    // Flipping the status field to active is an activation like any other: stamp the
+    // current period on the member and their family. Only on the transition, so editing
+    // an already-active member's phone number doesn't silently re-date their membership.
+    // Data only — an edit is not a payment, so no cards and no welcome email.
+    if (status === 'active' && before && before.status !== 'active') {
+      await activation.activateForPeriod({
+        memberId: req.params.id,
+        period: await periodsRepo.getCurrent(),
+        clearRenewalToken: false,
+        membershipYear: membership_year || null,
+      });
+    }
     // Propagate status/name changes to Sender. Logs and swallows any Sender failure.
     await require('../services/sender').syncMemberSafe(req.params.id);
     req.session.flash_success = 'Member updated.';
@@ -683,13 +707,15 @@ router.post('/members/:id/payments', async (req, res) => {
   }
 
   const amountCents = Math.round(dollars * 100);
-  const isActivating = activate_member === 'on' && member.status !== 'active';
-  await paymentsService.recordOfflinePayment({
+  // Deliberately not gated on the member's current status: a renewal paid by an
+  // already-active member still has to move them onto the new period, which is what the
+  // old `member.status !== 'active'` guard silently skipped.
+  const isActivating = activate_member === 'on';
+  const paymentId = await paymentsService.recordOfflinePayment({
     memberId: member.id,
     amountCents,
     paymentMethod: payment_method,
     description,
-    activateMember: isActivating,
   });
 
   (req.logger || logger).info('Offline payment recorded', {
@@ -699,38 +725,34 @@ router.post('/members/:id/payments', async (req, res) => {
     activating: isActivating,
   });
 
-  if (isActivating) {
-    const currentPeriod = await periodsRepo.getCurrent();
-    if (currentPeriod) {
-      const completedPayments = await paymentRepo.findByMemberId(member.id);
-      const latestPayment = completedPayments.find(p => p.status === 'completed') || null;
-      const paymentId = latestPayment ? latestPayment.id : null;
+  const currentPeriod = isActivating ? await periodsRepo.getCurrent() : null;
 
-      await memberRepo.setExpiryDate(member.id, currentPeriod.end_date);
-      await memberRepo.setMembershipYear(member.id, new Date(currentPeriod.start_date).getFullYear());
-      await membershipYearsRepo.enroll(member.id, currentPeriod.id, paymentId);
+  if (isActivating && !currentPeriod) {
+    // Activating with nowhere to activate them *to* would leave a member marked active
+    // with no expiry, no year and no enrollment, and would mail them a welcome carrying
+    // last season's card. Keep the payment, refuse the activation, and say why.
+    req.session.flash_error = 'Payment recorded, but the member was not activated: no membership period is currently open, so no expiry date or membership year could be set. Create a period under Membership Periods, then record the activation.';
+    await require('../services/sender').syncMemberSafe(member.primary_member_id || member.id);
+  } else if (isActivating) {
+    const { primary, members } = await activation.activateForPeriod({
+      memberId: member.id,
+      period: currentPeriod,
+      paymentId,
+    });
+    await activation.deliverActivation({ primary, members, receipt: { amount_total: amountCents } });
 
-      if (member.membership_type === 'family') {
-        const familyMembers = await memberRepo.findFamilyMembers(member.id);
-        for (const fm of familyMembers) {
-          await memberRepo.activate(fm.id);
-          await memberRepo.setExpiryDate(fm.id, currentPeriod.end_date);
-          await memberRepo.setMembershipYear(fm.id, new Date(currentPeriod.start_date).getFullYear());
-          await membershipYearsRepo.enroll(fm.id, currentPeriod.id, paymentId);
-        }
-      }
-    }
     (req.logger || logger).info('Member activated via offline payment', {
       memberId: member.id,
       memberNumber: member.member_number,
-      periodId: (await periodsRepo.getCurrent())?.id,
+      periodId: currentPeriod.id,
+      membersActivated: members.length,
     });
+  } else {
+    // Sync even without an activation: the payment itself is worth reflecting, and
+    // deliverActivation already handles the sync on the activating branch. Family
+    // sub-members share the primary's email, so the primary is what Sender sees.
+    await require('../services/sender').syncMemberSafe(member.primary_member_id || member.id);
   }
-
-  // Sync on every recorded payment, not just activations: a renewal for a member who is
-  // already active changes their expiry date, which Sender carries as a custom field.
-  // Family sub-members share the primary's email, so the primary is what Sender sees.
-  await require('../services/sender').syncMemberSafe(member.primary_member_id || member.id);
 
   req.session.flash_success = `Payment of $${dollars.toFixed(2)} recorded.`;
   res.redirect(`/admin/members/${req.params.id}`);

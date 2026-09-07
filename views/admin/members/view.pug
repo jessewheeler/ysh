@@ -159,12 +159,16 @@ block content
                 label(for="description") Description
                 input#description.form-control(type="text" name="description" placeholder="Membership dues")
               .form-group
+                //- Checked even when the member is already active: the common case for this
+                //- form is a cash/check renewal, and defaulting it off for active members is
+                //- what left renewals stuck on their old period in the first place.
                 label.checkbox-label
-                  if member.status !== 'active'
-                    input(type="checkbox" name="activate_member" checked)
-                  else
-                    input(type="checkbox" name="activate_member")
-                  |  Activate member
+                  input(type="checkbox" name="activate_member" checked)
+                  |  Activate / renew for the current period
+                if currentPeriod
+                  small.form-hint Moves #{member.membership_type === 'family' ? 'this member and their family' : 'this member'} onto #{currentPeriod.label}. Leave unticked for a payment that is not dues.
+                else
+                  small.form-hint No membership period is open, so no expiry date or year can be set.
               .form-actions
                 button.btn(type="submit") Record Payment
 

@@ -1,8 +1,12 @@
 const paymentRepo = require('../db/repos/payments');
-const memberRepo = require('../db/repos/members');
 
-async function recordOfflinePayment({ memberId, amountCents, paymentMethod, description, activateMember }) {
-  await paymentRepo.create({
+/**
+ * Records a cash/check payment an admin took in person. Returns the new payment's id so
+ * the caller can link it to a membership_years enrollment — activation itself belongs to
+ * services/activation.js, which handles the family and the period alongside the status.
+ */
+async function recordOfflinePayment({ memberId, amountCents, paymentMethod, description }) {
+  const result = await paymentRepo.create({
     member_id: memberId,
     amount_cents: amountCents,
     currency: 'usd',
@@ -11,9 +15,7 @@ async function recordOfflinePayment({ memberId, amountCents, paymentMethod, desc
     payment_method: paymentMethod || 'cash',
   });
 
-  if (activateMember) {
-    await memberRepo.activate(memberId);
-  }
+  return result.lastInsertRowid;
 }
 
 async function completeStripePayment(sessionId, paymentIntent) {
