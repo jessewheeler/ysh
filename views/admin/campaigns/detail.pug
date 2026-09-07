@@ -95,19 +95,23 @@ block content
         if visits.length === 0
             p.text-muted No visits recorded yet.
         else
-            table#campaign-visits.admin-table
-                thead
-                    tr
-                        th Landed on
-                        th Referrer
-                        th Source / Medium
-                        th When
-                tbody
-                    each v in visits
+            //- --scroll opts out of the mobile card layout: a path, a referrer URL, a
+            //- source/medium and a timestamp read as a scannable grid, not as four
+            //- labelled lines per visit.
+            .table-responsive
+                table#campaign-visits.admin-table.admin-table--scroll
+                    thead
                         tr
-                            td= v.landing_path
-                            td.text-muted= v.referrer || 'direct'
-                            td.text-muted= [v.utm_source, v.utm_medium].filter(Boolean).join(' / ') || '—'
-                            td= v.created_at
+                            th Landed on
+                            th Referrer
+                            th Source / Medium
+                            th When
+                    tbody
+                        each v in visits
+                            tr
+                                td= v.landing_path
+                                td.text-muted= v.referrer || 'direct'
+                                td.text-muted= [v.utm_source, v.utm_medium].filter(Boolean).join(' / ') || '—'
+                                td= v.created_at
             p.text-muted Showing the 25 most recent. Visits are pruned after two years.
 

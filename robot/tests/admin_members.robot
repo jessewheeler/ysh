@@ -163,6 +163,46 @@ Record Offline Payment Disclosure Reveals The Form
     Flash Success Should Be Visible    recorded
     Get Text    table#member-payments    contains    25.00
 
+Activating An Offline Payment Renews The Whole Family
+    [Documentation]    The bug this covers: an offline payment for a member who was already
+    ...    active recorded the payment and nothing else, leaving the membership year, the
+    ...    expiry and every family member untouched. Ticks the Activate checkbox through the
+    ...    UI, because posting activate_member directly would pass even if the control were
+    ...    missing from the form.
+    Seed Period
+    ${id}=    Seed Member    first_name=Rita    last_name=Renewal    email=rita@example.com
+    ...    status=active    membership_year=2020    membership_type=family
+    Login As Admin
+    Navigate To    /admin/members/${id}
+
+    # Add the family member through the UI — seed_member cannot set primary_member_id.
+    Click    summary >> text=Add Family Member
+    Wait For Elements State    input#fm_first_name    visible    timeout=10s
+    Fill Text    input#fm_first_name    Rudy
+    Fill Text    input#fm_last_name    Renewal
+    Fill Text    input#fm_email    rudy@example.com
+    Click    form#add-family-member button[type="submit"]
+    Flash Success Should Be Visible    Family member Rudy Renewal added
+
+    Click    summary >> text=Record Offline Payment
+    Wait For Elements State    input#amount    visible    timeout=10s
+    Check Checkbox    form#record-payment input[name="activate_member"]
+    Click    form#record-payment button[type="submit"]
+    Flash Success Should Be Visible    recorded
+
+    # The primary is off 2020 and enrolled in the current period. The Year row is picked
+    # out precisely: the member number YSH-2020-0001 also contains "2020".
+    ${year}=    Get Text    tr:has(th:text-is("Year")) >> td
+    Should Not Be Equal    ${year}    2020
+    Enrollment Panel Should List A Period
+
+    # And so is the family member, which is what the old code skipped entirely.
+    ${family}=    Get Member Id By Email    rudy@example.com
+    Navigate To    /admin/members/${family}
+    ${family_year}=    Get Text    tr:has(th:text-is("Year")) >> td
+    Should Be Equal    ${family_year}    ${year}
+    Enrollment Panel Should List A Period
+
 Add Family Member Disclosure Reveals The Form
     [Documentation]    Same shape as the offline-payment disclosure: assert hidden, operate the
     ...    control, then submit through it.
@@ -220,3 +260,14 @@ Member Actions Sit On One Row
     ${rows}=    Evaluate JavaScript    ${None}
     ...    () => new Set([...document.querySelectorAll('.record-actionbar button, .record-actionbar a.btn')].map(el => Math.round(el.getBoundingClientRect().top))).size
     Should Be Equal As Integers    ${rows}    1
+
+
+*** Keywords ***
+Enrollment Panel Should List A Period
+    [Documentation]    Asserts the Membership Years panel holds an enrollment row rather than
+    ...    its "No enrollment history." empty state. Scoped to the panel because the member
+    ...    page renders three .admin-table elements.
+    ${panel}=    Set Variable    .admin-panel:has(h3:text-is("Membership Years"))
+    Wait For Elements State    ${panel} >> table.admin-table    visible    timeout=10s
+    ${rows}=    Get Element Count    ${panel} >> tbody tr
+    Should Be True    ${rows} > 0

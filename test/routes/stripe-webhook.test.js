@@ -109,6 +109,37 @@ describe('POST /webhook — checkout.session.completed', () => {
     expect(updated.expiry_date).toBe('2027-07-31');
   });
 
+  test('an activation failure is logged, not thrown — Stripe must not retry a paid session', async () => {
+    const testDb = getTestDb();
+    const member = insertMember(testDb, { email: 'renewer@test.com', status: 'pending' });
+    const period = insertPeriod(testDb, { start_date: '2026-04-01', end_date: '2027-07-31' });
+    insertPayment(testDb, {
+      member_id: member.id, stripe_session_id: 'cs_boom', status: 'pending',
+    });
+
+    // Stand in for any DB failure inside the activation writes.
+    const activation = require('../../services/activation');
+    const spy = jest.spyOn(activation, 'activateForPeriod')
+      .mockRejectedValue(new Error('connection terminated'));
+
+    stripeService.constructWebhookEvent.mockReturnValue(checkoutCompletedEvent({
+      id: 'cs_boom',
+      amount_total: 2600,
+      payment_intent: 'pi_boom',
+      metadata: { member_id: String(member.id), period_id: String(period.id) },
+    }));
+
+    const res = mockRes();
+    await mockHandlers['POST /webhook'](mockReq(), res);
+
+    // 2xx, so Stripe does not redeliver a session whose payment is already recorded.
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+    const payment = testDb.prepare('SELECT status FROM payments WHERE stripe_session_id = ?').get('cs_boom');
+    expect(payment.status).toBe('completed');
+
+    spy.mockRestore();
+  });
+
   test('does nothing for non-checkout events', async () => {
     stripeService.constructWebhookEvent.mockReturnValue({
       type: 'payment_intent.created',

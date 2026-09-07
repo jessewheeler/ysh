@@ -43,6 +43,7 @@ db/repos/                    # Data-access layer (one file per table)
 routes/                      # Express routers (index, admin, stripe)
 services/                    # Business logic
   members.js stripe.js email.js card.js  # core domain services
+  activation.js              #   THE place a member is activated for a membership period
   admin.js                   #   admin-specific operations
   attention.js               #   thresholds + current period for the needs-attention filter
   auth.js                    #   password hashing / OTP
@@ -64,7 +65,8 @@ middleware/                  # Express middleware
   locals.js                  #   site settings + flash into res.locals
   captcha.js                 #   hCaptcha verification
   requestLogger.js           #   Morgan + Winston request logging
-scripts/                     # CLI tools (create-admin, sync-sender, expire-memberships, dev.sh, check.sh)
+scripts/                     # CLI tools (create-admin, sync-sender, dev.sh, check.sh)
+  repair-offline-renewals.js #   backfills members whose offline payment never stamped a period
 views/                       # Pug templates (layout.pug base)
 public/                      # Static assets (css, js, img)
 assets/                      # Non-served binary assets (Council .xlsx report template)
@@ -161,6 +163,32 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
 - The Needs attention member filter is documented in `docs/needs-attention-signals.md` — read it
   before changing a signal predicate or threshold, and note that neither Jest nor Robot exercises
   `pg-translate`, so those queries need a manual PostgreSQL check
+
+## Activating a member
+
+`services/activation.js` is the only place a member becomes active for a membership period.
+Every caller — the Stripe webhook, the admin offline-payment form, admin member create/edit and
+`scripts/repair-offline-renewals.js` — goes through it. Do not re-implement the sequence in a route.
+
+- `activateForPeriod({ memberId, period, paymentId, clearRenewalToken, membershipYear })` sets
+  `status`, `expiry_date` and `membership_year` and writes a `membership_years` enrollment row for
+  the **primary and every family member**, resolving up to the primary when handed a sub-member id.
+  It returns the rows re-fetched after the writes. With no open period it flips status only and
+  returns `period: null` so the caller can warn instead of leaving a half-activated member.
+- `deliverActivation({ primary, members, receipt, generateCards, sendEmails })` is the outbound
+  half: cards, the welcome + receipt emails and the Sender sync. Split out so paths that only fix
+  data (an admin edit, a bulk repair) never mail anybody.
+- Derive the membership year from `period.start_date.slice(0, 4)`, never
+  `new Date(period.start_date).getFullYear()` — a bare `YYYY-MM-DD` parses as UTC midnight and
+  reports the previous year west of Greenwich.
+- Activation on the offline-payment route is **not** gated on the member's prior status. Gating it
+  that way is what caused renewals paid by an already-active member to skip the family cascade and
+  the membership year entirely — which is also why the form's Activate box defaults to checked.
+- With no open period, callers must refuse the activation rather than flip status and deliver: an
+  active member with no expiry or enrollment, mailed last season's card, is worse than an
+  unactivated one.
+- Both calls belong inside a log-and-continue `try`/`catch` on the Stripe webhook — the payment is
+  already recorded by then, so throwing turns a paid session into a retry loop.
 
 ## CI
 

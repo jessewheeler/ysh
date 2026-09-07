@@ -3,6 +3,9 @@ extends ../layout
 block page_title
   | Members
 
+//- Sorting is desktop-only: below 768px admin.css hides the thead to lay each row out as a
+//- card, and these links go with it. The filters do not — the view pills and the three
+//- data-auto-submit selects sit outside the table.
 mixin sortTh(key, label)
   - const isActive = sort === key
   - const nextDir = isActive && dir === 'asc' ? 'desc' : 'asc'

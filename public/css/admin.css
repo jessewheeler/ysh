@@ -858,6 +858,17 @@ a.stat-card:hover {
     align-items: stretch;
   }
 
+  /* .btn gets width: 100% below, .btn-outline deliberately does not — side by side in a flex
+     row that let "+ New Member" take the line and squeezed "Export CSV" onto two. */
+  .toolbar-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-actions .btn-outline {
+    text-align: center;
+  }
+
   .search-form {
     width: 100%;
   }
@@ -865,6 +876,19 @@ a.stat-card:hover {
   .search-form input {
     flex: 1;
     font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+
+  /* The 280px floor overflows a 320px viewport on its own, before any table does. A whole
+     line each also stops the search field sharing a row with the period select at a width
+     where neither is readable. */
+  .search-form-wide input[type="search"] {
+    min-width: 0;
+    max-width: none;
+    flex-basis: 100%;
+  }
+
+  .search-form-wide select {
+    flex: 1;
   }
 
   .admin-content .form-group input,
@@ -880,6 +904,12 @@ a.stat-card:hover {
   .admin-table th,
   .admin-table td {
     padding: 0.75rem;
+  }
+
+  /* Was 1.75rem all round, which left only ~286px of content inside a 390px viewport --
+     half the reason the payment table had nowhere to go but off the side of the page. */
+  .admin-panel {
+    padding: 1.25rem 1rem;
   }
 
   .btn,
@@ -1506,4 +1536,153 @@ a.stat-card:hover {
 
 .flash-list {
   margin: 0.5rem 0 0 1.25rem;
+}
+
+/* === Mobile table cards ===
+   Below 768px a 5-to-9 column table cannot fit, and nothing here gave it a scroll
+   container: .admin-content carries no overflow-x (deliberately, so desktop tables get the
+   full width) and .admin-main has min-width: 0, so the overflow landed on the *document*.
+   The page then scrolled sideways, which is what made the panels look off-centre with a
+   grey strip down the left — the cards were centred, the page was scrolled.
+
+   So each row becomes a card instead. The <table> markup is untouched: robot selects rows
+   as `.admin-table tbody tr:first-child a.btn-sm` and locates four tables by id, and Get
+   Text runs in Playwright strict mode, so a second parallel card markup would break all of
+   that. The column labels come from data-label, set by public/js/admin.js from the thead —
+   Chromium's innerText excludes generated content, so the ::before labels stay out of Get
+   Text too.
+
+   Opt out with .admin-table--scroll (inside a .table-responsive) where a grid still reads
+   better than one labelled line per value. .admin-table--kv is already label/value. */
+@media (max-width: 768px) {
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv),
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody,
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr,
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr > td {
+    display: block;
+  }
+
+  /* Takes the members list's sort links with it — see the note in views/admin/members/list.pug.
+     Filtering survives: the view pills and the three selects are outside the table. */
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > thead {
+    display: none;
+  }
+
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 0.5rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Inside a white panel a white card is invisible, so those keep the border only. The
+     members and payments lists sit straight on --page-bg and need the fill. */
+  .admin-panel .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr {
+    background: transparent;
+  }
+
+  /* .admin-table tr:hover td paints #f8f9fa, which greys the whole card on tap. */
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr:hover > td {
+    background: transparent;
+  }
+
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr > td {
+    grid-template-columns: 7rem minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: baseline;
+    /* Grid items stretch by default, which blew every status pill out to the full width of
+       the value column and made it read as a filled bar rather than a badge. */
+    justify-items: start;
+    padding: 0.375rem 0;
+    border-bottom: none;
+    overflow-wrap: anywhere;      /* long emails, referrer URLs */
+  }
+
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr > td[data-label] {
+    display: grid;
+  }
+
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr > td::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.8125rem;
+  }
+
+  /* A blank cell would otherwise leave its label stranded on a line of its own. */
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr > td:empty {
+    display: none;
+  }
+
+  /* Full-width cells: the actions column, and the colspan empty-state rows. periods/list
+     and campaigns/list both head their actions column with an empty th, so those cells get
+     no data-label at all and land here too. */
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr > td[colspan],
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr > td:has(.row-actions),
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr > td:has(> .btn-sm),
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr > td:has(> .inline-form) {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 0.625rem;
+  }
+
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr > td[colspan]::before,
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr > td:has(.row-actions)::before,
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr > td:has(> .btn-sm)::before,
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) > tbody > tr > td:has(> .inline-form)::before {
+    display: none;
+  }
+
+  /* The actions sit on their own line at the foot of the card, at their natural width.
+     Stretching them edge to edge turned a one-word Edit link into a navy slab heavier than
+     the record it belonged to, and .btn-sm already clears --tap-target-sm. */
+  .admin-table:not(.admin-table--scroll):not(.admin-table--kv) .row-actions {
+    justify-content: flex-start;
+  }
+
+  /* Key/value tables: label over value. The fixed label columns — 160px on .detail-table,
+     14rem on --kv — left ~150px for the value on a 390px phone, which is what wrapped the
+     member's address onto three lines. */
+  .detail-table,
+  .detail-table > tbody,
+  .detail-table > tbody > tr,
+  .detail-table > tbody > tr > th,
+  .detail-table > tbody > tr > td,
+  .snapshot-table,
+  .snapshot-table > tbody,
+  .snapshot-table > tbody > tr,
+  .snapshot-table > tbody > tr > th,
+  .snapshot-table > tbody > tr > td,
+  .admin-table--kv,
+  .admin-table--kv > tbody,
+  .admin-table--kv > tbody > tr,
+  .admin-table--kv > tbody > tr > th,
+  .admin-table--kv > tbody > tr > td {
+    display: block;
+    width: auto;
+  }
+
+  .detail-table > tbody > tr > th,
+  .snapshot-table > tbody > tr > th,
+  .admin-table--kv > tbody > tr > th {
+    padding: 0 0 0.125rem;
+    white-space: normal;
+    border-bottom: none;
+    font-size: 0.8125rem;
+  }
+
+  .detail-table > tbody > tr > td,
+  .snapshot-table > tbody > tr > td,
+  .admin-table--kv > tbody > tr > td {
+    padding: 0 0 0.75rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .detail-table > tbody > tr:last-child > td,
+  .snapshot-table > tbody > tr:last-child > td,
+  .admin-table--kv > tbody > tr:last-child > td {
+    margin-bottom: 0;
+    border-bottom: none;
+  }
 }
