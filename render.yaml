@@ -28,6 +28,10 @@ services:
         sync: false
       - key: FROM_EMAIL
         sync: false
+      - key: EXPIRY_JOB_ENABLED
+        sync: false
+      - key: EXPIRY_JOB_CRON
+        sync: false
       - key: SENDER_API_TOKEN
         sync: false
       - key: SENDER_GROUP_CURRENT

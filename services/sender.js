@@ -14,8 +14,9 @@ const BASE_BACKOFF_MS = 1000;
 // window is the right call. REQUEST is for anything inside an HTTP handler: a Stripe
 // webhook that blocks for minutes gets re-delivered by Stripe, which re-runs payment
 // completion and re-sends welcome/card emails — a duplicated signup is worse than a
-// missed sync. A miss is only repaired by the next run of `scripts/sync-sender.js`,
-// which nothing schedules yet, so it has to be run periodically by hand.
+// missed sync. A miss is repaired by the next run of `scripts/sync-sender.js`, which
+// nothing schedules yet, so it has to be run periodically by hand. (The nightly
+// membership-expiry job re-syncs the members it expires, but only those.)
 const BACKGROUND_RETRY = { maxAttempts: 5, maxBackoffMs: 60000 };
 const REQUEST_RETRY = { maxAttempts: 2, maxBackoffMs: 1000 };
 
@@ -150,10 +151,12 @@ function isoDate() {
  * Which Sender group a member belongs in, or null if they belong in none
  * (pending members never paid; cancelled members opted out).
  *
- * Lapsed has to be *derived*, not read off `status`: nothing in the app ever writes
- * status='expired' (only an admin picking it by hand does), so a membership that simply
- * runs out keeps status='active' with a past expiry_date. This mirrors the expired
- * predicate the member list uses — see the status filter in db/repos/members.js.
+ * Lapsed is still *derived*, not read off `status` alone. services/membershipExpiry.js
+ * writes status='expired' nightly, but only for members with no enrollment in an open
+ * period, and status lags reality between runs — so a membership that has just run out
+ * can still carry status='active' with a past expiry_date. Checking both keeps grouping
+ * correct whether or not the job has caught up. This mirrors the expired predicate the
+ * member list uses — see the status filter in db/repos/members.js.
  *
  * There is deliberately no "all members" group — Sender's subscriber list already
  * is that, so a campaign to everyone needs no group at all.

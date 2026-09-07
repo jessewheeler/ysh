@@ -12,6 +12,7 @@ const { injectLocals } = require('./middleware/locals');
 const {captureActor} = require('./middleware/auth');
 const {captureCampaign} = require('./middleware/campaign');
 const logger = require('./services/logger');
+const scheduler = require('./services/scheduler');
 const { attachRequestId, attachLogger, morganMiddleware, logError } = require('./middleware/requestLogger');
 
 const app = express();
@@ -244,6 +245,7 @@ async function start() {
   // Run migration + seed on startup
   try {
     await seed();
+    scheduler.start();
     app.listen(PORT, () => {
       logger.info(`Server running at http://localhost:${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);

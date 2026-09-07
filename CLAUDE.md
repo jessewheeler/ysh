@@ -7,10 +7,13 @@ Member-management web app: Express 5, Pug templates, better-sqlite3, Stripe paym
 ```bash
 npm run dev             # Start dev server (nodemon)
 npm run lint            # ESLint
-npm test                # Jest (~860 tests, --forceExit)
-./robot/run_tests.sh    # Robot Framework end-to-end tests (~57 tests, Playwright)
+npm test                # Jest (~830 tests, --forceExit)
+./robot/run_tests.sh    # Robot Framework end-to-end tests (~115 tests, Playwright)
 ./scripts/dev.sh        # Install deps + start dev server
 ./scripts/check.sh      # Full check: lint + Jest + Robot end-to-end — run this before declaring work done
+
+node scripts/expire-memberships.js --dry-run   # Preview which memberships would be expired
+node scripts/expire-memberships.js --max=N     # Expire them (ceiling defaults to 50)
 ```
 
 `./robot/run_tests.sh` accepts pass-through args, so a single suite or tag can be run on
@@ -50,8 +53,10 @@ services/                    # Business logic
   csv.js                     #   CSV export helpers
   dashboard.js               #   stats aggregation for admin dashboard
   logger.js                  #   Winston logger (logs/ directory)
+  membershipExpiry.js        #   nightly lapsed-member expiry (writes status='expired')
   payments.js                #   payment processing / history
   renewal.js                 #   renewal token generation + bulk reminders
+  scheduler.js               #   node-cron registration, armed by EXPIRY_JOB_ENABLED
   sender.js                  #   Sender.net subscriber list sync (one-way, YSH → Sender)
   storage.js                 #   file upload/delete (S3-compatible)
 middleware/                  # Express middleware
@@ -145,6 +150,12 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
 - `members.campaign_id` is the one exception: it lives only in the migrate ALTERs (and is mirrored in
   `test/helpers/db.js`), because `members` is created before `campaigns` while `campaigns.created_by`
   references `members`, and PostgreSQL rejects a forward `REFERENCES` at `CREATE TABLE` time
+- `members.status = 'expired'` is written by `services/membershipExpiry.js` (nightly, plus
+  `scripts/expire-memberships.js`), which expires members with no `membership_years` row for any
+  period whose `end_date` is still in the future. It aborts when no period is open — otherwise the
+  rule would match the entire roster — and refuses to expire more than `--max` members in one run.
+  Because it runs on a schedule, `status` lags reality between runs: code that must be exact should
+  still test enrollment, not `status`. Family sub-members inherit their primary's enrollment.
 - `payments.status` allows `pending`/`completed`/`failed`/`refunded`. `failed` is written only by the
   Stripe failure webhooks (`checkout.session.expired`, `payment_intent.payment_failed`), and
   `payments.failure_reason` holds Stripe's message. Nothing writes `refunded`.

@@ -208,9 +208,11 @@ function predicateFor(signal, c) {
  *
  * Two definitions were tried and rejected:
  *
- * - `status != 'active'`. Nothing in this codebase ever writes status = 'expired' (there
- *   is no expiry job), so a lapsed member still carries status = 'active'. This would
- *   exclude the very people the renewal signals exist to find.
+ * - `status != 'active'`. Historically nothing wrote status = 'expired', so a lapsed
+ *   member still carried status = 'active'. services/membershipExpiry.js now does write
+ *   it, but only nightly and only for members with no enrollment in an open period — so
+ *   status still lags reality between runs, and this would exclude the very people the
+ *   renewal signals exist to find.
  * - The derived good-standing test used by the `active` viewClause, which treats a NULL
  *   expiry_date as current. Most of the membership has a NULL expiry_date because it
  *   predates expiry tracking, so this dropped ~106 of 172 active members who genuinely

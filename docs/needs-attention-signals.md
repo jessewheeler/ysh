@@ -32,8 +32,11 @@ real data.
 
 **Two rejected definitions, both of which were actually tried:**
 
-- **`status != 'active'`** — nothing in this codebase ever writes `status = 'expired'`;
-  there is no expiry job. A lapsed member keeps `status = 'active'` with a stale
+- **`status != 'active'`** — when this was written nothing ever wrote
+  `status = 'expired'`. `services/membershipExpiry.js` now does, on a nightly schedule,
+  but it only expires members with no enrollment in an open period and it aborts entirely
+  when no period is open — so `status` still lags reality between runs and cannot be
+  relied on here. A just-lapsed member keeps `status = 'active'` with a stale
   `expiry_date`. This would exclude precisely the people `repeated_reminders` and
   `renewal_never_started` exist to find, turning both into dead code that quietly matches
   nobody forever.
