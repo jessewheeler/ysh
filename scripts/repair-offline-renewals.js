@@ -63,8 +63,19 @@ function parseArgs(argv) {
   };
 }
 
-/** Both period bounds and payment timestamps are YYYY-MM-DD-prefixed strings. */
-const dayOf = value => String(value || '').slice(0, 10);
+/**
+ * Period bounds are YYYY-MM-DD strings in both dialects, but payment timestamps are not:
+ * toPgSchema turns `created_at TEXT DEFAULT (datetime('now'))` into a real TIMESTAMP, so
+ * node-pg hands back a Date where SQLite hands back a string. String(date).slice(0, 10) is
+ * 'Mon Sep 07', which sorts after a period's start_date and before its end_date, so every
+ * payment fell outside the window and every member was reported NOPAY under PostgreSQL.
+ * Built from local parts, not toISOString(): node-pg reads `timestamp without time zone`
+ * as local, so UTC would roll an evening payment onto the next day.
+ */
+const pad = n => String(n).padStart(2, '0');
+const dayOf = value => value instanceof Date
+    ? `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`
+    : String(value || '').slice(0, 10);
 const startYearOf = period => parseInt(String(period.start_date).slice(0, 4), 10);
 
 /** YYYY-MM-DD shifted by whole days, via UTC so no local timezone rolls the date over. */

@@ -21,6 +21,7 @@ const db = require('../../db/database');
 const { run, parseArgs } = require('../../scripts/repair-offline-renewals');
 const memberRepo = require('../../db/repos/members');
 const membershipYearsRepo = require('../../db/repos/membershipYears');
+const paymentsRepo = require('../../db/repos/payments');
 const cardService = require('../../services/card');
 const emailService = require('../../services/email');
 const {
@@ -94,6 +95,34 @@ describe('repair-offline-renewals', () => {
     const enrollments = await membershipYearsRepo.findByMember(primary.id);
     expect(enrollments[0].payment_id).toBe(payment.id);
   });
+
+    test('matches a payment whose created_at is a Date, as PostgreSQL returns it', async () => {
+        const period = insertPeriod(db, CURRENT);
+        const {primary, familyMembers, payment} = brokenFamily(period);
+
+        // SQLite stores created_at as TEXT, but toPgSchema rewrites the column to a real
+        // TIMESTAMP, so node-pg hands back a Date. The in-memory SQLite the rest of this suite
+        // runs on can never produce that shape, which is why the NOPAY-on-Postgres bug shipped
+        // with eighteen passing tests. Stub the repo to return what the pg driver would.
+        const rows = await paymentsRepo.findByMemberId(primary.id);
+        const spy = jest.spyOn(paymentsRepo, 'findByMemberId').mockResolvedValue(
+            rows.map(row => ({...row, created_at: new Date(row.created_at.replace(' ', 'T'))}))
+        );
+
+        try {
+            const stats = await run({...RUN, apply: true});
+
+            expect(stats.noPayment).toBe(0);
+            expect(stats.repaired).toBe(1);
+            for (const id of [primary.id, ...familyMembers.map(fm => fm.id)]) {
+                expect(await membershipYearsRepo.isEnrolled(id, period.id)).toBe(true);
+            }
+            const enrollments = await membershipYearsRepo.findByMember(primary.id);
+            expect(enrollments[0].payment_id).toBe(payment.id);
+        } finally {
+            spy.mockRestore();
+        }
+    });
 
   test('a second run reports everything already correct', async () => {
     insertPeriod(db, CURRENT);
