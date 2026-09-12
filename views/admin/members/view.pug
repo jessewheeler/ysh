@@ -20,7 +20,7 @@ block content
         form(method="POST" action=`/admin/members/${member.id}/renewal-link` data-spinner="Generating…")
           button.btn-outline.btn-compact(type="submit") Generate Renewal Link
       if member.membership_type !== 'family' && !member.primary_member_id
-        form(method="POST" action=`/admin/members/${member.id}/upgrade-to-family` data-confirm=`Upgrade ${member.first_name} ${member.last_name} to a family membership?`)
+        form(method="POST" action=`/admin/members/${member.id}/upgrade-to-family` data-confirm=`Upgrade ${member.first_name} ${member.last_name} to a family membership?` data-spinner="Upgrading…")
           button.btn-outline.btn-compact(type="submit") Upgrade to Family
     .actionbar-group.actionbar-danger
       form(method="POST" action=`/admin/members/${member.id}/delete` data-confirm="Delete this member?")
@@ -104,7 +104,7 @@ block content
           details.disclosure(open=(flash_reopen === 'add-family-member'))
             summary Add Family Member
             .disclosure-body
-              form#add-family-member(method="POST" action=`/admin/members/${member.id}/family-members`)
+              form#add-family-member(method="POST" action=`/admin/members/${member.id}/family-members` data-spinner="Adding…")
                 .form-group
                   label(for="fm_first_name") First Name
                   input#fm_first_name.form-control(type="text" name="first_name" required)
@@ -120,6 +120,11 @@ block content
       .admin-panel
         h3 Payments
         if payments.length
+          //- Void is super-admin only and only for completed offline payments: it changes
+          //- what the dashboard reports as money taken, and a Stripe row voided here would
+          //- silently drift from Stripe without refunding anything.
+          - const canVoid = (p) => adminRole === 'super_admin' && p.status === 'completed' && p.payment_method !== 'stripe'
+          - const showActions = payments.some(canVoid)
           table#member-payments.admin-table
             thead
               tr
@@ -128,22 +133,53 @@ block content
                 th Method
                 th Description
                 th Date
+                if showActions
+                  th Actions
             tbody
               each p in payments
                 tr
                   td= formatMoney(p.amount_cents)
                   td
                     +badge(p.status, p.status)
+                    if p.status === 'voided'
+                      - const reasonLabel = (voidReasons.find(r => r.value === p.void_reason) || {}).label || p.void_reason
+                      span.void-detail= [reasonLabel, p.void_note, p.voided_at ? formatDate(p.voided_at) : null].filter(Boolean).join(' · ')
                   td= p.payment_method || 'stripe'
                   td= p.description || '—'
                   td= formatDate(p.created_at)
+                  if showActions
+                    td
+                      if canVoid(p)
+                        //- The form lives in a native <dialog> opened by data-dialog-open
+                        //- (public/js/admin.js). The modal is the confirmation, so there is
+                        //- no data-confirm on top of it. data-dialog-open-on-load reopens it
+                        //- after a refused submit so the message lands next to the form.
+                        button.btn-danger.btn-tiny(type="button" data-dialog-open=`#void-payment-${p.id}`) Void
+                        dialog.modal.void-modal(id=`void-payment-${p.id}` data-dialog-open-on-load=(flash_reopen === `void-payment-${p.id}` ? 'true' : undefined) aria-labelledby=`void-payment-${p.id}-title`)
+                          form.void-payment(method="POST" action=`/admin/members/${member.id}/payments/${p.id}/void` data-spinner="Voiding…")
+                            h3.modal-title(id=`void-payment-${p.id}-title`) Void payment
+                            p.text-muted #{formatMoney(p.amount_cents)} by #{p.payment_method} on #{formatDate(p.created_at)}. The payment stays in the history as voided and stops counting toward totals. Nothing is refunded.
+                            .form-group
+                              label(for=`void-reason-${p.id}`) Reason
+                              select.form-control(id=`void-reason-${p.id}` name="void_reason" required)
+                                option(value="" disabled selected) — choose a reason —
+                                each r in voidReasons
+                                  option(value=r.value)= r.label
+                            .form-group
+                              label(for=`void-note-${p.id}`) Note
+                              input.form-control(id=`void-note-${p.id}` type="text" name="void_note" placeholder="Required when the reason is Other")
+                            .form-actions
+                              button.btn-danger(type="submit") Void payment
+                              button.btn-outline(type="button" data-dialog-close) Cancel
         else
           p.text-muted No payments yet.
 
         details.disclosure(open=(flash_reopen === 'record-payment'))
           summary Record Offline Payment
           .disclosure-body
-            form#record-payment(method="POST" action=`/admin/members/${member.id}/payments`)
+            //- data-spinner disables the button on the first click; the route's duplicate
+            //- check is what actually stops a second post (issue #108).
+            form#record-payment(method="POST" action=`/admin/members/${member.id}/payments` data-spinner="Recording…")
               .form-group
                 label(for="amount") Amount ($)
                 input#amount.form-control(type="number" name="amount" step="0.01" min="0.01" required value=defaultPaymentDollars)
@@ -264,7 +300,7 @@ block content
                   a.btn-sm(href=`/admin/members/${member.id}/card/pdf`) PDF
                 if card.png_path
                   a.btn-sm(href=`/admin/members/${member.id}/card/png`) PNG
-                form.inline-form(method="POST" action=`/admin/members/${member.id}/email-card`)
+                form.inline-form(method="POST" action=`/admin/members/${member.id}/email-card` data-spinner="Sending…")
                   button.btn-sm(type="submit") Email
         else
           p.text-muted No cards generated yet.

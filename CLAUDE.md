@@ -101,6 +101,15 @@ served from `'self'`, which the CSP allows. Two hooks already exist:
 
 - `data-auto-submit` on a form control submits its form on change
 - `data-confirm="Are you sure?"` on a form confirms before submit
+- `data-spinner="Saving…"` on a form disables the submit button and swaps in a spinner on submit.
+  It is opt-in, so any form that sends email or records money should carry it. It checks
+  `e.defaultPrevented`, so it can share a form with `data-confirm` — a cancelled dialog leaves the
+  button usable.
+- `data-dialog-open="#id"` on a button opens that `dialog.modal` with `showModal()`; anything with
+  `data-dialog-close` inside it closes it, as does a backdrop click or Escape. Render
+  `data-dialog-open-on-load` on the dialog to reopen it after a redirect (the void-payment form does
+  this so a refused submit lands back in the form). The modal is the confirmation — don't stack
+  `data-confirm` on a form inside one.
 
 Inline `<style>` and `style=` attributes are fine; `style-src` includes `'unsafe-inline'`.
 Only scripts are restricted. When adding a filter control, cover it with a Robot test that
@@ -156,9 +165,24 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
   rule would match the entire roster — and refuses to expire more than `--max` members in one run.
   Because it runs on a schedule, `status` lags reality between runs: code that must be exact should
   still test enrollment, not `status`. Family sub-members inherit their primary's enrollment.
-- `payments.status` allows `pending`/`completed`/`failed`/`refunded`. `failed` is written only by the
-  Stripe failure webhooks (`checkout.session.expired`, `payment_intent.payment_failed`), and
+- `payments.status` allows `pending`/`completed`/`failed`/`refunded`/`voided`. `failed` is written only
+  by the Stripe failure webhooks (`checkout.session.expired`, `payment_intent.payment_failed`), and
   `payments.failure_reason` holds Stripe's message. Nothing writes `refunded`.
+- `voided` is the soft delete for a mistaken offline payment (issue #108), written only by
+  `paymentRepo.voidById` via the super-admin Void control on the member page. The row stays, with a
+  mandatory `void_reason` (`refunded`/`voided`/`duplicate`/`other`, note required for `other`) and
+  `voided_at`, so the audit trail and any `membership_years.payment_id` citation survive; the dashboard
+  total drops it because `sumCompletedCents` only ever counted `completed`. Stripe rows are refused —
+  voiding one locally would silently drift from Stripe without refunding anything. Adding `voided` to
+  the CHECK meant rebuilding `payments` in SQLite (`migratePaymentsStatusCheck` in `db/migrate.js`,
+  foreign keys off around it because `membership_years` cites payments) and a DROP/ADD of
+  `payments_status_check` in `pgAlters`.
+- `POST /members/:id/payments` refuses an identical completed payment (member, amount, method) recorded
+  within the last minute (`paymentsService.isRecentOfflineDuplicate`). The `data-spinner` on the form
+  only stops a double-click; this is what stops a refresh or a slow network from activating and
+  mailing the member twice. `membershipYears.enroll` re-points an enrollment whose payment was voided
+  at the next payment it is handed, so voiding a wrong-amount payment and recording the right one
+  leaves the period citing the real money.
 - Campaign tracking is documented in `docs/campaign-tracking.md`
 - The Needs attention member filter is documented in `docs/needs-attention-signals.md` — read it
   before changing a signal predicate or threshold, and note that neither Jest nor Robot exercises

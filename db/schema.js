@@ -55,10 +55,15 @@ const SCHEMA = `
     stripe_payment_intent TEXT,
     amount_cents INTEGER NOT NULL,
     currency TEXT NOT NULL DEFAULT 'usd',
-    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','completed','failed','refunded')),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','completed','failed','refunded','voided')),
     description TEXT,
     failure_reason TEXT,
     payment_method TEXT NOT NULL DEFAULT 'stripe',
+    -- 'voided' is the soft delete for a mistaken offline payment (issue #108). The row stays
+    -- so the audit trail and any membership_years citation survive; the reason is mandatory.
+    void_reason TEXT CHECK(void_reason IN ('refunded','voided','duplicate','other')),
+    void_note TEXT,
+    voided_at TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT
   (

@@ -247,3 +247,97 @@ describe('migrate()', () => {
     expect(member.created_at).toBeTruthy();
   });
 });
+
+describe("payments status CHECK widened to 'voided' (issue #108)", () => {
+  /**
+   * Rebuilds payments the way a database from before #108 had it — no 'voided' in the
+   * CHECK, no void columns — with a member, a payment and an enrollment citing it, so the
+   * migration has a real foreign key to preserve.
+   */
+  async function seedOldPayments() {
+    await migrate();
+    db.prepare("INSERT INTO members (first_name, last_name, email) VALUES ('A','B','x@y.com')").run();
+    const memberId = db.prepare('SELECT id FROM members LIMIT 1').get().id;
+    db.prepare("INSERT INTO membership_periods (label, start_date, end_date, individual_dues_cents, family_dues_cents) VALUES ('2020', '2020-01-01', '2020-12-31', 1600, 2600)").run();
+    const periodId = db.prepare('SELECT id FROM membership_periods LIMIT 1').get().id;
+
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      CREATE TABLE payments_old (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+        stripe_session_id TEXT,
+        stripe_payment_intent TEXT,
+        amount_cents INTEGER NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'usd',
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','completed','failed','refunded')),
+        description TEXT,
+        failure_reason TEXT,
+        payment_method TEXT NOT NULL DEFAULT 'stripe',
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        created_by INTEGER REFERENCES members(id) ON DELETE SET NULL,
+        updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL
+      );
+      DROP TABLE payments;
+      ALTER TABLE payments_old RENAME TO payments;
+    `);
+    db.pragma('foreign_keys = ON');
+
+    db.prepare("INSERT INTO payments (id, member_id, amount_cents, status, payment_method, description) VALUES (7, ?, 2600, 'completed', 'check', 'Dues')").run(memberId);
+    db.prepare('INSERT INTO membership_years (member_id, membership_period_id, payment_id) VALUES (?, ?, 7)').run(memberId, periodId);
+    return { memberId, periodId };
+  }
+
+  test('rebuilds the table, keeps the rows and the enrollment citation, and accepts voided', async () => {
+    const { memberId } = await seedOldPayments();
+    expect(() => db.prepare("UPDATE payments SET status = 'voided' WHERE id = 7").run()).toThrow();
+
+    await migrate();
+
+    const ddl = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='payments'").get().sql;
+    expect(ddl).toContain("'voided'");
+    expect(ddl).toContain('void_reason');
+
+    const payment = db.prepare('SELECT * FROM payments WHERE id = 7').get();
+    expect(payment.member_id).toBe(memberId);
+    expect(payment.amount_cents).toBe(2600);
+    expect(payment.payment_method).toBe('check');
+    expect(payment.description).toBe('Dues');
+    expect(payment.void_reason).toBeNull();
+
+    const enrollment = db.prepare('SELECT * FROM membership_years WHERE payment_id = 7').get();
+    expect(enrollment).toBeTruthy();
+    expect(db.pragma('foreign_key_check')).toEqual([]);
+    expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+
+    expect(() => db.prepare("UPDATE payments SET status = 'voided', void_reason = 'duplicate' WHERE id = 7").run()).not.toThrow();
+    expect(() => db.prepare("UPDATE payments SET void_reason = 'bogus' WHERE id = 7").run()).toThrow();
+    expect(db.prepare('SELECT name FROM sqlite_master WHERE type=\'index\' AND name=\'idx_payments_member_status\'').get()).toBeTruthy();
+  });
+
+  test('tolerates foreign key violations that were already there', async () => {
+    const { memberId } = await seedOldPayments();
+    // An orphan from before ON DELETE CASCADE: a payment whose member is gone.
+    db.pragma('foreign_keys = OFF');
+    db.prepare("INSERT INTO payments (id, member_id, amount_cents, status) VALUES (8, 9999, 100, 'completed')").run();
+    db.pragma('foreign_keys = ON');
+    expect(db.pragma('foreign_key_check')).toHaveLength(1);
+
+    await expect(migrate()).resolves.not.toThrow();
+
+    expect(db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='payments'").get().sql).toContain("'voided'");
+    expect(db.prepare('SELECT member_id FROM payments WHERE id = 8').get().member_id).toBe(9999);
+    expect(db.prepare('SELECT member_id FROM payments WHERE id = 7').get().member_id).toBe(memberId);
+    expect(db.pragma('foreign_key_check')).toHaveLength(1);
+  });
+
+  test('a fresh database already allows voided and the migration leaves it alone', async () => {
+    await migrate();
+    const before = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='payments'").get().sql;
+    await migrate();
+    const after = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='payments'").get().sql;
+    expect(after).toBe(before);
+    expect(after).toContain("'voided'");
+  });
+});

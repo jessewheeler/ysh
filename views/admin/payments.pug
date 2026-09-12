@@ -34,6 +34,8 @@ block content
             td= formatMoney(p.amount_cents)
             td
               span(class=`badge badge-${p.status}`)= p.status
+              if p.status === 'voided'
+                span.void-detail= [p.void_reason, p.void_note].filter(Boolean).join(' · ')
             td= p.payment_method || 'stripe'
             td= p.period_label || '—'
             td= formatDate(p.created_at)

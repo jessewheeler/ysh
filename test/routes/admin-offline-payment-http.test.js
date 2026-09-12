@@ -201,6 +201,45 @@ describe('POST /admin/members/:id/payments', () => {
     expect((await memberRepo.findById(m.id)).status).toBe('expired');
   });
 
+  test('the same payment posted twice in quick succession is recorded and delivered once', async () => {
+    insertPeriod(db, PERIOD);
+    const m = insertMember(db, { email: 'solo@ysh.test', status: 'expired' });
+
+    await recordPayment(agent, m.id, { activate_member: 'on' });
+    await recordPayment(agent, m.id, { activate_member: 'on' });
+
+    expect(await paymentRepo.findByMemberId(m.id)).toHaveLength(1);
+    expect(emailService.sendWelcomeEmail).toHaveBeenCalledTimes(1);
+    expect(emailService.sendPaymentConfirmation).toHaveBeenCalledTimes(1);
+
+    const page = await agent.get(`/admin/members/${m.id}`).expect(200);
+    expect(page.text).toMatch(/not recorded again/i);
+  });
+
+  test('a different amount inside the window is still a new payment', async () => {
+    insertPeriod(db, PERIOD);
+    const m = insertMember(db, { email: 'solo@ysh.test', status: 'expired' });
+
+    await recordPayment(agent, m.id, { amount: '26.00' });
+    await recordPayment(agent, m.id, { amount: '5.00', description: 'Hat' });
+
+    const amounts = (await paymentRepo.findByMemberId(m.id)).map(p => p.amount_cents).sort((a, b) => a - b);
+    expect(amounts).toEqual([500, 2600]);
+  });
+
+  test('a voided payment does not block recording the corrected one', async () => {
+    insertPeriod(db, PERIOD);
+    const m = insertMember(db, { email: 'solo@ysh.test', status: 'expired' });
+
+    await recordPayment(agent, m.id, { amount: '26.00' });
+    const [wrong] = await paymentRepo.findByMemberId(m.id);
+    await paymentRepo.voidById(wrong.id, { reason: 'voided' });
+    await recordPayment(agent, m.id, { amount: '26.00' });
+
+    const rows = await paymentRepo.findByMemberId(m.id);
+    expect(rows.map(p => p.status).sort()).toEqual(['completed', 'voided']);
+  });
+
   test('a payment recorded against a sub-member still activates the whole family', async () => {
     const period = insertPeriod(db, PERIOD);
     const { primary, familyMembers } = insertFamilyMembership(db, {

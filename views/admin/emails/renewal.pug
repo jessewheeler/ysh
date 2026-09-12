@@ -27,7 +27,7 @@ block content
         p
             | #{count} member#{count !== 1 ? 's' : ''} will receive a personalized renewal reminder with a pre-filled checkout link.
 
-        form(method="POST" action="/admin/emails/renewal" data-confirm=`Send renewal reminders to ${count} member${count !== 1 ? 's' : ''}?`)
+        form(method="POST" action="/admin/emails/renewal" data-confirm=`Send renewal reminders to ${count} member${count !== 1 ? 's' : ''}?` data-spinner="Sending…")
             .form-actions
                 button.btn(type="submit") Send Renewal Reminders
                 a.btn-outline(href="/admin/emails") Cancel

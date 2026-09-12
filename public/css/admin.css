@@ -311,7 +311,7 @@ a.stat-card:hover {
   border: 1px solid #f5c6cb;
 }
 
-.badge-cancelled, .badge-refunded {
+.badge-cancelled, .badge-refunded, .badge-voided {
   background: #e2e3e5;
   color: #383d41;
   border: 1px solid #d6d8db;
@@ -1685,4 +1685,34 @@ a.stat-card:hover {
     margin-bottom: 0;
     border-bottom: none;
   }
+}
+
+/* Modal dialogs (issue #108 introduced the first: voiding a payment). Native <dialog>
+   opened with showModal(), so Escape and focus trapping come for free. */
+dialog.modal {
+  /* The global margin reset would otherwise pin the dialog to the top-left corner. */
+  margin: auto;
+  border: 0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  width: min(28rem, calc(100vw - 2rem));
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+dialog.modal::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+dialog.modal .modal-title {
+  margin: 0 0 0.5rem;
+}
+dialog.modal .form-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+.void-detail {
+  display: block;
+  font-size: 0.78rem;
+  color: #666;
+  margin-top: 0.2rem;
 }

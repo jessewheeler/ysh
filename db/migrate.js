@@ -69,6 +69,13 @@ async function migrate() {
       // members is created before campaigns and campaigns.created_by points back at members.
       "ALTER TABLE members ADD COLUMN IF NOT EXISTS campaign_id INTEGER REFERENCES campaigns(id) ON DELETE SET NULL",
       "CREATE INDEX IF NOT EXISTS idx_members_campaign ON members (campaign_id)",
+      // payments: soft delete of a mistaken offline payment (issue #108). PG names an inline
+      // column CHECK <table>_<column>_check; DROP IF EXISTS + ADD keeps the pair idempotent.
+      "ALTER TABLE payments ADD COLUMN IF NOT EXISTS void_reason TEXT CHECK(void_reason IN ('refunded','voided','duplicate','other'))",
+      'ALTER TABLE payments ADD COLUMN IF NOT EXISTS void_note TEXT',
+      'ALTER TABLE payments ADD COLUMN IF NOT EXISTS voided_at TEXT',
+      'ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_status_check',
+      "ALTER TABLE payments ADD CONSTRAINT payments_status_check CHECK (status IN ('pending','completed','failed','refunded','voided'))",
     ];
     for (const sql of pgAlters) {
       await db.exec(sql);
@@ -169,6 +176,8 @@ async function migrate() {
   } catch (_e) {
     // Column already exists
   }
+
+  await migratePaymentsStatusCheck(db);
 
   // Merge admins into members: add admin-related columns
   try {
@@ -335,6 +344,11 @@ async function migrate() {
     "CREATE INDEX IF NOT EXISTS idx_members_campaign ON members (campaign_id)",
     // payments: why Stripe declined, captured by the failure webhooks
     'ALTER TABLE payments ADD COLUMN failure_reason TEXT',
+    // payments: void columns (issue #108). The rebuild above adds them on a database that
+    // predates 'voided'; these cover one that already has the status but not the columns.
+    "ALTER TABLE payments ADD COLUMN void_reason TEXT CHECK(void_reason IN ('refunded','voided','duplicate','other'))",
+    'ALTER TABLE payments ADD COLUMN void_note TEXT',
+    'ALTER TABLE payments ADD COLUMN voided_at TEXT',
   ];
   for (const sql of auditAlters) {
     try {
@@ -393,6 +407,75 @@ async function migrate() {
   await pruneCampaignVisits();
 
   logger.info('Database migration complete');
+}
+
+/**
+ * Widens payments.status to allow 'voided' (issue #108). SQLite cannot alter a CHECK, so
+ * the table is rebuilt the way emails_log is above — but payments is referenced by
+ * membership_years.payment_id, and with foreign keys on a DROP TABLE runs an implicit
+ * DELETE that those citations would veto (or, worse, cascade). Hence SQLite's documented
+ * twelve-step dance: foreign_keys OFF outside the transaction, rebuild inside it, verify
+ * with foreign_key_check, foreign_keys back ON.
+ *
+ * Only columns present on the old table are copied; anything newer takes its default.
+ */
+async function migratePaymentsStatusCheck(db) {
+  const current = await db.get(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='payments'"
+  );
+  if (!current || current.sql.includes("'voided'")) return;
+
+  const columns = (await db.all('PRAGMA table_info(payments)')).map(c => c.name);
+  const copyable = [
+    'id', 'member_id', 'stripe_session_id', 'stripe_payment_intent', 'amount_cents',
+    'currency', 'status', 'description', 'failure_reason', 'payment_method',
+    'created_at', 'updated_at', 'created_by', 'updated_by',
+  ].filter(name => columns.includes(name)).join(', ');
+
+  // Only violations the rebuild introduces are ours to fail on. An older database can
+  // already carry orphans (payments citing a member deleted before ON DELETE CASCADE
+  // existed), and the rebuild copies those rows exactly as it found them.
+  const violationKey = v => `${v.table}:${v.rowid}:${v.parent}:${v.fkid}`;
+  const before = new Set((await db.all('PRAGMA foreign_key_check')).map(violationKey));
+
+  await db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    await db.transaction(async () => {
+      await db.exec(`
+        CREATE TABLE payments_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+          stripe_session_id TEXT,
+          stripe_payment_intent TEXT,
+          amount_cents INTEGER NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'usd',
+          status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','completed','failed','refunded','voided')),
+          description TEXT,
+          failure_reason TEXT,
+          payment_method TEXT NOT NULL DEFAULT 'stripe',
+          void_reason TEXT CHECK(void_reason IN ('refunded','voided','duplicate','other')),
+          void_note TEXT,
+          voided_at TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+          created_by INTEGER REFERENCES members(id) ON DELETE SET NULL,
+          updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL
+        )
+      `);
+      await db.exec(`INSERT INTO payments_new (${copyable}) SELECT ${copyable} FROM payments`);
+      await db.exec('DROP TABLE payments');
+      await db.exec('ALTER TABLE payments_new RENAME TO payments');
+      await db.exec('CREATE INDEX IF NOT EXISTS idx_payments_member_status ON payments(member_id, status)');
+    });
+    const introduced = (await db.all('PRAGMA foreign_key_check'))
+      .filter(v => !before.has(violationKey(v)));
+    if (introduced.length) {
+      throw new Error(`payments rebuild introduced ${introduced.length} foreign key violation(s)`);
+    }
+  } finally {
+    await db.exec('PRAGMA foreign_keys = ON');
+  }
+  logger.info("Payments table migrated to allow status 'voided'");
 }
 
 module.exports = migrate;

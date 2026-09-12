@@ -15,6 +15,18 @@ Login As Admin
     Click    button.btn[type="submit"]
     Wait For Elements State    .stats-grid    visible    timeout=10s
 
+Login As Editor
+    [Documentation]    Same OTP flow as Login As Admin, as a freshly seeded editor-role admin —
+    ...    for asserting what a non-super-admin does not see.
+    Seed Admin    email=editor@example.com    first_name=Ed    last_name=Editor    role=editor
+    Navigate To    /admin/login
+    Fill Text    input[name="email"]    editor@example.com
+    Click    button.btn[type="submit"]
+    Wait For Elements State    input[name="code"]    visible    timeout=10s
+    Fill Text    input[name="code"]    ${OTP_CODE}
+    Click    button.btn[type="submit"]
+    Wait For Elements State    .stats-grid    visible    timeout=10s
+
 Submit Admin Form
     Click    .form-actions button[type="submit"]
 

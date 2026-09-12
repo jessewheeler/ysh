@@ -497,7 +497,8 @@ router.get('/members/:id', async (req, res, next) => {
       primaryMember,
       familyPrimaries,
       currentPeriod,
-      defaultPaymentDollars
+      defaultPaymentDollars,
+      voidReasons: paymentsService.VOID_REASONS,
     });
   } catch (err) {
     next(err);
@@ -707,6 +708,18 @@ router.post('/members/:id/payments', async (req, res) => {
   }
 
   const amountCents = Math.round(dollars * 100);
+  const method = payment_method || 'cash';
+
+  // The submit button disables itself on the first click, but that is a convenience, not a
+  // defense: a refresh or a slow network posts twice regardless, and with Activate ticked
+  // each post re-ran activation and mailed a second welcome and receipt. An identical
+  // payment recorded within the last minute is the same one arriving again.
+  if (await paymentsService.isRecentOfflineDuplicate({ memberId: member.id, amountCents, paymentMethod: method })) {
+    (req.logger || logger).warn('Duplicate offline payment ignored', { memberId: member.id, amountCents, paymentMethod: method });
+    req.session.flash_error = `A ${method} payment of $${dollars.toFixed(2)} was recorded for this member less than a minute ago, so this one was not recorded again. If it really is a second payment, wait a minute and record it again.`;
+    return res.redirect(`/admin/members/${req.params.id}`);
+  }
+
   // Deliberately not gated on the member's current status: a renewal paid by an
   // already-active member still has to move them onto the new period, which is what the
   // old `member.status !== 'active'` guard silently skipped.
@@ -721,7 +734,7 @@ router.post('/members/:id/payments', async (req, res) => {
   (req.logger || logger).info('Offline payment recorded', {
     memberId: member.id,
     amountCents,
-    paymentMethod: payment_method || 'cash',
+    paymentMethod: method,
     activating: isActivating,
   });
 
@@ -756,6 +769,37 @@ router.post('/members/:id/payments', async (req, res) => {
 
   req.session.flash_success = `Payment of $${dollars.toFixed(2)} recorded.`;
   res.redirect(`/admin/members/${req.params.id}`);
+});
+
+// --- Void a mistaken offline payment (issue #108) ---
+// Super-admin only: this changes what the dashboard and the CSV report as money taken.
+// A soft delete — the row stays as 'voided' with the reason, so the audit trail and any
+// membership_years citation survive. Stripe rows are refused in the service.
+router.post('/members/:memberId/payments/:id/void', requireSuperAdmin, async (req, res) => {
+  const member = await memberRepo.findById(req.params.memberId);
+  if (!member) { req.session.flash_error = 'Member not found.'; return res.redirect('/admin/members'); }
+
+  const { void_reason, void_note } = req.body;
+  try {
+    const voided = await paymentsService.voidPayment({
+      paymentId: req.params.id,
+      memberId: member.id,
+      reason: void_reason,
+      note: void_note,
+    });
+    (req.logger || logger).info('Payment voided', {
+      paymentId: voided.id,
+      memberId: member.id,
+      amountCents: voided.amount_cents,
+      reason: voided.void_reason,
+    });
+    req.session.flash_success = `Payment of $${(voided.amount_cents / 100).toFixed(2)} voided (${voided.void_reason}).`;
+  } catch (e) {
+    (req.logger || logger).warn('Payment void refused', { paymentId: req.params.id, memberId: member.id, error: e.message });
+    req.session.flash_error = e.message;
+    req.session.flash_reopen = `void-payment-${req.params.id}`;
+  }
+  res.redirect(`/admin/members/${member.id}`);
 });
 
 // --- Upgrade individual membership to family ---
