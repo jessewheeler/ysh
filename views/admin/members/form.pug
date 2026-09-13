@@ -7,7 +7,7 @@ block page_title
     | New Member
 
 block content
-  form(method="POST" action=member ? `/admin/members/${member.id}` : '/admin/members')
+  form(method="POST" action=member ? `/admin/members/${member.id}` : '/admin/members' data-spinner="Saving…")
     if !member
       .form-group
         label Membership Type

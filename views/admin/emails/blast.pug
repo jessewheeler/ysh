@@ -6,7 +6,7 @@ block page_title
 block content
   p Sending to #[strong #{activeCount}] active member#{activeCount !== 1 ? 's' : ''}.
 
-  form(method="POST" action="/admin/emails/blast" data-confirm="Send this email to all active members?" data-draft="email blast")
+  form(method="POST" action="/admin/emails/blast" data-confirm="Send this email to all active members?" data-draft="email blast" data-spinner="Sending…")
     .form-group
       label(for="subject") Subject *
       input#subject(type="text" name="subject" required)

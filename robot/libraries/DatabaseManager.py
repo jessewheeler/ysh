@@ -243,11 +243,12 @@ class DatabaseManager:
 
     def seed_payment(self, member_id, status='completed', amount_cents=1600,
                      stripe_session_id=None, stripe_payment_intent=None,
-                     failure_reason=None, hours_ago=None):
+                     failure_reason=None, hours_ago=None, payment_method='stripe'):
         """Insert a payment and return the row ID.
 
         `hours_ago` backdates created_at, which is how a test makes a pending payment
-        old enough to count as an abandoned checkout.
+        old enough to count as an abandoned checkout. `payment_method` defaults to
+        stripe; pass cash/check/other for a payment the Void control applies to.
         """
         if hours_ago is None:
             created_at = datetime.utcnow()
@@ -257,8 +258,8 @@ class DatabaseManager:
             '''INSERT INTO payments
                (member_id, amount_cents, currency, status, description, payment_method,
                 stripe_session_id, stripe_payment_intent, failure_reason, created_at)
-               VALUES (?, ?, 'usd', ?, 'Robot test payment', 'stripe', ?, ?, ?, ?)''',
-            (int(member_id), int(amount_cents), status, stripe_session_id,
+               VALUES (?, ?, 'usd', ?, 'Robot test payment', ?, ?, ?, ?, ?)''',
+            (int(member_id), int(amount_cents), status, payment_method, stripe_session_id,
              stripe_payment_intent, failure_reason,
              created_at.strftime('%Y-%m-%d %H:%M:%S')),
         )

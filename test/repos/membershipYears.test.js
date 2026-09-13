@@ -43,6 +43,47 @@ describe('enroll', () => {
         expect(log).toBeTruthy();
     });
 
+    test('re-points an enrollment whose payment was voided at the corrected payment', async () => {
+        const m = insertMember(db);
+        const p = insertPeriod(db);
+        const wrong = insertPayment(db, {member_id: m.id, amount_cents: 1600, payment_method: 'check'});
+        const first = await repo.enroll(m.id, p.id, wrong.id);
+        db.prepare("UPDATE payments SET status = 'voided', void_reason = 'voided' WHERE id = ?").run(wrong.id);
+        const right = insertPayment(db, {member_id: m.id, amount_cents: 2600, payment_method: 'check'});
+
+        const second = await repo.enroll(m.id, p.id, right.id);
+
+        expect(second.id).toBe(first.id);
+        expect(second.payment_id).toBe(right.id);
+        const log = db.prepare("SELECT * FROM audit_log WHERE table_name='membership_years' AND action='UPDATE'").get();
+        expect(JSON.parse(log.old_values).payment_id).toBe(wrong.id);
+        expect(JSON.parse(log.new_values).payment_id).toBe(right.id);
+    });
+
+    test('adopts a payment for an enrollment that cited none', async () => {
+        const m = insertMember(db);
+        const p = insertPeriod(db);
+        await repo.enroll(m.id, p.id, null);
+        const pay = insertPayment(db, {member_id: m.id});
+
+        const row = await repo.enroll(m.id, p.id, pay.id);
+        expect(row.payment_id).toBe(pay.id);
+    });
+
+    test('leaves an enrollment citing a completed payment alone', async () => {
+        const m = insertMember(db);
+        const p = insertPeriod(db);
+        const first = insertPayment(db, {member_id: m.id});
+        const dup = insertPayment(db, {member_id: m.id});
+        await repo.enroll(m.id, p.id, first.id);
+
+        const row = await repo.enroll(m.id, p.id, dup.id);
+
+        expect(row.payment_id).toBe(first.id);
+        const updates = db.prepare("SELECT COUNT(*) AS c FROM audit_log WHERE table_name='membership_years' AND action='UPDATE'").get();
+        expect(updates.c).toBe(0);
+    });
+
     test('does not write a duplicate audit row on idempotent re-enroll', async () => {
         const m = insertMember(db);
         const p = insertPeriod(db);

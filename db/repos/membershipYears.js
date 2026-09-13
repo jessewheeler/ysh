@@ -8,7 +8,25 @@ async function enroll(memberId, periodId, paymentId) {
         'SELECT * FROM membership_years WHERE member_id = ? AND membership_period_id = ?',
         memberId, periodId
     );
-    if (existing) return existing;
+    if (existing) {
+        // An enrollment that cites nothing, or cites a payment since voided, adopts the new
+        // payment — otherwise voiding a wrong-amount payment and recording the right one
+        // would leave the period pointing at the void and the real payment uncited.
+        if (paymentId && await citationIsStale(existing.payment_id)) {
+            await db.run('UPDATE membership_years SET payment_id = ? WHERE id = ?', paymentId, existing.id);
+            const updated = await db.get('SELECT * FROM membership_years WHERE id = ?', existing.id);
+            await auditLog.insert({
+                tableName: 'membership_years',
+                recordId: existing.id,
+                action: 'UPDATE',
+                actor,
+                oldValues: existing,
+                newValues: updated
+            });
+            return updated;
+        }
+        return existing;
+    }
 
     const result = await db.run(
         `INSERT INTO membership_years (member_id, membership_period_id, payment_id, created_by)
@@ -25,6 +43,12 @@ async function enroll(memberId, periodId, paymentId) {
         newValues: row
     });
     return row;
+}
+
+async function citationIsStale(paymentId) {
+    if (!paymentId) return true;
+    const cited = await db.get('SELECT status FROM payments WHERE id = ?', paymentId);
+    return !cited || cited.status === 'voided';
 }
 
 async function isEnrolled(memberId, periodId) {

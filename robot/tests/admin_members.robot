@@ -163,6 +163,101 @@ Record Offline Payment Disclosure Reveals The Form
     Flash Success Should Be Visible    recorded
     Get Text    table#member-payments    contains    25.00
 
+Double-Clicking Record Payment Records One Payment
+    [Documentation]    Issue #108. The button disables itself on the first click and the
+    ...    route refuses an identical payment inside a minute, so two clicks must leave one
+    ...    row. Counts tbody rows rather than looking for the amount, which would match once
+    ...    whether there were one row or two.
+    Seed Period
+    ${id}=    Seed Member    first_name=Dee    last_name=Double    email=dee@example.com    status=pending
+    Login As Admin
+    Navigate To    /admin/members/${id}
+    Click    summary >> text=Record Offline Payment
+    Wait For Elements State    input#amount    visible    timeout=10s
+    Fill Text    input#amount    25.00
+    Click With Options    form#record-payment button[type="submit"]    clickCount=2
+    Flash Success Should Be Visible    recorded
+    ${rows}=    Get Element Count    table#member-payments tbody tr
+    Should Be Equal As Integers    ${rows}    1
+
+Recording The Same Payment Again Within A Minute Is Refused
+    [Documentation]    The server-side half of #108: a refresh or a slow network posts the
+    ...    form twice with no double-click involved, and the route has to catch that itself.
+    Seed Period
+    ${id}=    Seed Member    first_name=Rae    last_name=Repeat    email=rae@example.com    status=pending
+    Login As Admin
+    Navigate To    /admin/members/${id}
+    Click    summary >> text=Record Offline Payment
+    Wait For Elements State    input#amount    visible    timeout=10s
+    Fill Text    input#amount    25.00
+    Click    form#record-payment button[type="submit"]
+    Flash Success Should Be Visible    recorded
+    Click    summary >> text=Record Offline Payment
+    Wait For Elements State    input#amount    visible    timeout=10s
+    Fill Text    input#amount    25.00
+    Click    form#record-payment button[type="submit"]
+    Flash Error Should Be Visible    not recorded again
+    ${rows}=    Get Element Count    table#member-payments tbody tr
+    Should Be Equal As Integers    ${rows}    1
+
+Super Admin Voids A Check Payment With A Reason
+    [Documentation]    Issue #108. Opens the per-row modal from its button, picks a reason,
+    ...    submits, and checks the badge flipped. Also pins that Other with no note is
+    ...    refused with the modal reopened so the message lands next to the form.
+    ${id}=    Seed Member    first_name=Vera    last_name=Void    email=vera@example.com
+    ${pay}=    Seed Payment    ${id}    status=completed    amount_cents=2600    payment_method=check
+    Login As Admin
+    Navigate To    /admin/members/${id}
+    Wait For Elements State    dialog#void-payment-${pay}    hidden    timeout=10s
+    Click    button[data-dialog-open="#void-payment-${pay}"]
+    Wait For Elements State    dialog#void-payment-${pay}\[open] form.void-payment    visible    timeout=10s
+    Select Options By    form.void-payment select[name="void_reason"]    value    other
+    Click    dialog#void-payment-${pay} button[type="submit"]
+    Flash Error Should Be Visible    note is required
+    # Refused: the modal is back open on load, the badge unchanged.
+    Wait For Elements State    dialog#void-payment-${pay}\[open] form.void-payment    visible    timeout=10s
+    Get Element Count    table#member-payments .badge-completed    ==    1
+    Select Options By    form.void-payment select[name="void_reason"]    value    duplicate
+    Click    dialog#void-payment-${pay} button[type="submit"]
+    Flash Success Should Be Visible    voided (duplicate)
+    Get Element Count    table#member-payments .badge-voided    ==    1
+    Get Element Count    table#member-payments .badge-completed    ==    0
+    Get Text    table#member-payments .void-detail    contains    Duplicate
+    Get Element Count    form.void-payment    ==    0
+
+Cancelling The Void Modal Leaves The Payment Alone
+    [Documentation]    Cancel closes the modal without posting; the button stays usable so
+    ...    the admin can open it again.
+    ${id}=    Seed Member    first_name=Cal    last_name=Cancel    email=cal@example.com
+    ${pay}=    Seed Payment    ${id}    status=completed    payment_method=cash
+    Login As Admin
+    Navigate To    /admin/members/${id}
+    Click    button[data-dialog-open="#void-payment-${pay}"]
+    Wait For Elements State    dialog#void-payment-${pay}\[open]    visible    timeout=10s
+    Click    dialog#void-payment-${pay} button[data-dialog-close]
+    Wait For Elements State    dialog#void-payment-${pay}    hidden    timeout=10s
+    Get Element Count    table#member-payments .badge-completed    ==    1
+    Click    button[data-dialog-open="#void-payment-${pay}"]
+    Wait For Elements State    dialog#void-payment-${pay}\[open]    visible    timeout=10s
+
+Stripe Payments Have No Void Control
+    ${id}=    Seed Member    first_name=Stan    last_name=Stripe    email=stan@example.com
+    Seed Payment    ${id}    status=completed    payment_method=stripe
+    Login As Admin
+    Navigate To    /admin/members/${id}
+    Wait For Elements State    table#member-payments    visible    timeout=10s
+    Get Element Count    button[data-dialog-open]    ==    0
+    Get Element Count    form.void-payment    ==    0
+
+Editors Have No Void Control
+    ${id}=    Seed Member    first_name=Ed    last_name=Editor    email=ed@example.com
+    Seed Payment    ${id}    status=completed    payment_method=check
+    Login As Editor
+    Navigate To    /admin/members/${id}
+    Wait For Elements State    table#member-payments    visible    timeout=10s
+    Get Element Count    button[data-dialog-open]    ==    0
+    Get Element Count    form.void-payment    ==    0
+
 Activating An Offline Payment Renews The Whole Family
     [Documentation]    The bug this covers: an offline payment for a member who was already
     ...    active recorded the payment and nothing else, leaving the membership year, the

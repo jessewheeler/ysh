@@ -105,6 +105,67 @@ async function recordFailure({ member_id, stripe_payment_intent, amount_cents, r
     return result;
 }
 
+async function findById(id) {
+    return db.get('SELECT * FROM payments WHERE id = ?', id);
+}
+
+/** UTC 'YYYY-MM-DD HH:MM:SS', the shape datetime('now') writes, for binding as a parameter. */
+function sqlTimestamp(date) {
+    return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+/**
+ * Soft-deletes a mistaken offline payment (issue #108). The row stays — as 'voided', with
+ * a mandatory reason — so the audit trail and any membership_years citation survive, and
+ * sumCompletedCents drops it because it only ever counted 'completed'.
+ *
+ * Refuses (returns null, writes nothing) unless the payment is completed and not a Stripe
+ * charge: voiding the local row of a real charge would silently desynchronize the app
+ * from Stripe without refunding anything. The status guard in the WHERE makes a double
+ * submit of the void form a no-op rather than a second audit row.
+ */
+async function voidById(id, { reason, note }) {
+    const actor = getActor();
+    const doomed = await db.get('SELECT * FROM payments WHERE id = ?', id);
+    if (!doomed || doomed.status !== 'completed' || doomed.payment_method === 'stripe') return null;
+
+    const result = await db.run(
+        `UPDATE payments SET status = 'voided', void_reason = ?, void_note = ?, voided_at = ?,
+                             updated_at = datetime('now'), updated_by = ?
+         WHERE id = ? AND status = 'completed'`,
+        reason, note || null, sqlTimestamp(new Date()), actor.id || null, id
+    );
+    if (!result.changes) return null;
+
+    const row = await db.get('SELECT * FROM payments WHERE id = ?', id);
+    await auditLog.insert({
+        tableName: 'payments',
+        recordId: id,
+        action: 'UPDATE',
+        actor,
+        oldValues: doomed,
+        newValues: row
+    });
+    return row;
+}
+
+/**
+ * The most recent completed payment matching a would-be offline payment exactly, recorded
+ * at or after `since` — the server-side half of the duplicate-submit guard. `since` is a
+ * JS-computed timestamp bound as a parameter: comparing created_at to date('now') inline
+ * behaves differently across the two dialects. Voided rows never match, so a corrected
+ * re-record after a void is not mistaken for a duplicate.
+ */
+async function findRecentCompletedDuplicate({ memberId, amountCents, paymentMethod, since }) {
+    return db.get(
+        `SELECT * FROM payments
+         WHERE member_id = ? AND amount_cents = ? AND payment_method = ?
+           AND status = 'completed' AND created_at >= ?
+         ORDER BY created_at DESC LIMIT 1`,
+        memberId, amountCents, paymentMethod, sqlTimestamp(since)
+    );
+}
+
 async function findByMemberId(memberId) {
   return await db.all('SELECT * FROM payments WHERE member_id = ? ORDER BY created_at DESC', memberId);
 }
@@ -172,5 +233,8 @@ module.exports = {
   listRecent,
   sumCompletedCents,
   countAll,
-    findByStripeSession,
+  findByStripeSession,
+  findById,
+  voidById,
+  findRecentCompletedDuplicate,
 };

@@ -193,9 +193,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.querySelectorAll('form[data-draft]').forEach(initDraftSave);
 
-  // Spinner + disable on forms with data-spinner
+  // Modal dialogs. A button with data-dialog-open="#id" opens that <dialog> as a modal;
+  // anything with data-dialog-close inside it closes it; clicking the backdrop closes it
+  // too (Escape is native). data-dialog-open-on-load reopens a dialog after a redirect, so
+  // a refused submit lands back in the form it came from. All here, not inline, because
+  // the CSP blocks inline handlers outright.
+  document.querySelectorAll('[data-dialog-open]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var dialog = document.querySelector(button.dataset.dialogOpen);
+      if (dialog && typeof dialog.showModal === 'function') dialog.showModal();
+    });
+  });
+  document.querySelectorAll('dialog.modal').forEach(function (dialog) {
+    dialog.querySelectorAll('[data-dialog-close]').forEach(function (button) {
+      button.addEventListener('click', function () { dialog.close(); });
+    });
+    dialog.addEventListener('click', function (e) {
+      if (e.target === dialog) dialog.close();
+    });
+    if (dialog.dataset.dialogOpenOnLoad && typeof dialog.showModal === 'function') dialog.showModal();
+  });
+
+  // Spinner + disable on forms with data-spinner. A form may also carry data-confirm; that
+  // listener runs first and only calls preventDefault() when the admin cancels, so check
+  // for it here — otherwise a cancelled dialog left the button disabled with nowhere to go.
   document.querySelectorAll('form[data-spinner]').forEach(function (form) {
-    form.addEventListener('submit', function () {
+    form.addEventListener('submit', function (e) {
+      if (e.defaultPrevented) return;
       var btn = form.querySelector('button[type="submit"]');
       if (!btn || btn.disabled) return;
       btn.disabled = true;
