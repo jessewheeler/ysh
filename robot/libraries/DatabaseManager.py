@@ -33,6 +33,8 @@ class DatabaseManager:
     def reset_database(self):
         """Delete all rows in FK-safe order and re-seed minimal data."""
         tables = [
+            'check_ins',
+            'events',
             'membership_cards',
             'emails_log',
             'membership_years',
@@ -237,6 +239,43 @@ class DatabaseManager:
             (member_number, first_name, last_name, email, phone,
              address_street, address_city, address_state, address_zip,
              membership_year, status, notes, expiry_date, membership_type),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def seed_family_member(self, primary_id, first_name='Family', last_name='Member', email=None):
+        """Insert a family member under `primary_id` and return the row ID.
+
+        seed_member cannot set primary_member_id. The primary should have been seeded with
+        membership_type=family.
+        """
+        primary = self.conn.execute(
+            'SELECT email, status, membership_year FROM members WHERE id = ?', (int(primary_id),)
+        ).fetchone()
+        cursor = self.conn.execute(
+            '''INSERT INTO members
+               (first_name, last_name, email, status, membership_year, membership_type, primary_member_id)
+               VALUES (?, ?, ?, ?, ?, 'family', ?)''',
+            (first_name, last_name, email or primary['email'], primary['status'],
+             primary['membership_year'], int(primary_id)),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def seed_event(self, name='Robot Watch Party', days_from_today=0, period_id=None):
+        """Insert a game-day event and return the row ID.
+
+        The date is today in America/Denver, the zone the app uses for game days, shifted
+        by `days_from_today`. With no `period_id` it is filed under the current period.
+        """
+        from zoneinfo import ZoneInfo
+        local_today = datetime.now(ZoneInfo('America/Denver')).date()
+        event_date = (local_today + timedelta(days=int(days_from_today))).isoformat()
+        if period_id is None:
+            period_id = self.get_current_period_id()
+        cursor = self.conn.execute(
+            'INSERT INTO events (name, event_date, membership_period_id) VALUES (?, ?, ?)',
+            (name, event_date, period_id),
         )
         self.conn.commit()
         return cursor.lastrowid

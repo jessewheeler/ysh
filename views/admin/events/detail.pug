@@ -1,0 +1,71 @@
+extends ../layout
+
+block page_title
+  | #{event.name}
+
+block content
+  .record-actionbar
+    .actionbar-group
+      if !event.cancelled
+        a.btn.btn-compact(href=`/admin/check-in?event=${event.id}`) Check In Members
+      a.btn-outline.btn-compact(href=`/admin/events/${event.id}/edit`) Edit
+      a.btn-outline.btn-compact(href=`/admin/events/${event.id}/attendance.csv`) Attendance (CSV)
+
+  .admin-panel
+    table.admin-table.admin-table--kv
+      tbody
+        tr
+          th Date
+          td= event.event_date
+        tr
+          th Kickoff
+          td= event.kickoff_at ? localTime(event.kickoff_at) : '—'
+        if event.opponent
+          tr
+            th Opponent
+            td= `${event.opponent}${event.home_away ? ` (${event.home_away})` : ''}`
+        if event.location
+          tr
+            th Location
+            td= event.location
+        tr
+          th Season
+          td= period ? (period.label || `${period.start_date} – ${period.end_date}`) : '—'
+        if event.cancelled
+          tr
+            th Status
+            td
+              span.badge.badge-cancelled Cancelled
+        if event.notes
+          tr
+            th Notes
+            td= event.notes
+
+  h2 Attendance
+  p#attendance-summary
+    = `${attendees.length} checked in · ${totalTickets} raffle ticket${totalTickets === 1 ? '' : 's'}`
+  .admin-panel
+    if attendees.length === 0
+      p.text-muted Nobody has checked in yet.
+    else
+      table.admin-table#attendance-table
+        thead
+          tr
+            th Name
+            th Family of
+            th Enrolled
+            th Tickets
+            th Checked in
+        tbody
+          each a in attendees
+            tr(data-member-id=a.member_id)
+              td
+                a(href=`/admin/members/${a.member_id}`)= `${a.first_name} ${a.last_name}`
+              td= a.primary_first_name ? `${a.primary_first_name} ${a.primary_last_name}` : '—'
+              td
+                if a.enrolled_at_check_in
+                  span.badge.badge-active Yes
+                else
+                  span.badge.badge-expired No
+              td.ticket-count= a.tickets_issued
+              td= localTime(a.checked_in_at)

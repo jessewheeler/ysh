@@ -1,0 +1,53 @@
+extends ../layout
+
+block page_title
+  | #{event ? 'Edit' : 'New'} Event
+
+block content
+  form(method="POST" action=(event ? `/admin/events/${event.id}` : '/admin/events'))
+    .form-group
+      label(for="name") Event Name
+      input#name(type="text" name="name" value=values.name || '' required placeholder="e.g. Week 3 at Washington Commanders")
+
+    .form-group
+      label(for="event_date") Date
+      input#event_date(type="date" name="event_date" value=values.event_date || '' required)
+      if event && event.source === 'espn'
+        p.text-muted Synced from the Seahawks schedule. A later sync moves the date if the game is flexed.
+
+    .form-group
+      label(for="opponent") Opponent
+      input#opponent(type="text" name="opponent" value=values.opponent || '' placeholder="Optional")
+
+    .form-group
+      label(for="home_away") Home / Away
+      select#home_away(name="home_away")
+        option(value="" selected=!values.home_away) —
+        option(value="home" selected=values.home_away === 'home') Home
+        option(value="away" selected=values.home_away === 'away') Away
+
+    .form-group
+      label(for="location") Location
+      input#location(type="text" name="location" value=values.location || '' placeholder="Where the watch party is")
+
+    .form-group
+      label(for="membership_period_id") Season
+      select#membership_period_id(name="membership_period_id")
+        option(value="" selected=!values.membership_period_id) Whichever season the date falls in
+        each p in periods
+          option(value=p.id selected=Number(values.membership_period_id) === p.id)= p.label || `${p.start_date} – ${p.end_date}`
+      p.text-muted Raffle tickets from this event count toward this season's drawing.
+
+    .form-group
+      label(for="notes") Notes
+      textarea#notes(name="notes" rows="3")= values.notes || ''
+
+    if event
+      .form-group
+        label.checkbox-label
+          input(type="checkbox" name="cancelled" checked=!!values.cancelled)
+          |  Cancelled — hide from check-in
+
+    .form-actions
+      button.btn(type="submit")= event ? 'Save Changes' : 'Create Event'
+      a.btn-outline(href=(event ? `/admin/events/${event.id}` : '/admin/events')) Cancel

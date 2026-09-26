@@ -421,6 +421,23 @@ async function findFamilyMembers(primaryMemberId) {
   );
 }
 
+/**
+ * The account holder and everyone on their membership, from any member id in it.
+ * A sub-member id resolves up to the primary. `members` is the primary first, then family
+ * members in the order they were added. Returns null when the id does not exist.
+ */
+async function findHousehold(memberId) {
+  const member = await findById(memberId);
+  if (!member) return null;
+  const primary = member.primary_member_id
+    ? (await findById(member.primary_member_id)) || member
+    : member;
+  const family = primary.membership_type === 'family'
+    ? await findFamilyMembers(primary.id)
+    : [];
+  return { primary, members: [primary, ...family] };
+}
+
 async function findNeedingRenewal(currentPeriodId, daysUntilExpiry) {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() + daysUntilExpiry);
@@ -672,6 +689,7 @@ module.exports = {
   clearRole,
   createAdmin,
   findFamilyMembers,
+  findHousehold,
   createWithFamily,
     findNeedingRenewal,
     setExpiryDate,

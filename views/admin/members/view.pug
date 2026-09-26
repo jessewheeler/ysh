@@ -12,6 +12,8 @@ block content
   .record-actionbar
     .actionbar-group
       a.btn.btn-compact(href=`/admin/members/${member.id}?edit=1`) Edit
+      if checkInEvent
+        a.btn-outline.btn-compact(href=`/admin/check-in/${checkInEvent.id}/member/${member.id}` title=`Check in for ${checkInEvent.name}`) Check In
     .actionbar-sep
     .actionbar-group
       form(method="POST" action=`/admin/members/${member.id}/card` data-spinner="Generating…")
