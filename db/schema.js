@@ -352,6 +352,50 @@ const SCHEMA = `
     created_at   TEXT DEFAULT (datetime('now'))
   );
 
+  -- Game-day events (watch parties) that members check in to. Rows with source='espn'
+  -- come from services/nflSchedule.js and are matched on external_id; admins create the
+  -- rest by hand. event_date is the America/Denver local date, not the UTC one.
+  CREATE TABLE IF NOT EXISTS events
+  (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                 TEXT    NOT NULL,
+    event_date           TEXT    NOT NULL,
+    kickoff_at           TEXT,
+    opponent             TEXT,
+    home_away            TEXT CHECK (home_away IN ('home', 'away') OR home_away IS NULL),
+    location             TEXT,
+    notes                TEXT,
+    membership_period_id INTEGER REFERENCES membership_periods (id) ON DELETE SET NULL,
+    source               TEXT    NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'espn')),
+    external_id          TEXT,
+    cancelled            INTEGER NOT NULL DEFAULT 0,
+    created_at           TEXT DEFAULT (datetime('now')),
+    updated_at           TEXT DEFAULT (datetime('now')),
+    created_by           INTEGER REFERENCES members (id) ON DELETE SET NULL,
+    updated_by           INTEGER REFERENCES members (id) ON DELETE SET NULL
+  );
+
+  -- One row per person per event. tickets_issued is the raffle entry count; staff can
+  -- raise it above 1 for promotions, and it is forced to 0 for anyone not enrolled.
+  CREATE TABLE IF NOT EXISTS check_ins
+  (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id             INTEGER NOT NULL REFERENCES events (id) ON DELETE CASCADE,
+    member_id            INTEGER NOT NULL REFERENCES members (id) ON DELETE CASCADE,
+    tickets_issued       INTEGER NOT NULL DEFAULT 0 CHECK (tickets_issued >= 0),
+    enrolled_at_check_in INTEGER NOT NULL DEFAULT 0,
+    checked_in_at        TEXT DEFAULT (datetime('now')),
+    checked_in_by        INTEGER REFERENCES members (id) ON DELETE SET NULL,
+    updated_at           TEXT DEFAULT (datetime('now')),
+    updated_by           INTEGER REFERENCES members (id) ON DELETE SET NULL,
+    UNIQUE (event_id, member_id)
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_events_external_id ON events(external_id) WHERE external_id IS NOT NULL;
+  CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
+  CREATE INDEX IF NOT EXISTS idx_events_period ON events(membership_period_id);
+  CREATE INDEX IF NOT EXISTS idx_check_ins_member ON check_ins(member_id);
+
   CREATE INDEX IF NOT EXISTS idx_campaign_visits_campaign ON campaign_visits(campaign_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_campaign_visits_created ON campaign_visits(created_at);
   CREATE INDEX IF NOT EXISTS idx_contact_submissions_campaign ON contact_submissions(campaign_id);

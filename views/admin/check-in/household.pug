@@ -1,0 +1,70 @@
+extends ../layout
+
+block page_title
+  | Check-In: #{primary.first_name} #{primary.last_name}
+
+block content
+  p
+    | Event: 
+    strong= event.name
+    |  (#{event.event_date})
+    if event.cancelled
+      |  
+      span.badge.badge-cancelled Cancelled
+
+  - const already = people.filter(p => p.checkIn)
+  if already.length
+    .checkin-banner#already-checked-in
+      strong Already checked in:
+      ul
+        each p in already
+          li
+            = `${p.member.first_name} ${p.member.last_name} — ${p.checkIn.tickets_issued} ticket${Number(p.checkIn.tickets_issued) === 1 ? '' : 's'} at ${localTime(p.checkIn.checked_in_at)}`
+            if p.checkIn.checked_in_by_email
+              = ` by ${p.checkIn.checked_in_by_email}`
+
+  if !period
+    .checkin-banner.checkin-banner--warn
+      | No membership season covers this event's date, so nobody counts as enrolled and no
+      | raffle tickets can be issued. Set the event's season under Events.
+
+  form#household-check-in(method="POST" action=`/admin/check-in/${event.id}/member/${primary.id}` data-spinner="Saving…")
+    .admin-panel
+      table.admin-table#household-table
+        thead
+          tr
+            th Present
+            th Name
+            th Membership
+            th Raffle tickets
+        tbody
+          each p in people
+            - const id = p.member.id
+            - const ticked = !!p.checkIn || people.length === 1
+            - const tickets = p.checkIn ? p.checkIn.tickets_issued : (p.enrolled ? defaultTickets : 0)
+            tr(data-checkin-row data-member-id=id)
+              td
+                input(type="checkbox" id=`present-${id}` name=`present_${id}` value="1" checked=ticked aria-label=`${p.member.first_name} is present`)
+              td
+                label(for=`present-${id}`)= `${p.member.first_name} ${p.member.last_name}`
+                if p.isPrimary && people.length > 1
+                  |  
+                  span.text-muted (primary)
+              td
+                if p.enrolled
+                  span.badge.badge-active Enrolled
+                else
+                  span.badge.badge-expired Not enrolled
+                  .text-muted
+                    | No raffle tickets · 
+                    a(href=`/admin/members/${primary.id}`) Renew
+              td
+                input.ticket-input(type="number" id=`tickets-${id}` name=`tickets_${id}` min="0" max=maxTickets value=tickets disabled=!p.enrolled || !ticked aria-label=`Raffle tickets for ${p.member.first_name}` data-enrolled=(p.enrolled ? '1' : '0'))
+
+    .form-actions
+      button.btn(type="submit") Save Check-In
+      a.btn-outline(href=`/admin/check-in?event=${event.id}${search ? `&search=${encodeURIComponent(search)}` : ''}`) Back to Search
+
+  p.text-muted.page-footnote
+    | Enrollment is for the #{period ? (period.label || 'current') : 'event\'s'} season. Unticking someone
+    | who was already checked in removes their check-in and tickets.

@@ -26,6 +26,11 @@ const campaignsService = require('../services/campaigns');
 const attentionService = require('../services/attention');
 const memberAttentionRepo = require('../db/repos/memberAttention');
 const councilReport = require('../services/councilReport');
+const eventsRepo = require('../db/repos/events');
+const checkInsRepo = require('../db/repos/checkIns');
+const eventsService = require('../services/events');
+const checkInService = require('../services/checkIn');
+const nflSchedule = require('../services/nflSchedule');
 const logger = require('../services/logger');
 const isDevOrTest = ['development', 'test', 'dev'].includes(process.env.NODE_ENV);
 
@@ -479,6 +484,8 @@ router.get('/members/:id', async (req, res, next) => {
     // has no dues set for the type, and centsToDollars(undefined) yields the string
     // "NaN" — which would render as value="NaN" and fail number validation silently.
     const currentPeriod = await periodsRepo.getCurrent();
+    // Offers a Check in button when there's a game-day event today.
+    const [checkInEvent] = await eventsRepo.listOnDate(eventsService.localDate());
     const {duesForType, centsToDollars} = membershipPeriodsService;
     const duesCents = currentPeriod
         ? duesForType(currentPeriod, member.membership_type)
@@ -499,6 +506,7 @@ router.get('/members/:id', async (req, res, next) => {
       currentPeriod,
       defaultPaymentDollars,
       voidReasons: paymentsService.VOID_REASONS,
+      checkInEvent: checkInEvent || null,
     });
   } catch (err) {
     next(err);
@@ -1273,6 +1281,230 @@ router.get('/campaigns/:id/qr.svg', async (req, res, next) => {
     res.setHeader('Content-Type', 'image/svg+xml');
     res.setHeader('Content-Disposition', `attachment; filename="${campaignsService.qrFilename(campaign, 'svg')}"`);
     res.send(svg);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Events & game-day check-in (issue #114) ---
+function csvDownload(res, filename, rows, columns, headers) {
+  const { toCsv } = require('../services/csv');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(toCsv(rows, columns, headers));
+}
+
+function householdName(row) {
+  return row.primary_first_name ? `${row.primary_first_name} ${row.primary_last_name}` : '';
+}
+
+// ?period= picks a season; blank means the current one, and "all" means no filter.
+async function resolvePeriodFilter(raw) {
+  if (raw === 'all') return { periodId: null, periodParam: 'all' };
+  const id = parseInt(raw, 10);
+  if (id) return { periodId: id, periodParam: String(id) };
+  const current = await periodsRepo.getCurrent(eventsService.localDate());
+  return { periodId: current ? current.id : null, periodParam: current ? String(current.id) : 'all' };
+}
+
+router.get('/events', async (req, res, next) => {
+  try {
+    const { periodId, periodParam } = await resolvePeriodFilter(req.query.period);
+    const [events, periods] = await Promise.all([
+      eventsRepo.list({ periodId }),
+      periodsRepo.list(),
+    ]);
+    res.render('admin/events/list', {
+      events,
+      periods,
+      periodParam,
+      periodId,
+      today: eventsService.localDate(),
+      localTime: eventsService.localTime,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/events/sync', async (req, res) => {
+  try {
+    const stats = await nflSchedule.syncSchedule();
+    req.session.flash_success = `Seahawks schedule synced: ${stats.created} new, ${stats.updated} updated, ${stats.unchanged} unchanged.`;
+  } catch (err) {
+    logger.error('Seahawks schedule sync failed', { error: err.message });
+    req.session.flash_error = 'Could not reach the ESPN schedule. Try again later, or add the event by hand.';
+  }
+  res.redirect('/admin/events');
+});
+
+router.get('/events/raffle.csv', async (req, res, next) => {
+  try {
+    const { periodId } = await resolvePeriodFilter(req.query.period);
+    if (!periodId) {
+      req.session.flash_error = 'Choose a season to export raffle entries for.';
+      return res.redirect('/admin/events');
+    }
+    const rows = (await checkInsRepo.raffleEntries(periodId)).map(r => ({ ...r, household: householdName(r) }));
+    csvDownload(res, `ysh-raffle-entries-${eventsService.localDate()}.csv`, rows,
+      ['member_number', 'first_name', 'last_name', 'email', 'household', 'events_attended', 'tickets'],
+      ['Member #', 'First name', 'Last name', 'Email', 'Family of', 'Events attended', 'Tickets']);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/events/new', async (req, res, next) => {
+  try {
+    res.render('admin/events/form', {
+      event: null,
+      values: { event_date: eventsService.localDate() },
+      periods: await periodsRepo.list(),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/events', async (req, res, next) => {
+  try {
+    const { errors, fields } = eventsService.parseEventForm(req.body);
+    if (errors.length) {
+      res.locals.flash_error = errors.join(' ');
+      return res.status(400).render('admin/events/form', { event: null, values: fields, periods: await periodsRepo.list() });
+    }
+    const event = await eventsService.createEvent(fields);
+    req.session.flash_success = `Event "${event.name}" created.`;
+    res.redirect(`/admin/events/${event.id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/events/:id', async (req, res, next) => {
+  try {
+    const event = await eventsRepo.get(req.params.id);
+    if (!event) { req.session.flash_error = 'Event not found.'; return res.redirect('/admin/events'); }
+    const attendees = await checkInsRepo.listByEvent(event.id);
+    res.render('admin/events/detail', {
+      event,
+      attendees,
+      period: event.membership_period_id ? await periodsRepo.get(event.membership_period_id) : null,
+      totalTickets: attendees.reduce((sum, a) => sum + Number(a.tickets_issued), 0),
+      localTime: eventsService.localTime,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/events/:id/edit', async (req, res, next) => {
+  try {
+    const event = await eventsRepo.get(req.params.id);
+    if (!event) { req.session.flash_error = 'Event not found.'; return res.redirect('/admin/events'); }
+    res.render('admin/events/form', { event, values: event, periods: await periodsRepo.list() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/events/:id', async (req, res, next) => {
+  try {
+    const event = await eventsRepo.get(req.params.id);
+    if (!event) { req.session.flash_error = 'Event not found.'; return res.redirect('/admin/events'); }
+    const { errors, fields } = eventsService.parseEventForm(req.body);
+    if (errors.length) {
+      res.locals.flash_error = errors.join(' ');
+      return res.status(400).render('admin/events/form', { event, values: { ...event, ...fields }, periods: await periodsRepo.list() });
+    }
+    await eventsRepo.update(event.id, fields);
+    req.session.flash_success = 'Event saved.';
+    res.redirect(`/admin/events/${event.id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/events/:id/attendance.csv', async (req, res, next) => {
+  try {
+    const event = await eventsRepo.get(req.params.id);
+    if (!event) { req.session.flash_error = 'Event not found.'; return res.redirect('/admin/events'); }
+    const rows = (await checkInsRepo.listByEvent(event.id)).map(r => ({
+      ...r,
+      household: householdName(r),
+      enrolled: r.enrolled_at_check_in ? 'yes' : 'no',
+      checked_in_time: eventsService.localTime(r.checked_in_at),
+    }));
+    csvDownload(res, `ysh-attendance-${event.event_date}-${event.id}.csv`, rows,
+      ['member_number', 'first_name', 'last_name', 'email', 'household', 'enrolled', 'tickets_issued', 'checked_in_time', 'checked_in_by_email'],
+      ['Member #', 'First name', 'Last name', 'Email', 'Family of', 'Enrolled', 'Tickets', 'Checked in', 'Checked in by']);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/check-in', async (req, res, next) => {
+  try {
+    const today = eventsService.localDate();
+    const nearby = await eventsRepo.listAround(today);
+    let event = null;
+    const requested = parseInt(req.query.event, 10);
+    if (requested) event = await eventsRepo.get(requested);
+    if (!event) event = (await eventsRepo.listOnDate(today))[0] || null;
+    const events = event && !nearby.some(e => e.id === event.id) ? [event, ...nearby] : nearby;
+
+    const search = String(req.query.search || '').trim();
+    let results = [];
+    if (search && event) {
+      const { members } = await memberRepo.search({ search, sort: 'name', dir: 'asc', limit: 25, offset: 0 });
+      // Family members are listed under their own name; show whose family they're on so
+      // staff can tell two people with the same name apart.
+      const primaryIds = [...new Set(members.map(m => m.primary_member_id).filter(Boolean))];
+      const primaries = new Map();
+      for (const id of primaryIds) primaries.set(id, await memberRepo.findById(id));
+      const checkedIn = await checkInsRepo.findForMembers(event.id, members.map(m => m.id));
+      results = members.map(m => ({
+        member: m,
+        primary: m.primary_member_id ? primaries.get(m.primary_member_id) || null : null,
+        checkIn: checkedIn.get(Number(m.id)) || null,
+      }));
+    }
+
+    res.render('admin/check-in/index', { event, events, today, search, results });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/check-in/:eventId/member/:memberId', async (req, res, next) => {
+  try {
+    const ctx = await checkInService.householdForCheckIn(req.params.eventId, req.params.memberId);
+    if (!ctx) { req.session.flash_error = 'Event or member not found.'; return res.redirect('/admin/check-in'); }
+    res.render('admin/check-in/household', {
+      ...ctx,
+      search: String(req.query.search || ''),
+      defaultTickets: checkInService.DEFAULT_TICKETS,
+      maxTickets: checkInService.MAX_TICKETS,
+      localTime: eventsService.localTime,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/check-in/:eventId/member/:memberId', async (req, res, next) => {
+  try {
+    const result = await checkInService.recordHousehold(req.params.eventId, req.params.memberId, req.body);
+    if (!result) { req.session.flash_error = 'Event or member not found.'; return res.redirect('/admin/check-in'); }
+    const names = result.checkedIn.map(m => m.first_name).join(', ');
+    const parts = [];
+    if (result.checkedIn.length) {
+      parts.push(`Checked in ${names} — ${result.tickets} raffle ticket${result.tickets === 1 ? '' : 's'}.`);
+    }
+    if (result.removed.length) parts.push(`Removed ${result.removed.map(m => m.first_name).join(', ')}.`);
+    if (parts.length) req.session.flash_success = parts.join(' ');
+    else req.session.flash_error = 'Nobody was ticked, so nobody was checked in.';
+    res.redirect(`/admin/check-in?event=${encodeURIComponent(req.params.eventId)}`);
   } catch (err) {
     next(err);
   }

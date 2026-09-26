@@ -223,6 +223,29 @@ function insertContactSubmission(db, overrides = {}) {
     return {...s, id: info.lastInsertRowid};
 }
 
+function insertEvent(db, overrides = {}) {
+    const e = {
+        name: 'Week 1 vs New England Patriots',
+        event_date: '2026-09-13',
+        kickoff_at: null,
+        opponent: null,
+        home_away: null,
+        location: null,
+        notes: null,
+        membership_period_id: null,
+        source: 'manual',
+        external_id: null,
+        cancelled: 0,
+        ...overrides,
+    };
+    const info = db.prepare(
+        `INSERT INTO events (name, event_date, kickoff_at, opponent, home_away, location, notes, membership_period_id, source, external_id, cancelled)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(e.name, e.event_date, e.kickoff_at, e.opponent, e.home_away, e.location, e.notes, e.membership_period_id, e.source,
+        e.external_id, e.cancelled);
+    return {...e, id: info.lastInsertRowid};
+}
+
 module.exports = {
     buildMember,
     insertMember,
@@ -239,5 +262,6 @@ module.exports = {
     buildFamilyMembership,
     insertFamilyMembership,
     insertPeriod,
-    enrollMember
+    enrollMember,
+    insertEvent
 };

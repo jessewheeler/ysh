@@ -1,0 +1,56 @@
+extends ../layout
+
+block page_title
+  | Check-In
+
+block content
+  .admin-toolbar
+    form.search-form.search-form-wide#check-in-search(method="GET" action="/admin/check-in")
+      select#check-in-event(name="event" data-auto-submit aria-label="Event")
+        if !event
+          option(value="" selected) Choose an event…
+        each e in events
+          option(value=e.id selected=event && event.id === e.id)= `${e.event_date === today ? 'Today' : e.event_date} — ${e.name}`
+      if event
+        input(type="search" name="search" placeholder="Search name, email, or member number..." value=search autofocus)
+        button.btn(type="submit") Search
+
+  if !event
+    .admin-panel
+      p.text-muted
+        | No event today. Pick one above, or
+        |  
+        a(href="/admin/events") add or sync events
+        | .
+  else
+    if !search
+      p.text-muted
+        | Checking in for 
+        strong= event.name
+        | . Search for anyone in the household — the whole family opens together.
+    else
+      .admin-panel
+        if results.length === 0
+          p.text-muted No members match "#{search}".
+        else
+          table.admin-table#check-in-results
+            thead
+              tr
+                th Name
+                th Member #
+                th Family of
+                th Status
+                th
+            tbody
+              each r in results
+                tr
+                  td= `${r.member.first_name} ${r.member.last_name}`
+                  td= r.member.member_number || '—'
+                  td= r.primary ? `${r.primary.first_name} ${r.primary.last_name}` : '—'
+                  td
+                    if r.checkIn
+                      span.badge.badge-active Checked in
+                    else
+                      span.text-muted Not yet
+                  td
+                    a.btn.btn-compact(href=`/admin/check-in/${event.id}/member/${r.member.id}?search=${encodeURIComponent(search)}`) Open Household

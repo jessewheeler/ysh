@@ -24,19 +24,12 @@ async function activateForPeriod({
   clearRenewalToken = true,
   membershipYear = null,
 }) {
-  const member = await memberRepo.findById(memberId);
-  if (!member) return { period: period || null, primary: null, members: [] };
-
   // A payment recorded against a family sub-member is still a payment for the whole
   // family, so always work from the account holder down.
-  const primary = member.primary_member_id
-    ? (await memberRepo.findById(member.primary_member_id)) || member
-    : member;
-
-  const family = primary.membership_type === 'family'
-    ? await memberRepo.findFamilyMembers(primary.id)
-    : [];
-  const ids = [primary.id, ...family.map(fm => fm.id)];
+  const household = await memberRepo.findHousehold(memberId);
+  if (!household) return { period: period || null, primary: null, members: [] };
+  const { primary } = household;
+  const ids = household.members.map(m => m.id);
 
   // membershipYear lets the admin forms keep the year the admin typed; everywhere else it
   // comes from the period, which is the authoritative source. Sliced off the string rather

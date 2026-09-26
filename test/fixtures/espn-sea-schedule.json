@@ -1,0 +1,125 @@
+{
+  "requestedSeason": {
+    "year": 2026,
+    "type": 2
+  },
+  "events": [
+    {
+      "id": "401872656",
+      "date": "2026-09-10T00:20Z",
+      "name": "New England Patriots at Seattle Seahawks",
+      "seasonType": {
+        "type": 2
+      },
+      "week": {
+        "number": 1,
+        "text": "Week 1"
+      },
+      "timeValid": true,
+      "competitions": [
+        {
+          "id": "401872656",
+          "date": "2026-09-10T00:20Z",
+          "timeValid": true,
+          "venue": {
+            "fullName": "Lumen Field"
+          },
+          "competitors": [
+            {
+              "homeAway": "home",
+              "team": {
+                "abbreviation": "SEA",
+                "displayName": "Seattle Seahawks"
+              }
+            },
+            {
+              "homeAway": "away",
+              "team": {
+                "abbreviation": "NE",
+                "displayName": "New England Patriots"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "401872955",
+      "date": "2026-09-27T17:00Z",
+      "name": "Seattle Seahawks at Washington Commanders",
+      "seasonType": {
+        "type": 2
+      },
+      "week": {
+        "number": 3,
+        "text": "Week 3"
+      },
+      "timeValid": true,
+      "competitions": [
+        {
+          "id": "401872955",
+          "date": "2026-09-27T17:00Z",
+          "timeValid": true,
+          "venue": {
+            "fullName": "Northwest Stadium"
+          },
+          "competitors": [
+            {
+              "homeAway": "home",
+              "team": {
+                "abbreviation": "WSH",
+                "displayName": "Washington Commanders"
+              }
+            },
+            {
+              "homeAway": "away",
+              "team": {
+                "abbreviation": "SEA",
+                "displayName": "Seattle Seahawks"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "401873185",
+      "date": "2027-01-10T05:00Z",
+      "name": "Seattle Seahawks at Los Angeles Rams",
+      "seasonType": {
+        "type": 2
+      },
+      "week": {
+        "number": 18,
+        "text": "Week 18"
+      },
+      "timeValid": false,
+      "competitions": [
+        {
+          "id": "401873185",
+          "date": "2027-01-10T05:00Z",
+          "timeValid": false,
+          "venue": {
+            "fullName": "SoFi Stadium"
+          },
+          "competitors": [
+            {
+              "homeAway": "home",
+              "team": {
+                "abbreviation": "LAR",
+                "displayName": "Los Angeles Rams"
+              }
+            },
+            {
+              "homeAway": "away",
+              "team": {
+                "abbreviation": "SEA",
+                "displayName": "Seattle Seahawks"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

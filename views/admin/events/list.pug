@@ -1,0 +1,59 @@
+extends ../layout
+
+block page_title
+  | Events
+
+block content
+  .admin-toolbar
+    form.search-form.search-form-wide(method="GET" action="/admin/events")
+      select(name="period" data-auto-submit aria-label="Season")
+        option(value="all" selected=periodParam === 'all') All seasons
+        each p in periods
+          option(value=p.id selected=periodId === p.id)= p.label || `${p.start_date} – ${p.end_date}`
+    .actionbar-group
+      a.btn(href="/admin/events/new") + New Event
+      form(method="POST" action="/admin/events/sync" data-spinner="Syncing…")
+        button.btn-outline(type="submit") Sync Seahawks Schedule
+      if periodId
+        a.btn-outline(href=`/admin/events/raffle.csv?period=${periodId}`) Raffle Entries (CSV)
+
+  .admin-panel
+    if events.length === 0
+      p.text-muted
+        | No events for this season yet. Sync the Seahawks schedule to add every game as a
+        | watch party, or add an event by hand.
+    else
+      table.admin-table#events-table
+        thead
+          tr
+            th Date
+            th Event
+            th Kickoff
+            th Checked in
+            th Tickets
+            th
+        tbody
+          each event in events
+            tr(data-event-id=event.id)
+              td= event.event_date
+              td
+                a(href=`/admin/events/${event.id}`)= event.name
+                if event.cancelled
+                  | 
+                  span.badge.badge-cancelled Cancelled
+                else if event.event_date === today
+                  | 
+                  span.badge.badge-active Today
+              td= event.kickoff_at ? localTime(event.kickoff_at) : (event.source === 'espn' ? 'TBD' : '—')
+              td.attendance-count= event.attendance
+              td.ticket-count= event.tickets
+              td
+                if !event.cancelled
+                  a(href=`/admin/check-in?event=${event.id}`) Check-in
+                  |  · 
+                a(href=`/admin/events/${event.id}/edit`) Edit
+
+  p.text-muted.page-footnote
+    | Synced games refresh their date and kickoff when the league flexes them; the name,
+    | location and notes you set are kept. Raffle entries total every ticket issued at the
+    | season's events.

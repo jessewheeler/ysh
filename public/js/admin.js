@@ -228,6 +228,20 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
+  // Game-day check-in: a row's ticket count only applies while its person is ticked
+  // present, and never for someone not enrolled (data-enrolled="0"). The server enforces
+  // both regardless; this just keeps the form honest about what will be saved.
+  document.querySelectorAll('tr[data-checkin-row]').forEach(function (row) {
+    var present = row.querySelector('input[type="checkbox"]');
+    var tickets = row.querySelector('input.ticket-input');
+    if (!present || !tickets) return;
+    var sync = function () {
+      tickets.disabled = !present.checked || tickets.dataset.enrolled !== '1';
+    };
+    present.addEventListener('change', sync);
+    sync();
+  });
+
   // Auto-submit forms when a select with data-autosubmit changes
   document.querySelectorAll('select[data-autosubmit]').forEach(function (select) {
     select.addEventListener('change', function () {

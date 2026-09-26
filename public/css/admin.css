@@ -1716,3 +1716,33 @@ dialog.modal .form-actions {
   color: #666;
   margin-top: 0.2rem;
 }
+
+/* Game-day check-in (issue #114) */
+.checkin-banner {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+  border-radius: var(--radius-card);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+.checkin-banner ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.25rem;
+}
+.checkin-banner--warn {
+  background: #f8d7da;
+  color: #721c24;
+  border-color: #f5c6cb;
+}
+.admin-toolbar form {
+  margin: 0;
+}
+#household-table input[type="checkbox"] {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+#household-table .ticket-input {
+  width: 5rem;
+  padding: 0.4rem 0.5rem;
+}

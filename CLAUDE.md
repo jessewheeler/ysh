@@ -14,6 +14,8 @@ npm test                # Jest (~830 tests, --forceExit)
 
 node scripts/expire-memberships.js --dry-run   # Preview which memberships would be expired
 node scripts/expire-memberships.js --max=N     # Expire them (ceiling defaults to 50)
+node scripts/sync-schedule.js --dry-run        # Preview Seahawks games that would become events
+node scripts/sync-schedule.js --season=2026    # Create/refresh game-day events from ESPN
 ```
 
 `./robot/run_tests.sh` accepts pass-through args, so a single suite or tag can be run on
@@ -39,6 +41,8 @@ db/repos/                    # Data-access layer (one file per table)
   campaigns.js               #   campaigns + attribution stats
   campaignVisits.js          #   campaign_visits (no audit rows — high-volume system writes)
   contactSubmissions.js      #   stored contact-form messages
+  events.js                  #   game-day events (ESPN-synced or manual)
+  checkIns.js                #   per-person event check-ins + raffle tickets
   announcements.js bios.js gallery.js emailLog.js settings.js
 routes/                      # Express routers (index, admin, stripe)
 services/                    # Business logic
@@ -48,15 +52,18 @@ services/                    # Business logic
   attention.js               #   thresholds + current period for the needs-attention filter
   auth.js                    #   password hashing / OTP
   campaigns.js               #   UTM link building, QR (PNG/SVG), campaign validation
+  checkIn.js                 #   household check-in: enrollment per person, ticket rules
   content.js                 #   announcements, bios, gallery CRUD
   councilReport.js           #   Central Council membership report (.xlsx, template injection)
   csv.js                     #   CSV export helpers
   dashboard.js               #   stats aggregation for admin dashboard
+  events.js                  #   America/Denver local date/time helpers, event form parsing
   logger.js                  #   Winston logger (logs/ directory)
   membershipExpiry.js        #   nightly lapsed-member expiry (writes status='expired')
+  nflSchedule.js             #   Seahawks schedule sync from ESPN's public API → events
   payments.js                #   payment processing / history
   renewal.js                 #   renewal token generation + bulk reminders
-  scheduler.js               #   node-cron registration, armed by EXPIRY_JOB_ENABLED
+  scheduler.js               #   node-cron registration, armed by EXPIRY_JOB_ENABLED / SCHEDULE_SYNC_ENABLED
   sender.js                  #   Sender.net subscriber list sync (one-way, YSH → Sender)
   storage.js                 #   file upload/delete (S3-compatible)
 middleware/                  # Express middleware
@@ -148,7 +155,7 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
 
 - SQLite via better-sqlite3, WAL mode, foreign keys ON
 - Schema defined in `db/schema.js`, applied by `db/migrate.js`
-- Tables: members, payments, announcements, gallery_images, bios, site_settings, emails_log, membership_cards, admins, audit_log, membership_periods, membership_years, campaigns, campaign_visits, contact_submissions
+- Tables: members, payments, announcements, gallery_images, bios, site_settings, emails_log, membership_cards, admins, audit_log, membership_periods, membership_years, campaigns, campaign_visits, contact_submissions, events, check_ins
 - `audit_log` captures table_name, record_id, action (INSERT/UPDATE/DELETE), actor_id, actor_email, old_values (JSON), new_values (JSON), changed_at
 - `created_by`/`updated_by` FK columns on all mutable tables; actor propagated via AsyncLocalStorage in `db/audit-context.js`
 - Sensitive fields (`otp_hash`, `renewal_token`) are stripped from audit JSON snapshots
@@ -183,6 +190,14 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
   mailing the member twice. `membershipYears.enroll` re-points an enrollment whose payment was voided
   at the next payment it is handed, so voiding a wrong-amount payment and recording the right one
   leaves the period citing the real money.
+- Game-day check-in (issue #114): `events` rows are watch parties, created by `services/nflSchedule.js`
+  (matched on `external_id`, the ESPN game id) or by hand. A sync only refreshes `event_date` and
+  `kickoff_at` on existing rows — name, location, notes and `cancelled` belong to admins. `event_date`
+  is the **America/Denver** date (a 6:20 PM MT kickoff is the next day in UTC); use
+  `services/events.js#localDate`, not `toISOString().slice(0, 10)`. `check_ins` is unique on
+  (event, member); `services/checkIn.js` is the only writer. It tests enrollment for the event's season
+  (sub-members through their primary, lifetime always) and forces `tickets_issued = 0` for anyone not
+  enrolled. The unmerged `feature/member-portal` branch had its own `events` table — this one replaces it
 - Campaign tracking is documented in `docs/campaign-tracking.md`
 - The Needs attention member filter is documented in `docs/needs-attention-signals.md` — read it
   before changing a signal predicate or threshold, and note that neither Jest nor Robot exercises

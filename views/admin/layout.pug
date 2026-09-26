@@ -19,6 +19,8 @@ html(lang="en")
         nav.sidebar-nav
           a(href="/admin/dashboard" class=(currentPath === '/admin/dashboard' ? 'active' : '')) Dashboard
           a(href="/admin/members" class=(currentPath && currentPath.startsWith('/admin/members') ? 'active' : '')) Members
+          a(href="/admin/check-in" class=(currentPath && currentPath.startsWith('/admin/check-in') ? 'active' : '')) Check-In
+          a(href="/admin/events" class=(currentPath && currentPath.startsWith('/admin/events') ? 'active' : '')) Events
           a(href="/admin/announcements" class=(currentPath && currentPath.startsWith('/admin/announcements') ? 'active' : '')) Announcements
           a(href="/admin/gallery" class=(currentPath && currentPath.startsWith('/admin/gallery') ? 'active' : '')) Gallery
           a(href="/admin/bios" class=(currentPath && currentPath.startsWith('/admin/bios') ? 'active' : '')) Bios
