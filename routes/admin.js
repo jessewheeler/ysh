@@ -30,6 +30,8 @@ const eventsRepo = require('../db/repos/events');
 const checkInsRepo = require('../db/repos/checkIns');
 const eventsService = require('../services/events');
 const checkInService = require('../services/checkIn');
+const familyDowngrade = require('../services/familyDowngrade');
+const archivedMembersRepo = require('../db/repos/archivedMembers');
 const nflSchedule = require('../services/nflSchedule');
 const logger = require('../services/logger');
 const isDevOrTest = ['development', 'test', 'dev'].includes(process.env.NODE_ENV);
@@ -345,6 +347,51 @@ router.get('/reports/membership/download', async (req, res, next) => {
     res.send(buffer);
   } catch (err) {
     next(err);
+  }
+});
+
+// --- Archived family members (issue #107) ---
+// Registered ahead of /members/:id, which would otherwise take "archived" as an id.
+router.get('/members/archived', async (req, res, next) => {
+  try {
+    const q = (req.query.q || '').trim();
+    const archived = await archivedMembersRepo.search({ q: q || undefined });
+    res.render('admin/members/archived', { archived, q });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Suggestions for the Add Family Member form, keyed on what has been typed as a last name.
+router.get('/members/archived/search', async (req, res, next) => {
+  try {
+    const lastName = (req.query.last_name || '').trim();
+    if (lastName.length < 2) return res.json([]);
+    const rows = await archivedMembersRepo.search({ lastName, limit: 10 });
+    res.json(rows.map(r => ({
+      id: r.id,
+      first_name: r.first_name,
+      last_name: r.last_name,
+      join_date: r.join_date,
+      member_numbers: r.member_numbers,
+    })));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/members/archived/:id/restore', async (req, res) => {
+  try {
+    const member = await familyDowngrade.restoreFromArchive(req.params.id, { email: req.body.email });
+    await require('../services/sender').syncMemberSafe(member.id);
+    req.session.flash_success = `${member.first_name} ${member.last_name} restored as ${member.member_number}. Record a payment or send a renewal link to activate them.`;
+    return res.redirect(`/admin/members/${member.id}`);
+  } catch (e) {
+    (req.logger || logger).warn('Archive restore refused', { archivedId: req.params.id, error: e.message });
+    req.session.flash_error = e.message;
+    req.session.flash_reopen = `restore-${req.params.id}`;
+    const q = (req.body.q || '').trim();
+    return res.redirect(`/admin/members/archived${q ? `?q=${encodeURIComponent(q)}` : ''}`);
   }
 });
 
@@ -835,6 +882,27 @@ router.post('/members/:id/upgrade-to-family', async (req, res) => {
   res.redirect(`/admin/members/${req.params.id}`);
 });
 
+// --- Downgrade family membership to individual ---
+router.post('/members/:id/downgrade-to-individual', async (req, res) => {
+  try {
+    const { primary, detached, archived } = await familyDowngrade.downgradeToIndividual(req.params.id);
+    const senderService = require('../services/sender');
+    // After the commit: detached members are primaries in their own right now. Archived
+    // people shared the primary's address, so the primary's sync covers them.
+    await senderService.syncMemberSafe(primary.id);
+    for (const fm of detached) await senderService.syncMemberSafe(fm.id);
+
+    const names = (list) => list.map(m => `${m.first_name} ${m.last_name}`).join(', ');
+    const parts = [`${primary.first_name} ${primary.last_name}'s membership downgraded to individual.`];
+    if (detached.length) parts.push(`Now individual members: ${names(detached)}.`);
+    if (archived.length) parts.push(`Archived: ${names(archived)}.`);
+    req.session.flash_success = parts.join(' ');
+  } catch (e) {
+    req.session.flash_error = e.message;
+  }
+  res.redirect(`/admin/members/${req.params.id}`);
+});
+
 // --- Attach an individual member to an existing family ---
 router.post('/members/:id/attach-to-family', async (req, res) => {
   const member = await memberRepo.findById(req.params.id);
@@ -879,7 +947,18 @@ router.post('/members/:id/family-members', async (req, res) => {
     req.session.flash_error = 'Only the primary account holder of a family membership can have family members added.';
     return res.redirect(`/admin/members/${req.params.id}`);
   }
-  const {first_name, last_name, email} = req.body;
+  const {first_name, last_name, email, archived_member_id} = req.body;
+  // Chosen from the archive suggestions: bring the same person back, number and all.
+  if (archived_member_id) {
+    try {
+      const fm = await familyDowngrade.reattachFromArchive(member.id, archived_member_id, { email });
+      req.session.flash_success = `Family member ${fm.first_name} ${fm.last_name} restored from the archive (${fm.member_number}).`;
+    } catch (e) {
+      req.session.flash_error = e.message;
+      req.session.flash_reopen = 'add-family-member';
+    }
+    return res.redirect(`/admin/members/${req.params.id}`);
+  }
   if (!first_name?.trim() || !last_name?.trim()) {
     req.session.flash_error = 'First and last name are required.';
     req.session.flash_reopen = 'add-family-member';

@@ -391,6 +391,32 @@ const SCHEMA = `
     UNIQUE (event_id, member_id)
   );
 
+  -- Family sub-members with no email of their own, set aside when their primary downgrades
+  -- to an individual membership (issue #107). Their members row is deleted, so this keeps
+  -- what's needed to bring them back: name, original join date, every member number they
+  -- have held and the periods they were enrolled in (both JSON arrays). A restore stamps
+  -- restored_at rather than deleting the row.
+  CREATE TABLE IF NOT EXISTS archived_members
+  (
+    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_name               TEXT NOT NULL,
+    last_name                TEXT NOT NULL,
+    join_date                TEXT,
+    member_numbers           TEXT NOT NULL DEFAULT '[]',
+    enrolled_period_ids      TEXT NOT NULL DEFAULT '[]',
+    former_member_id         INTEGER,
+    former_primary_member_id INTEGER REFERENCES members (id) ON DELETE SET NULL,
+    archived_at              TEXT DEFAULT (datetime('now')),
+    restored_at              TEXT,
+    restored_member_id       INTEGER REFERENCES members (id) ON DELETE SET NULL,
+    created_at               TEXT DEFAULT (datetime('now')),
+    updated_at               TEXT DEFAULT (datetime('now')),
+    created_by               INTEGER REFERENCES members (id) ON DELETE SET NULL,
+    updated_by               INTEGER REFERENCES members (id) ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_archived_members_name ON archived_members(last_name, first_name);
+
   CREATE UNIQUE INDEX IF NOT EXISTS idx_events_external_id ON events(external_id) WHERE external_id IS NOT NULL;
   CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
   CREATE INDEX IF NOT EXISTS idx_events_period ON events(membership_period_id);

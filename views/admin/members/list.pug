@@ -53,6 +53,7 @@ block content
     .toolbar-actions
       a.btn(href="/admin/members/new") + New Member
       a.btn-outline(href=`/admin/members/export${qs({})}`) Export CSV
+      a.btn-outline(href="/admin/members/archived") Archived
 
   if members.length
     table.admin-table

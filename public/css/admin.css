@@ -1244,6 +1244,41 @@ a.stat-card:hover {
   margin-bottom: 0.25rem;
 }
 
+/* Archived people offered while typing a last name in Add Family Member (issue #107). */
+.archive-suggestions {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.archive-suggestion {
+  display: block;
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.archive-suggestion:hover,
+.archive-suggestion:focus {
+  background: var(--page-bg);
+}
+
+.archive-suggestions-note {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted, #666);
+}
+
 /* The rail is dropped before the 768px mobile breakpoint: below this the main column is
    already too tight for the payment tables to sit beside a 320px rail. */
 @media (max-width: 1080px) {

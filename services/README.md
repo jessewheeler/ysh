@@ -8,7 +8,7 @@ Service modules encapsulate domain logic and third-party integrations. They are 
 
 | Function               | Signature                      | Description                                                                                                                                 |
 |------------------------|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
-| `generateMemberNumber` | `(year?) => string`            | Returns the next available member number for the given year. Format: `YSH-2026-0001`. Counts existing members for that year and increments. |
+| `generateMemberNumber` | `(year?) => string`            | Returns the next available member number for the given year. Format: `YSH-2026-0001`. Takes the larger of the year's member count and the highest issued `YSH-{year}-` suffix, plus one, so a deleted member never causes a reused number. |
 | `findMemberById`       | `(id) => object\|undefined`    | Looks up a member by primary key.                                                                                                           |
 | `findMemberByEmail`    | `(email) => object\|undefined` | Looks up a member by email.                                                                                                                 |
 | `activateMember`       | `(id) => void`                 | Sets a member's status to `active` and updates `updated_at`.                                                                                |

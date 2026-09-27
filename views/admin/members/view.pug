@@ -24,6 +24,15 @@ block content
       if member.membership_type !== 'family' && !member.primary_member_id
         form(method="POST" action=`/admin/members/${member.id}/upgrade-to-family` data-confirm=`Upgrade ${member.first_name} ${member.last_name} to a family membership?` data-spinner="Upgrading…")
           button.btn-outline.btn-compact(type="submit") Upgrade to Family
+      if member.membership_type === 'family' && !member.primary_member_id
+        //- Spells out what happens to each family member. wouldDeleteOnRemove is the same test
+        //- services/familyDowngrade.js uses to choose between detaching and archiving.
+        - const fmName = (fm) => `${fm.first_name} ${fm.last_name}`
+        - const toDetach = familyMembers.filter(fm => !fm.wouldDeleteOnRemove).map(fmName)
+        - const toArchive = familyMembers.filter(fm => fm.wouldDeleteOnRemove).map(fmName)
+        - const downgradeMsg = [`Downgrade ${member.first_name} ${member.last_name} to an individual membership?`, toDetach.length ? `${toDetach.join(', ')} (own email) will become individual members.` : null, toArchive.length ? `${toArchive.join(', ')} (no email of their own) will be archived — name, join date and member number are kept.` : null, 'No dues are refunded.'].filter(Boolean).join(' ')
+        form(method="POST" action=`/admin/members/${member.id}/downgrade-to-individual` data-confirm=downgradeMsg data-spinner="Downgrading…")
+          button.btn-outline.btn-compact(type="submit") Downgrade to Individual
     .actionbar-group.actionbar-danger
       form(method="POST" action=`/admin/members/${member.id}/delete` data-confirm="Delete this member?")
         button.btn-danger.btn-compact(type="submit") Delete
@@ -106,13 +115,18 @@ block content
           details.disclosure(open=(flash_reopen === 'add-family-member'))
             summary Add Family Member
             .disclosure-body
+              //- Typing a last name offers matching people from the archive (public/js/admin.js,
+              //- data-archive-lookup). Choosing one sets archived_member_id, and the route brings
+              //- that person back with their old member number instead of creating someone new.
               form#add-family-member(method="POST" action=`/admin/members/${member.id}/family-members` data-spinner="Adding…")
+                input#fm_archived_member_id(type="hidden" name="archived_member_id" value="")
                 .form-group
                   label(for="fm_first_name") First Name
                   input#fm_first_name.form-control(type="text" name="first_name" required)
                 .form-group
                   label(for="fm_last_name") Last Name
-                  input#fm_last_name.form-control(type="text" name="last_name" required)
+                  input#fm_last_name.form-control(type="text" name="last_name" required autocomplete="off" data-archive-lookup="/admin/members/archived/search" data-archive-target="#fm_archived_member_id" data-archive-first-name="#fm_first_name" data-archive-list="#fm_archive_suggestions")
+                  ul#fm_archive_suggestions.archive-suggestions(hidden)
                 .form-group
                   label(for="fm_email") Email (optional)
                   input#fm_email.form-control(type="email" name="email" placeholder=`Defaults to ${member.email}`)

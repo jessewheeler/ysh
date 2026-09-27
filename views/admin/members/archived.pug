@@ -1,0 +1,57 @@
+extends ../layout
+
+block page_title
+  | Archived Family Members
+
+//- Family members with no email of their own, set aside when their primary downgraded to an
+//- individual membership (issue #107). Restoring someone needs an email; they come back as a
+//- pending individual member, and the admin then records a payment or sends a renewal link.
+//- To put someone back into a household instead, type their last name in that primary's
+//- Add Family Member form.
+block content
+  .admin-toolbar
+    form.search-form.search-form-wide(method="GET" action="/admin/members/archived")
+      input(type="search" name="q" placeholder="Search first or last name..." value=q)
+      button.btn(type="submit") Search
+      if q
+        a.btn-outline(href="/admin/members/archived") Clear
+    .toolbar-actions
+      a.btn-outline(href="/admin/members") Back to members
+
+  if archived.length
+    table.admin-table#archived-table
+      thead
+        tr
+          th Name
+          th Joined
+          th Member Numbers
+          th Archived
+          th Former Household
+          th
+      tbody
+        each a in archived
+          tr
+            td= `${a.first_name} ${a.last_name}`
+            td= a.join_date ? formatDate(a.join_date) : '—'
+            td.input-mono= a.member_numbers.join(', ') || '—'
+            td= formatDate(a.archived_at)
+            td
+              if a.former_primary_member_id
+                a(href=`/admin/members/${a.former_primary_member_id}`) View primary
+              else
+                | —
+            td
+              button.btn-outline.btn-tiny(type="button" data-dialog-open=`#restore-${a.id}`) Restore
+              dialog.modal(id=`restore-${a.id}` data-dialog-open-on-load=(flash_reopen === `restore-${a.id}` ? 'true' : undefined) aria-labelledby=`restore-${a.id}-title`)
+                form.restore-archived(method="POST" action=`/admin/members/archived/${a.id}/restore` data-spinner="Restoring…")
+                  input(type="hidden" name="q" value=q)
+                  h3.modal-title(id=`restore-${a.id}-title`) Restore #{a.first_name} #{a.last_name}
+                  p.text-muted They come back as a pending individual member with their old join date and, if it is still free, member number #{a.member_numbers[a.member_numbers.length - 1] || ''}. Record a payment or send a renewal link afterwards to activate them.
+                  .form-group
+                    label(for=`restore-email-${a.id}`) Email
+                    input.form-control(id=`restore-email-${a.id}` type="email" name="email" required)
+                  .form-actions
+                    button.btn(type="submit") Restore member
+                    button.btn-outline(type="button" data-dialog-close) Cancel
+  else
+    p.text-muted= q ? `No archived members match “${q}”.` : 'No archived members.'
