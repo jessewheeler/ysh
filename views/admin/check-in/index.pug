@@ -18,15 +18,17 @@ block content
   if !event
     .admin-panel
       p.text-muted
-        | No event today. Pick one above, or
+        | No events yet.
         |  
-        a(href="/admin/events") add or sync events
-        | .
+        a(href="/admin/events") Add or sync events
+        |  to start checking people in.
   else
     if !search
       p.text-muted
         | Checking in for 
         strong= event.name
+        if event.event_date !== today
+          |  (#{event.event_date})
         | . Search for anyone in the household — the whole family opens together.
     else
       .admin-panel

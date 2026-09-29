@@ -70,10 +70,73 @@ describe('GET /admin/check-in', () => {
     expect(res.text).toContain(`${primary.first_name} ${primary.last_name}`);
   });
 
-  test('without an event today, asks for one instead of searching', async () => {
+  test('on a non-game day, opens on the next upcoming event', async () => {
+    db.prepare('UPDATE events SET event_date = ? WHERE id = ?').run(shiftDate(today, -3), event.id);
+    const next = insertEvent(db, { name: 'Week 5 at Arizona Cardinals', event_date: shiftDate(today, 4), membership_period_id: period.id });
+    insertEvent(db, { name: 'Week 6 vs Denver', event_date: shiftDate(today, 11), membership_period_id: period.id });
+    const res = await agent.get('/admin/check-in').expect(200);
+    expect(res.text).toMatch(new RegExp(`<option value="${next.id}" selected`));
+    expect(res.text).toContain(`Week 5 at Arizona Cardinals</strong> (${shiftDate(today, 4)})`);
+  });
+
+  test('?event= still wins over the nearest event', async () => {
+    const other = insertEvent(db, { name: 'Bye Week Social', event_date: shiftDate(today, 2), membership_period_id: period.id });
+    const res = await agent.get(`/admin/check-in?event=${other.id}`).expect(200);
+    expect(res.text).toContain('Checking in for <strong>Bye Week Social</strong>');
+  });
+
+  test('an event beyond the picker window is slotted in by date', async () => {
+    db.prepare('UPDATE events SET event_date = ? WHERE id = ?').run(shiftDate(today, -3), event.id);
+    const far = insertEvent(db, { name: 'Far Game', event_date: shiftDate(today, 12), membership_period_id: period.id });
+    const res = await agent.get('/admin/check-in').expect(200);
+    expect(res.text).toMatch(new RegExp(`<option value="${far.id}" selected`));
+    expect(res.text.indexOf('Week 4 vs Los Angeles Chargers')).toBeLessThan(res.text.indexOf('Far Game'));
+  });
+
+  test('with only past events, opens on the most recent one', async () => {
     db.prepare('UPDATE events SET event_date = ? WHERE id = ?').run(shiftDate(today, -30), event.id);
     const res = await agent.get('/admin/check-in').expect(200);
-    expect(res.text).toContain('No event today');
+    expect(res.text).toContain(`Week 4 vs Los Angeles Chargers</strong> (${shiftDate(today, -30)})`);
+  });
+
+  test('with no events at all, asks for some instead of searching', async () => {
+    db.prepare('DELETE FROM events').run();
+    const res = await agent.get('/admin/check-in').expect(200);
+    expect(res.text).toContain('No events yet.');
+    expect(res.text).not.toContain('name="search"');
+  });
+});
+
+describe('GET /admin/events view pills', () => {
+  const rowIds = (html) => [...html.matchAll(/data-event-id="(\d+)"/g)].map(m => Number(m[1]));
+  let past;
+  let next;
+
+  beforeEach(() => {
+    db.prepare('UPDATE events SET event_date = ? WHERE id = ?').run(shiftDate(today, 7), event.id);
+    past = insertEvent(db, { name: 'Last Week', event_date: shiftDate(today, -7), membership_period_id: period.id });
+    next = insertEvent(db, { name: 'Tomorrow', event_date: shiftDate(today, 1), membership_period_id: period.id });
+  });
+
+  test('opens on Upcoming with the next event as the first row', async () => {
+    const res = await agent.get('/admin/events').expect(200);
+    expect(rowIds(res.text)).toEqual([next.id, event.id]);
+    expect(res.text).toMatch(/view-pill view-pill-active" href="\/admin\/events[^"]*">Upcoming<span class="pill-count">2</);
+    expect(res.text).toMatch(/>Past<span class="pill-count">1</);
+    expect(res.text).toMatch(/>All<span class="pill-count">3</);
+  });
+
+  test('Past shows only earlier events and All shows everything in date order', async () => {
+    const pastRes = await agent.get('/admin/events?view=past').expect(200);
+    expect(rowIds(pastRes.text)).toEqual([past.id]);
+    expect(pastRes.text).toContain('name="view" value="past"');
+    const allRes = await agent.get('/admin/events?view=all').expect(200);
+    expect(rowIds(allRes.text)).toEqual([past.id, next.id, event.id]);
+  });
+
+  test('an unknown view falls back to Upcoming', async () => {
+    const res = await agent.get('/admin/events?view=nope').expect(200);
+    expect(rowIds(res.text)).toEqual([next.id, event.id]);
   });
 });
 

@@ -13,11 +13,22 @@ async function findByExternalId(externalId) {
     return db.get('SELECT * FROM events WHERE external_id = ?', externalId);
 }
 
+// Upcoming runs from today onward, soonest first; Past is before today, most recent first;
+// All reads like a schedule. `today` is the America/Denver date, bound as a parameter.
+const EVENT_VIEWS = ['upcoming', 'past', 'all'];
+const VIEW_DATE_CLAUSE = {upcoming: 'e.event_date >= ?', past: 'e.event_date < ?'};
+const VIEW_ORDER = {
+    upcoming: 'e.event_date ASC, e.kickoff_at ASC, e.id ASC',
+    past: 'e.event_date DESC, e.kickoff_at DESC, e.id DESC',
+    all: 'e.event_date ASC, e.kickoff_at ASC, e.id ASC',
+};
+
 /**
- * Events, newest first, each with its attendance and ticket totals.
+ * Events in one view, each with its attendance and ticket totals.
  * `periodId` narrows to one season; cancelled events are left out unless asked for.
  */
-async function list({periodId = null, includeCancelled = true} = {}) {
+async function list({periodId = null, includeCancelled = true, view = 'all', today = null} = {}) {
+    if (!EVENT_VIEWS.includes(view)) view = 'all';
     const clauses = [];
     const params = [];
     if (periodId) {
@@ -25,6 +36,10 @@ async function list({periodId = null, includeCancelled = true} = {}) {
         params.push(periodId);
     }
     if (!includeCancelled) clauses.push('e.cancelled = 0');
+    if (VIEW_DATE_CLAUSE[view]) {
+        clauses.push(VIEW_DATE_CLAUSE[view]);
+        params.push(today);
+    }
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const rows = await db.all(
         `SELECT e.*,
@@ -32,10 +47,44 @@ async function list({periodId = null, includeCancelled = true} = {}) {
                 (SELECT COALESCE(SUM(c.tickets_issued), 0) FROM check_ins c WHERE c.event_id = e.id) AS tickets
          FROM events e
          ${where}
-         ORDER BY e.event_date DESC, e.kickoff_at DESC, e.id DESC`,
+         ORDER BY ${VIEW_ORDER[view]}`,
         ...params
     );
     return rows.map(r => ({...r, attendance: Number(r.attendance), tickets: Number(r.tickets)}));
+}
+
+/** Pill counts for the Events list: {upcoming, past, all}, narrowed to one season when given. */
+async function countByView({periodId = null, today}) {
+    const where = periodId ? 'WHERE membership_period_id = ?' : '';
+    const params = periodId ? [today, periodId] : [today];
+    const row = await db.get(
+        `SELECT COUNT(*) AS all_count,
+                COALESCE(SUM(CASE WHEN event_date >= ? THEN 1 ELSE 0 END), 0) AS upcoming
+         FROM events ${where}`,
+        ...params
+    );
+    const all = Number(row.all_count);
+    const upcoming = Number(row.upcoming);
+    return {upcoming, past: all - upcoming, all};
+}
+
+/**
+ * The event check-in should open on: today's (earliest kickoff), else the next upcoming
+ * one, else the most recent past one. Cancelled events are skipped; null when none exist.
+ */
+async function findNearest(date) {
+    const next = await db.get(
+        `SELECT * FROM events WHERE event_date >= ? AND cancelled = 0
+         ORDER BY event_date ASC, kickoff_at ASC, id ASC LIMIT 1`,
+        date
+    );
+    if (next) return next;
+    const last = await db.get(
+        `SELECT * FROM events WHERE event_date < ? AND cancelled = 0
+         ORDER BY event_date DESC, kickoff_at DESC, id DESC LIMIT 1`,
+        date
+    );
+    return last || null;
 }
 
 /** Events on one local date, earliest kickoff first. Cancelled events are left out. */
@@ -101,4 +150,6 @@ async function update(id, changes) {
     return row;
 }
 
-module.exports = {get, findByExternalId, list, listOnDate, listAround, create, update};
+module.exports = {
+    EVENT_VIEWS, get, findByExternalId, list, countByView, findNearest, listOnDate, listAround, create, update,
+};

@@ -71,6 +71,17 @@ Event Picker Switches The Check-In Event
     Wait For Condition    Url    contains    event=${later}    timeout=10s
     Get Text    .admin-content    contains    Checking in for Saturday Social
 
+Check-In Opens On The Next Event On A Non-Game Day
+    [Documentation]    With no event today, the picker lands on the next upcoming game rather
+    ...    than "Choose an event…" — and not on the one that has already happened.
+    Seed Event    name=Last Weekend Watch Party    days_from_today=-2
+    ${next}=    Seed Event    name=Thursday Night Watch Party    days_from_today=3
+    Login As Admin
+    Click    nav.sidebar-nav >> text=Check-In
+    Wait For Elements State    select#check-in-event    visible    timeout=10s
+    Get Selected Options    select#check-in-event    value    ==    ${{ str($next) }}
+    Get Text    .admin-content    contains    Checking in for Thursday Night Watch Party
+
 Admin Creates An Event By Hand
     Login As Admin
     Click    nav.sidebar-nav >> text=Events

@@ -1386,20 +1386,35 @@ async function resolvePeriodFilter(raw) {
   return { periodId: current ? current.id : null, periodParam: current ? String(current.id) : 'all' };
 }
 
+// Links for the Events view pills, keeping the season. Defaults are left out of the URL.
+function eventsQs({ view, period }) {
+  const params = new URLSearchParams();
+  if (view && view !== 'upcoming') params.set('view', view);
+  if (period) params.set('period', period);
+  const s = params.toString();
+  return s ? `?${s}` : '';
+}
+
 router.get('/events', async (req, res, next) => {
   try {
     const { periodId, periodParam } = await resolvePeriodFilter(req.query.period);
-    const [events, periods] = await Promise.all([
-      eventsRepo.list({ periodId }),
+    const view = eventsRepo.EVENT_VIEWS.includes(req.query.view) ? req.query.view : 'upcoming';
+    const today = eventsService.localDate();
+    const [events, counts, periods] = await Promise.all([
+      eventsRepo.list({ periodId, view, today }),
+      eventsRepo.countByView({ periodId, today }),
       periodsRepo.list(),
     ]);
     res.render('admin/events/list', {
       events,
+      counts,
+      view,
       periods,
       periodParam,
       periodId,
-      today: eventsService.localDate(),
+      today,
       localTime: eventsService.localTime,
+      qs: (overrides) => eventsQs({ view, period: periodParam, ...overrides }),
     });
   } catch (err) {
     next(err);
@@ -1529,8 +1544,11 @@ router.get('/check-in', async (req, res, next) => {
     let event = null;
     const requested = parseInt(req.query.event, 10);
     if (requested) event = await eventsRepo.get(requested);
-    if (!event) event = (await eventsRepo.listOnDate(today))[0] || null;
-    const events = event && !nearby.some(e => e.id === event.id) ? [event, ...nearby] : nearby;
+    if (!event) event = await eventsRepo.findNearest(today);
+    // The chosen event may sit outside the ±7-day picker window; slot it in by date.
+    const events = event && !nearby.some(e => e.id === event.id)
+      ? [...nearby, event].sort((a, b) => a.event_date.localeCompare(b.event_date))
+      : nearby;
 
     const search = String(req.query.search || '').trim();
     let results = [];

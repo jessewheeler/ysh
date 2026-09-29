@@ -4,8 +4,17 @@ block page_title
   | Events
 
 block content
+  .view-pills
+    - const pills = [['upcoming', 'Upcoming', counts.upcoming], ['past', 'Past', counts.past], ['all', 'All', counts.all]]
+    each pill in pills
+      a(class=`view-pill${view === pill[0] ? ' view-pill-active' : ''}` href=`/admin/events${qs({view: pill[0]})}`)
+        = pill[1]
+        span.pill-count= pill[2]
+
   .admin-toolbar
     form.search-form.search-form-wide(method="GET" action="/admin/events")
+      if view !== 'upcoming'
+        input(type="hidden" name="view" value=view)
       select(name="period" data-auto-submit aria-label="Season")
         option(value="all" selected=periodParam === 'all') All seasons
         each p in periods
@@ -18,10 +27,12 @@ block content
         a.btn-outline(href=`/admin/events/raffle.csv?period=${periodId}`) Raffle Entries (CSV)
 
   .admin-panel
-    if events.length === 0
+    if events.length === 0 && view === 'past'
+      p.text-muted No past events for this season.
+    else if events.length === 0
       p.text-muted
-        | No events for this season yet. Sync the Seahawks schedule to add every game as a
-        | watch party, or add an event by hand.
+        = view === 'upcoming' ? 'No upcoming events for this season. ' : 'No events for this season yet. '
+        | Sync the Seahawks schedule to add every game as a watch party, or add an event by hand.
     else
       table.admin-table#events-table
         thead
