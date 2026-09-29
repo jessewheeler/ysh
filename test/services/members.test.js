@@ -29,6 +29,17 @@ describe('generateMemberNumber', () => {
     expect(await generateMemberNumber(2025)).toMatch(/^YSH-2025-\d{4}$/);
   });
 
+  test('never reissues a number still held after an earlier member was deleted', async () => {
+    const testDb = db.__getCurrentDb();
+    insertMember(testDb, { email: 'a@a.com', membership_year: 2025, member_number: 'YSH-2025-0001' });
+    const doomed = insertMember(testDb, { email: 'b@b.com', membership_year: 2025, member_number: 'YSH-2025-0002' });
+    insertMember(testDb, { email: 'c@c.com', membership_year: 2025, member_number: 'YSH-2025-0003' });
+    testDb.prepare('DELETE FROM members WHERE id = ?').run(doomed.id);
+
+    // Two members left, but 0003 is taken: count + 1 alone would collide.
+    expect(await generateMemberNumber(2025)).toBe('YSH-2025-0004');
+  });
+
   test('counts per year independently', async () => {
     const testDb = db.__getCurrentDb();
     insertMember(testDb, { email: 'a@a.com', membership_year: 2024 });

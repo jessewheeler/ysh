@@ -43,6 +43,7 @@ db/repos/                    # Data-access layer (one file per table)
   contactSubmissions.js      #   stored contact-form messages
   events.js                  #   game-day events (ESPN-synced or manual)
   checkIns.js                #   per-person event check-ins + raffle tickets
+  archivedMembers.js         #   family members set aside by a downgrade (no email of their own)
   announcements.js bios.js gallery.js emailLog.js settings.js
 routes/                      # Express routers (index, admin, stripe)
 services/                    # Business logic
@@ -55,6 +56,7 @@ services/                    # Business logic
   checkIn.js                 #   household check-in: enrollment per person, ticket rules
   content.js                 #   announcements, bios, gallery CRUD
   councilReport.js           #   Central Council membership report (.xlsx, template injection)
+  familyDowngrade.js         #   family → individual downgrade; archive restore / reattach
   csv.js                     #   CSV export helpers
   dashboard.js               #   stats aggregation for admin dashboard
   events.js                  #   America/Denver local date/time helpers, event form parsing
@@ -155,7 +157,7 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
 
 - SQLite via better-sqlite3, WAL mode, foreign keys ON
 - Schema defined in `db/schema.js`, applied by `db/migrate.js`
-- Tables: members, payments, announcements, gallery_images, bios, site_settings, emails_log, membership_cards, admins, audit_log, membership_periods, membership_years, campaigns, campaign_visits, contact_submissions, events, check_ins
+- Tables: members, payments, announcements, gallery_images, bios, site_settings, emails_log, membership_cards, admins, audit_log, membership_periods, membership_years, campaigns, campaign_visits, contact_submissions, events, check_ins, archived_members
 - `audit_log` captures table_name, record_id, action (INSERT/UPDATE/DELETE), actor_id, actor_email, old_values (JSON), new_values (JSON), changed_at
 - `created_by`/`updated_by` FK columns on all mutable tables; actor propagated via AsyncLocalStorage in `db/audit-context.js`
 - Sensitive fields (`otp_hash`, `renewal_token`) are stripped from audit JSON snapshots
@@ -198,6 +200,23 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
   (event, member); `services/checkIn.js` is the only writer. It tests enrollment for the event's season
   (sub-members through their primary, lifetime always) and forces `tickets_issued = 0` for anyone not
   enrolled. The unmerged `feature/member-portal` branch had its own `events` table — this one replaces it
+- Family downgrade (issue #107): `services/familyDowngrade.js` is the only place a family primary
+  becomes individual. Each sub-member is split by `memberRepo.emailConflictsWithPrimary` — the same
+  test the Remove button uses. One with an email of their own is detached with the **primary's**
+  status (not `cancelled`) and the primary's phone/address filled into any blank fields (the report
+  borrowed them through `primary_member_id`, which the detach severs), keeping their
+  `membership_years` rows so they stay on this season's Council report. One sharing the primary's email can't become a primary
+  (`idx_members_email_primary`), so it goes to `archived_members` (name, join date, JSON arrays of
+  member numbers and enrolled period ids) and its `members` row is deleted. The archive insert must
+  come **before** the delete, because `primary_member_id` is `ON DELETE CASCADE`. Restoring
+  (`/admin/members/archived`, email required, comes back `pending`) or reattaching (typing a last
+  name in Add Family Member) reuses the latest old member number when it is still free and
+  re-enrolls the snapshotted periods that have **ended** — an open period is skipped so an unpaid
+  restore doesn't count on this season's report (payment activation or the new primary's enrollment
+  covers it); the archive row gets `restored_at` rather than being deleted.
+  Only the downgrade archives. The single Remove button and the public renew form still delete
+- `generateMemberNumber` takes the larger of the year's member count and the highest issued suffix.
+  Count alone reissues a held number as soon as anyone is deleted
 - Campaign tracking is documented in `docs/campaign-tracking.md`
 - The Needs attention member filter is documented in `docs/needs-attention-signals.md` — read it
   before changing a signal predicate or threshold, and note that neither Jest nor Robot exercises

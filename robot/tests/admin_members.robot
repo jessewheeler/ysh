@@ -138,7 +138,7 @@ Needs Attention Export Includes Signals
     Navigate To    /admin/members
     Click    .view-pill >> text=Needs attention
     Wait For Elements State    .admin-table    visible    timeout=10s
-    ${path}=    Download Via Click    .toolbar-actions a.btn-outline    filename=members.csv
+    ${path}=    Download Via Click    .toolbar-actions a[href^="/admin/members/export"]    filename=members.csv
     ${csv}=    Get File    ${path}
     Should Contain    ${csv}    Signals
     Should Contain    ${csv}    Stripe reported a failed payment
@@ -355,6 +355,84 @@ Member Actions Sit On One Row
     ${rows}=    Evaluate JavaScript    ${None}
     ...    () => new Set([...document.querySelectorAll('.record-actionbar button, .record-actionbar a.btn')].map(el => Math.round(el.getBoundingClientRect().top))).size
     Should Be Equal As Integers    ${rows}    1
+
+Downgrading A Family Detaches Or Archives Each Family Member
+    [Documentation]    Issue #107. Robin has an email of their own and becomes an individual
+    ...    member who stays on this season's Council report; Casey shares the primary's
+    ...    email, so their record is archived and they drop off it. Drives the real button
+    ...    and accepts the data-confirm dialog.
+    [Tags]    reports
+    ${period}=    Get Current Period Id
+    ${pat}=    Seed Member    first_name=Pat    last_name=Downgrade    email=pat@example.com
+    ...    membership_type=family    address_street=12 Hawk Way    address_city=Billings
+    ${robin}=    Seed Family Member    ${pat}    first_name=Robin    last_name=Downgrade
+    ...    email=robin@example.com
+    ${casey}=    Seed Family Member    ${pat}    first_name=Casey    last_name=Downgrade
+    Enroll Member    ${pat}    ${period}
+    Enroll Member    ${robin}    ${period}
+    Enroll Member    ${casey}    ${period}
+    Login As Admin
+
+    Navigate To    /admin/reports/membership
+    Get Text    \#download-report    contains    3 members
+
+    Navigate To    /admin/members/${pat}
+    Handle Future Dialogs    action=accept
+    Click    button >> text=Downgrade to Individual
+    Flash Success Should Be Visible    downgraded to individual
+    Get Text    .flash.flash-success    contains    Now individual members: Robin Downgrade.
+    Get Text    .flash.flash-success    contains    Archived: Casey Downgrade.
+    Get Text    tr:has(th:text-is("Type")) >> td    ==    Individual
+
+    Navigate To    /admin/members/${robin}
+    Get Text    tr:has(th:text-is("Type")) >> td    ==    Individual
+    # No address of their own; they take the primary's rather than dropping to blank.
+    Get Text    tr:has(th:text-is("Address")) >> td    contains    12 Hawk Way
+
+    Navigate To    /admin/members/archived
+    Get Text    table#archived-table    contains    Casey Downgrade
+
+    Navigate To    /admin/reports/membership
+    Get Text    \#download-report    contains    2 members
+
+Restoring An Archived Member Needs An Email And Keeps Their Number
+    ${archived}=    Seed Archived Member    first_name=Casey    last_name=Comeback
+    ...    member_number=YSH-2019-0042
+    Login As Admin
+    Navigate To    /admin/members
+    Click    a >> text=Archived
+    Fill Text    input[type="search"][name="q"]    come
+    Click    .search-form button[type="submit"]
+    Get Text    table#archived-table    contains    Casey Comeback
+    Click    button[data-dialog-open="#restore-${archived}"]
+    Wait For Elements State    input#restore-email-${archived}    visible    timeout=10s
+    Fill Text    input#restore-email-${archived}    casey.comeback@example.com
+    Click    dialog#restore-${archived} button[type="submit"]
+    Flash Success Should Be Visible    restored as YSH-2019-0042
+    Get Text    tr:has(th:text-is("Member Number")) >> td    ==    YSH-2019-0042
+    Get Text    tr:has(th:text-is("Email")) >> td    ==    casey.comeback@example.com
+    ${left}=    Archived Member Count    Comeback
+    Should Be Equal As Integers    ${left}    0
+
+Typing A Last Name In Add Family Member Offers The Archive
+    [Documentation]    Types into the last-name field rather than posting archived_member_id,
+    ...    so the test fails if the suggestion list never appears or never sets the field.
+    Seed Archived Member    first_name=Casey    last_name=Rejoin    member_number=YSH-2019-0077
+    ${primary}=    Seed Member    first_name=Fay    last_name=Rejoin    email=fay@example.com
+    ...    membership_type=family
+    Login As Admin
+    Navigate To    /admin/members/${primary}
+    Click    summary >> text=Add Family Member
+    Wait For Elements State    input#fm_last_name    visible    timeout=10s
+    Type Text    input#fm_last_name    Rej
+    Wait For Elements State    \#fm_archive_suggestions    visible    timeout=10s
+    Click    \#fm_archive_suggestions button >> text=Casey Rejoin
+    Get Property    input#fm_first_name    value    ==    Casey
+    Click    form#add-family-member button[type="submit"]
+    Flash Success Should Be Visible    restored from the archive (YSH-2019-0077)
+    Get Text    .detail-table    contains    Casey Rejoin
+    ${left}=    Archived Member Count    Rejoin
+    Should Be Equal As Integers    ${left}    0
 
 
 *** Keywords ***

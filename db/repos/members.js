@@ -167,6 +167,21 @@ async function countByYear(year) {
   return row ? row.c : 0;
 }
 
+async function findByMemberNumber(memberNumber) {
+  return await db.get('SELECT * FROM members WHERE member_number = ?', memberNumber);
+}
+
+// Highest NNNN among member numbers of the form YSH-{year}-NNNN. The suffix is parsed in JS
+// rather than with SUBSTR/CAST so the query reads the same in both dialects.
+async function maxNumberSuffixForYear(year) {
+  const prefix = `YSH-${year}-`;
+  const rows = await db.all('SELECT member_number FROM members WHERE member_number LIKE ?', `${prefix}%`);
+  return rows.reduce((max, {member_number}) => {
+    const n = parseInt(member_number.slice(prefix.length), 10);
+    return Number.isFinite(n) && n > max ? n : max;
+  }, 0);
+}
+
 // Dates are always computed in JS and bound as parameters: expiry_date and
 // membership_years.created_at are TEXT columns, and comparing them against
 // date('now') breaks on PostgreSQL (text vs date type error).
@@ -559,12 +574,24 @@ async function upgradeMembershipType(id, type) {
     return result;
 }
 
-async function detachFamilyMember(id) {
+const CONTACT_FIELDS = ['phone', 'address_street', 'address_city', 'address_state', 'address_zip'];
+
+// The Remove button cancels the person it lets go. A downgrade passes the primary's status
+// instead: the household paid for the season, so whoever is split off stays a member of it.
+// contactFrom (the primary) fills in phone and address fields the member has left blank.
+async function detachFamilyMember(id, {status = 'cancelled', contactFrom = null} = {}) {
     const actor = getActor();
     const old = await db.get('SELECT * FROM members WHERE id = ?', id);
+    const contact = {};
+    if (contactFrom) {
+        for (const f of CONTACT_FIELDS) {
+            if (!(old[f] || '').trim() && (contactFrom[f] || '').trim()) contact[f] = contactFrom[f];
+        }
+    }
+    const sets = Object.keys(contact).map(f => `${f} = ?`).join(', ');
     const result = await db.run(
-        "UPDATE members SET membership_type = 'individual', primary_member_id = NULL, status = 'cancelled', updated_at = datetime('now'), updated_by = ? WHERE id = ?",
-        actor.id || null, id
+        `UPDATE members SET membership_type = 'individual', primary_member_id = NULL, status = ?,${sets ? ` ${sets},` : ''} updated_at = datetime('now'), updated_by = ? WHERE id = ?`,
+        status, ...Object.values(contact), actor.id || null, id
     );
     const row = await db.get('SELECT * FROM members WHERE id = ?', id);
     await auditLog.insert({
@@ -578,16 +605,17 @@ async function detachFamilyMember(id) {
     return result;
 }
 
-async function addFamilyMember(primaryId, {first_name, last_name, email, membership_year}) {
+// member_number and join_date are only passed when reattaching someone from the archive.
+async function addFamilyMember(primaryId, {first_name, last_name, email, membership_year, member_number, join_date}) {
     const actor = getActor();
     const {generateMemberNumber} = require('../../services/members');
     const year = membership_year || new Date().getFullYear();
-    const memberNumber = await generateMemberNumber(year);
+    const memberNumber = member_number || await generateMemberNumber(year);
     const result = await db.run(
         `INSERT INTO members (member_number, first_name, last_name, email, membership_year, status, membership_type,
-                          primary_member_id, created_by, updated_by)
-         VALUES (?, ?, ?, ?, ?, 'active', 'family', ?, ?, ?)`,
-        memberNumber, first_name, last_name, email || null, year, primaryId, actor.id || null, actor.id || null
+                          primary_member_id, join_date, created_by, updated_by)
+         VALUES (?, ?, ?, ?, ?, 'active', 'family', ?, COALESCE(?, datetime('now')), ?, ?)`,
+        memberNumber, first_name, last_name, email || null, year, primaryId, join_date || null, actor.id || null, actor.id || null
     );
     const row = await db.get('SELECT * FROM members WHERE id = ?', result.lastInsertRowid);
     await auditLog.insert({
@@ -676,6 +704,8 @@ module.exports = {
   countAll,
   countActive,
   countByYear,
+  findByMemberNumber,
+  maxNumberSuffixForYear,
   search,
   countByView,
   listRecent,

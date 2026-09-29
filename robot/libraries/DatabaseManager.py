@@ -41,6 +41,7 @@ class DatabaseManager:
             'payments',
             'campaign_visits',
             'contact_submissions',
+            'archived_members',
             'members',
             'campaigns',
             'membership_periods',
@@ -261,6 +262,30 @@ class DatabaseManager:
         )
         self.conn.commit()
         return cursor.lastrowid
+
+    def seed_archived_member(self, first_name='Archie', last_name='Archived',
+                             member_number=None, join_date='2019-05-01'):
+        """Insert an archived family member (issue #107) and return the row ID.
+
+        Lets the restore and reattach tests start from the archive without running a
+        downgrade first.
+        """
+        import json
+        numbers = [member_number] if member_number else []
+        cursor = self.conn.execute(
+            '''INSERT INTO archived_members (first_name, last_name, join_date, member_numbers)
+               VALUES (?, ?, ?, ?)''',
+            (first_name, last_name, join_date, json.dumps(numbers)),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def archived_member_count(self, last_name):
+        """Unrestored archive rows with this last name."""
+        return self.conn.execute(
+            'SELECT COUNT(*) FROM archived_members WHERE last_name = ? AND restored_at IS NULL',
+            (last_name,),
+        ).fetchone()[0]
 
     def seed_event(self, name='Robot Watch Party', days_from_today=0, period_id=None):
         """Insert a game-day event and return the row ID.

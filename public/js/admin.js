@@ -242,6 +242,69 @@ document.addEventListener('DOMContentLoaded', function () {
     sync();
   });
 
+  // Archive suggestions on the Add Family Member form. Typing a last name looks up archived
+  // family members (issue #107); choosing one fills the names and sets the hidden
+  // archived_member_id, so the route brings that person back rather than creating a new
+  // record. Editing either name afterwards clears the choice — the names no longer describe
+  // the person picked.
+  document.querySelectorAll('input[data-archive-lookup]').forEach(function (lastName) {
+    var target = document.querySelector(lastName.dataset.archiveTarget);
+    var firstName = document.querySelector(lastName.dataset.archiveFirstName);
+    var list = document.querySelector(lastName.dataset.archiveList);
+    if (!target || !list) return;
+    var timer = null;
+    var seq = 0;
+
+    var clearChoice = function () { target.value = ''; };
+    var hide = function () { list.hidden = true; list.innerHTML = ''; };
+
+    var render = function (rows) {
+      list.innerHTML = '';
+      if (!rows.length) { list.hidden = true; return; }
+      rows.forEach(function (row) {
+        var li = document.createElement('li');
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'archive-suggestion';
+        var details = [];
+        if (row.join_date) details.push('joined ' + String(row.join_date).slice(0, 4));
+        if (row.member_numbers && row.member_numbers.length) details.push(row.member_numbers[row.member_numbers.length - 1]);
+        button.textContent = row.first_name + ' ' + row.last_name + (details.length ? ' — ' + details.join(', ') : '');
+        button.addEventListener('click', function () {
+          if (firstName) firstName.value = row.first_name;
+          lastName.value = row.last_name;
+          target.value = String(row.id);
+          hide();
+        });
+        li.appendChild(button);
+        list.appendChild(li);
+      });
+      var note = document.createElement('li');
+      note.className = 'archive-suggestions-note';
+      note.textContent = 'From the archive — pick one to restore them, or keep typing to add someone new.';
+      list.appendChild(note);
+      list.hidden = false;
+    };
+
+    lastName.addEventListener('input', function () {
+      clearChoice();
+      clearTimeout(timer);
+      var term = lastName.value.trim();
+      if (term.length < 2) { hide(); return; }
+      timer = setTimeout(function () {
+        var mine = ++seq;
+        fetch(lastName.dataset.archiveLookup + '?last_name=' + encodeURIComponent(term), {
+          headers: {Accept: 'application/json'},
+          credentials: 'same-origin'
+        })
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (rows) { if (mine === seq) render(rows); })
+          .catch(function () { hide(); });
+      }, 250);
+    });
+    if (firstName) firstName.addEventListener('input', clearChoice);
+  });
+
   // Auto-submit forms when a select with data-autosubmit changes
   document.querySelectorAll('select[data-autosubmit]').forEach(function (select) {
     select.addEventListener('change', function () {
