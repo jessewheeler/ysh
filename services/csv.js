@@ -19,4 +19,11 @@ function toCsv(rows, columns, headers) {
   return [headerRow, ...dataRows].join('\n');
 }
 
-module.exports = { escapeCsvValue, toCsv };
+/** Sends rows as a CSV attachment. */
+function sendCsv(res, filename, rows, columns, headers) {
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(toCsv(rows, columns, headers));
+}
+
+module.exports = { escapeCsvValue, toCsv, sendCsv };

@@ -1,0 +1,65 @@
+extends ../layout
+include _mixins
+
+block content
+  section.section.auction-page(
+    data-auction-stream=`/auctions/${auction.id}/stream`
+    data-auction-id=auction.id
+    data-ends-at=auction.ends_at
+    data-starts-at=auction.starts_at
+    data-phase=phase
+    data-my-paddle=myPaddle || '')
+    .container
+      header.auction-header
+        h2= auction.title
+        p.auction-meta
+          +phaseBadge(phase)
+          if phase === 'upcoming'
+            |  Bidding opens #{formatDenver(auction.starts_at)} and closes #{formatDenver(auction.ends_at)}.
+          else if phase === 'closed'
+            |  Bidding closed #{formatDenver(auction.ends_at)}. Thank you to everyone who bid!
+          else
+            |  Bidding closes #{formatDenver(auction.ends_at)}
+            span.auction-countdown(data-countdown aria-live="off")
+        if auction.description
+          p.auction-description= auction.description
+        +shippingNotice(auction.shipping_notice)
+        p.auction-account
+          if bidder
+            | Signed in as #{bidder.name}
+            if myPaddle
+              |  · Bidder ##{myPaddle}
+            form.inline-form(method="POST" action="/auctions/logout")
+              input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+              button.btn-link(type="submit") Sign out
+          else if phase !== 'closed'
+            a(href=`/auctions/login?returnTo=${encodeURIComponent('/auctions/' + auction.id)}`) Sign in to bid
+
+      .auction-live-status(data-live-status hidden)
+
+      if items.length === 0
+        p.text-center.text-muted Items are coming soon.
+      else
+        ul.auction-grid
+          each item in items
+            li.auction-card(data-item-id=item.id)
+              a.auction-card-link(href=`/auctions/${auction.id}/items/${item.id}`)
+                if item.cover_url
+                  img.auction-card-img(src=item.cover_url alt=item.title loading="lazy")
+                else
+                  .auction-card-img.auction-card-img--empty No photo
+                .auction-card-body
+                  h3= item.title
+                  p.auction-card-price
+                    span.auction-label(data-field="current-label")= item.state.current_bid_cents != null ? 'Current bid' : 'Starting bid'
+                    strong(data-field="current")
+                      +money(item.state.current_bid_cents != null ? item.state.current_bid_cents : item.state.starting_bid_cents)
+                  p.auction-card-count
+                    span(data-field="bid-count")= item.state.bid_count
+                    span(data-field="bid-noun")= item.state.bid_count === 1 ? ' bid' : ' bids'
+                    if myPaddle && item.state.high_paddle === myPaddle
+                      span.auction-you-lead(data-field="mine")  · You're winning
+                    else
+                      span(data-field="mine")
+
+  script(src="/js/auction.js" defer)

@@ -1,0 +1,63 @@
+extends ../layout
+include _nav
+
+block page_title
+  | #{item ? item.title : 'New Item'}
+
+block content
+  +auctionNav(auction, 'items')
+
+  form(method="POST" enctype="multipart/form-data" action=(item ? `/admin/auctions/${auction.id}/items/${item.id}` : `/admin/auctions/${auction.id}/items`) data-spinner="Saving…")
+    .form-group
+      label(for="title") Item title
+      input#title(type="text" name="title" value=values.title || '' required)
+
+    .form-group
+      label(for="description") Description
+      textarea#description(name="description" rows="6" placeholder="Condition, size, who donated it… Leave a blank line between paragraphs.")= values.description || ''
+
+    .form-row
+      .form-group
+        label(for="starting_bid") Starting bid ($)
+        input#starting_bid(type="number" name="starting_bid" min="1" step="1" value=values.starting_bid || '' required readonly=(item && item.bid_count > 0))
+        if item && item.bid_count > 0
+          p.text-muted Locked — this item already has bids.
+      .form-group
+        label(for="sort_order") Display order
+        input#sort_order(type="number" name="sort_order" step="1" value=values.sort_order != null ? values.sort_order : '')
+
+    .form-group
+      label(for="photos") #{item ? 'Add photos' : 'Photos'}
+      input#photos(type="file" name="photos" multiple accept="image/jpeg,image/png,image/gif,image/webp")
+      p.text-muted Up to 10 at a time; JPG, PNG, GIF or WebP, 15 MB each. The first photo is the cover.
+
+    +formActions(item ? 'Save Item' : 'Add Item', `/admin/auctions/${auction.id}/items`)
+
+  if item
+    section#photos.admin-panel
+      h3 Photos
+      if photos.length === 0
+        p.text-muted No photos yet.
+      else
+        ul.auction-photo-admin
+          each photo, idx in photos
+            li(data-photo-id=photo.id)
+              img(src=photo.url alt=`Photo ${idx + 1}`)
+              if idx === 0
+                +badge('active', 'Cover')
+              .row-actions
+                if idx > 0
+                  form.inline-form(method="POST" action=`/admin/auctions/${auction.id}/items/${item.id}/photos/${photo.id}/move`)
+                    input(type="hidden" name="dir" value="up")
+                    button.btn-sm(type="submit" aria-label="Move earlier") ↑
+                if idx < photos.length - 1
+                  form.inline-form(method="POST" action=`/admin/auctions/${auction.id}/items/${item.id}/photos/${photo.id}/move`)
+                    input(type="hidden" name="dir" value="down")
+                    button.btn-sm(type="submit" aria-label="Move later") ↓
+                +confirmForm(`/admin/auctions/${auction.id}/items/${item.id}/photos/${photo.id}/delete`, 'Remove this photo?', 'Remove', true)
+
+    .danger-zone
+      if item.bid_count === 0
+        +confirmForm(`/admin/auctions/${auction.id}/items/${item.id}/delete`, 'Delete this item and its photos?', 'Delete Item', true)
+      else
+        p.text-muted This item has bids, so it can't be deleted. Withdraw it from the Items list instead.

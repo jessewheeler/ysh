@@ -1,0 +1,24 @@
+extends ../layout
+
+block content
+  section.section
+    .container.auction-narrow
+      h2 Sign in to bid
+      p.text-center.text-muted
+        | We'll email you a 6-digit code. Anyone can bid — you don't need to be a member.
+      form.contact-form(method="POST" action="/auctions/login")
+        input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+        .form-group
+          label(for="name") Your name
+          input#name(type="text" name="name" value=values.name || '' required autocomplete="name")
+        .form-group
+          label(for="email") Email
+          input#email(type="email" name="email" value=values.email || '' required autocomplete="email" inputmode="email")
+        .form-group
+          label(for="phone") Phone
+          input#phone(type="tel" name="phone" value=values.phone || '' required autocomplete="tel" inputmode="tel")
+          p.form-hint So we can reach you if you win.
+        if hcaptchaSiteKey
+          .form-group
+            .h-captcha(data-sitekey=hcaptchaSiteKey)
+        button.btn.btn-full(type="submit") Email me a code

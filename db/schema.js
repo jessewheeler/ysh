@@ -202,7 +202,10 @@ const SCHEMA = `
     'blast',
     'contact',
     'otp',
-    'renewal_reminder'
+    'renewal_reminder',
+    'auction_otp',
+    'auction_outbid',
+    'auction_winner'
   )),
     status TEXT NOT NULL DEFAULT 'sent',
     error TEXT,
@@ -414,6 +417,119 @@ const SCHEMA = `
     created_by               INTEGER REFERENCES members (id) ON DELETE SET NULL,
     updated_by               INTEGER REFERENCES members (id) ON DELETE SET NULL
   );
+
+  -- Silent auction (issue #119). One auction is a bidding window; items carry denormalized
+  -- current_bid_cents / high_bidder_id / bid_count that services/auctionBids.js updates with a
+  -- compare-and-swap. Business timestamps (starts_at, ends_at, placed_at, ...) are TEXT holding
+  -- a JS toISOString() value and are only compared against bound JS strings, never datetime('now').
+  CREATE TABLE IF NOT EXISTS auctions
+  (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    title               TEXT    NOT NULL,
+    description         TEXT,
+    status              TEXT    NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
+    starts_at           TEXT    NOT NULL,
+    ends_at             TEXT    NOT NULL,
+    min_increment_cents INTEGER NOT NULL DEFAULT 500 CHECK (min_increment_cents >= 100),
+    shipping_notice     TEXT    NOT NULL,
+    winners_notified_at TEXT,
+    created_at          TEXT DEFAULT (datetime('now')),
+    updated_at          TEXT DEFAULT (datetime('now')),
+    created_by          INTEGER REFERENCES members (id) ON DELETE SET NULL,
+    updated_by          INTEGER REFERENCES members (id) ON DELETE SET NULL
+  );
+
+  -- Anyone can bid once they prove they own an email (OTP, same scheme as admin login).
+  -- member_id links a bidder to a member with the same email; it is informational only.
+  CREATE TABLE IF NOT EXISTS auction_bidders
+  (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    email          TEXT    NOT NULL UNIQUE,
+    name           TEXT    NOT NULL,
+    phone          TEXT,
+    member_id      INTEGER REFERENCES members (id) ON DELETE SET NULL,
+    verified_at    TEXT,
+    blocked_at     TEXT,
+    otp_hash       TEXT,
+    otp_expires_at TEXT,
+    otp_attempts   INTEGER NOT NULL DEFAULT 0,
+    created_at     TEXT DEFAULT (datetime('now')),
+    updated_at     TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS auction_items
+  (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    auction_id         INTEGER NOT NULL REFERENCES auctions (id) ON DELETE CASCADE,
+    title              TEXT    NOT NULL,
+    description        TEXT,
+    starting_bid_cents INTEGER NOT NULL CHECK (starting_bid_cents >= 100),
+    current_bid_cents  INTEGER,
+    high_bidder_id     INTEGER REFERENCES auction_bidders (id) ON DELETE SET NULL,
+    bid_count          INTEGER NOT NULL DEFAULT 0,
+    withdrawn          INTEGER NOT NULL DEFAULT 0,
+    sort_order         INTEGER NOT NULL DEFAULT 0,
+    winner_emailed_at  TEXT,
+    created_at         TEXT DEFAULT (datetime('now')),
+    updated_at         TEXT DEFAULT (datetime('now')),
+    created_by         INTEGER REFERENCES members (id) ON DELETE SET NULL,
+    updated_by         INTEGER REFERENCES members (id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS auction_item_photos
+  (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id    INTEGER NOT NULL REFERENCES auction_items (id) ON DELETE CASCADE,
+    url        TEXT    NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    created_by INTEGER REFERENCES members (id) ON DELETE SET NULL
+  );
+
+  -- A bidder's anonymous "Bidder #N" for one auction, assigned at their first bid. Assigning it
+  -- also records that they acknowledged shipping and handling is their responsibility.
+  CREATE TABLE IF NOT EXISTS auction_paddles
+  (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    auction_id      INTEGER NOT NULL REFERENCES auctions (id) ON DELETE CASCADE,
+    bidder_id       INTEGER NOT NULL REFERENCES auction_bidders (id),
+    paddle_number   INTEGER NOT NULL,
+    shipping_ack_at TEXT    NOT NULL,
+    created_at      TEXT DEFAULT (datetime('now')),
+    UNIQUE (auction_id, bidder_id),
+    UNIQUE (auction_id, paddle_number)
+  );
+
+  -- Every bid placed. An admin removes a bad bid by stamping removed_at (with a reason) rather
+  -- than deleting it; the item's high bid is then recomputed from the remaining live bids.
+  CREATE TABLE IF NOT EXISTS auction_bids
+  (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id        INTEGER NOT NULL REFERENCES auction_items (id) ON DELETE CASCADE,
+    bidder_id      INTEGER NOT NULL REFERENCES auction_bidders (id),
+    amount_cents   INTEGER NOT NULL,
+    placed_at      TEXT    NOT NULL,
+    removed_at     TEXT,
+    removed_reason TEXT,
+    removed_by     INTEGER REFERENCES members (id) ON DELETE SET NULL
+  );
+
+  -- Outbid email throttle: when each bidder was last mailed about each item, and how often.
+  CREATE TABLE IF NOT EXISTS auction_outbid_notices
+  (
+    item_id      INTEGER NOT NULL REFERENCES auction_items (id) ON DELETE CASCADE,
+    bidder_id    INTEGER NOT NULL REFERENCES auction_bidders (id) ON DELETE CASCADE,
+    last_sent_at TEXT    NOT NULL,
+    sent_count   INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (item_id, bidder_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_auctions_window ON auctions(status, ends_at);
+  CREATE INDEX IF NOT EXISTS idx_auction_items_auction ON auction_items(auction_id, sort_order);
+  CREATE INDEX IF NOT EXISTS idx_auction_photos_item ON auction_item_photos(item_id, sort_order);
+  CREATE INDEX IF NOT EXISTS idx_auction_bids_item ON auction_bids(item_id, amount_cents);
+  CREATE INDEX IF NOT EXISTS idx_auction_bids_bidder ON auction_bids(bidder_id);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_auction_bids_item_amount_live ON auction_bids(item_id, amount_cents) WHERE removed_at IS NULL;
 
   CREATE INDEX IF NOT EXISTS idx_archived_members_name ON archived_members(last_name, first_name);
 

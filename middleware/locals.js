@@ -1,4 +1,5 @@
 const settingsRepo = require('../db/repos/settings');
+const auctionsService = require('../services/auctions');
 
 async function injectLocals(req, res, next) {
   try {
@@ -8,6 +9,13 @@ async function injectLocals(req, res, next) {
     res.locals.adminRole = (req.session && req.session.adminRole) || null;
     res.locals.adminEmail = (req.session && req.session.adminEmail) || null;
     res.locals.currentPath = req.path;
+
+    // Silent auction (issue #119): the nav links to a published auction that hasn't ended.
+    // Cached for 30s in services/auctions.js, so this is not a query per page.
+    res.locals.navAuction = await auctionsService.getNavAuction();
+    res.locals.bidder = req.session && req.session.bidderId
+      ? { id: req.session.bidderId, name: req.session.bidderName }
+      : null;
 
     // Flash messages
     res.locals.flash_success = req.session && req.session.flash_success;

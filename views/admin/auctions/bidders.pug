@@ -1,0 +1,44 @@
+extends ../layout
+include _nav
+
+block page_title
+  | #{auction.title} — Bidders
+
+block content
+  +auctionNav(auction, 'bidders')
+
+  .admin-panel
+    if bidders.length === 0
+      p.text-muted No one has bid yet. A bidder gets a number at their first bid.
+    else
+      table.admin-table#bidders-table
+        thead
+          tr
+            th Bidder #
+            th Name
+            th Contact
+            th Member
+            th Bids
+            th
+        tbody
+          each b in bidders
+            tr(data-bidder-id=b.id)
+              td ##{b.paddle_number}
+              td
+                = b.name
+                if b.blocked_at
+                  | 
+                  +badge('failed', 'Blocked')
+              td
+                a(href=`mailto:${b.email}`)= b.email
+                if b.phone
+                  br
+                  a(href=`tel:${b.phone}`)= b.phone
+              td
+                if b.member_id
+                  a(href=`/admin/members/${b.member_id}`)= b.member_number || 'Member'
+                else
+                  | —
+              td= b.bid_count
+              td
+                +confirmForm(`/admin/auctions/${auction.id}/bidders/${b.id}/block`, b.blocked_at ? `Let ${b.name} bid again?` : `Block ${b.name} from bidding? Their existing bids stay until you remove them.`, b.blocked_at ? 'Unblock' : 'Block', !b.blocked_at)

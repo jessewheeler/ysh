@@ -1,0 +1,17 @@
+extends ../layout
+
+block content
+  section.section
+    .container.auction-narrow
+      h2 Enter your code
+      p.text-center.text-muted We sent a 6-digit code to #{maskedEmail}. It expires in 10 minutes.
+      form.contact-form(method="POST" action="/auctions/login/verify")
+        input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+        .form-group
+          label(for="code") Code
+          input#code(type="text" name="code" required inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6")
+        button.btn.btn-full(type="submit") Sign in
+      form.auction-resend(method="POST" action="/auctions/login/resend")
+        input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+        button.btn-outline(type="submit") Send a new code
+      p.text-center: a(href="/auctions/login") Use a different email

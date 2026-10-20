@@ -167,8 +167,12 @@ app.use(captureCampaign);
 
 // Parse multipart form data for admin routes before CSRF check
 // (multer populates req.body for multipart forms; without this, CSRF token is inaccessible)
+// `image` is the single upload every existing admin form sends; `photos` is the auction item
+// form's multi-file input (issue #119). req.file is set from `image` afterwards so the existing
+// handlers keep reading req.file.
+const adminUpload = upload.fields([{ name: 'image', maxCount: 1 }, { name: 'photos', maxCount: 10 }]);
 app.use('/admin', (req, res, next) => {
-  upload.single('image')(req, res, (err) => {
+  adminUpload(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       req.session.flash_error = `Upload error: ${err.message}`;
       return res.redirect(req.get('Referer') || '/admin/dashboard');
@@ -177,6 +181,7 @@ app.use('/admin', (req, res, next) => {
       req.session.flash_error = err.message;
       return res.redirect(req.get('Referer') || '/admin/dashboard');
     }
+    req.file = req.files?.image?.[0];
     next();
   });
 });
@@ -196,6 +201,11 @@ app.use((req, res, next) => {
 
   const token = req.body?._csrf || req.headers['x-csrf-token'];
   if (!token || token !== req.session.csrfToken) {
+    // A fetch() caller (the auction bid form) wants a status it can act on, not a redirect it
+    // would follow to an HTML page.
+    if ((req.get('Accept') || '').includes('application/json')) {
+      return res.status(403).json({ ok: false, code: 'csrf', message: 'Your session expired. Please try again.' });
+    }
     req.session.flash_error = 'Invalid form submission. Please try again.';
     const referer = req.get('Referer') || '/';
     return res.redirect(referer);
@@ -219,10 +229,58 @@ app.use('/admin/login/verify', loginLimiter);
 app.use('/admin/login/resend', loginLimiter);
 app.use('/membership', formLimiter);
 app.use('/contact', formLimiter);
+// Bidder sign-in. Unlike admin login, a whole room of people at a watch party may sign in from
+// one venue Wi-Fi address, so the per-IP ceiling is generous and only form posts count (page
+// loads don't). Guessing is already capped at five wrong codes per code (services/auth.js);
+// the per-email limit stops anyone using the form to flood someone's inbox with codes.
+const auctionLoginIpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTest ? 1000 : 150,
+  skip: (req) => req.method !== 'POST',
+  message: 'Too many sign-in attempts from this network. Please try again in a few minutes.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const auctionCodeEmailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTest ? 1000 : 5,
+  skip: (req) => req.method !== 'POST',
+  keyGenerator: (req) => {
+    const email = String(req.body?.email || req.session?.bidderPending?.email || '').trim().toLowerCase();
+    return email ? `email:${email}` : rateLimit.ipKeyGenerator(req.ip);
+  },
+  handler: (req, res) => {
+    req.session.flash_error = 'Too many codes have been sent to that email. Please wait a few minutes and try again.';
+    res.redirect(req.path.endsWith('/resend') ? '/auctions/login/verify' : '/auctions/login');
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/auctions/login', auctionLoginIpLimiter);
+app.post(['/auctions/login', '/auctions/login/resend'], auctionCodeEmailLimiter);
+
+// Bids are keyed per signed-in bidder so a crowded room behind one IP isn't throttled as one.
+const bidLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: isTest ? 1000 : 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.session?.bidderId ? `bidder:${req.session.bidderId}` : rateLimit.ipKeyGenerator(req.ip)),
+  handler: (req, res) => {
+    const message = 'You are bidding too quickly. Please wait a moment.';
+    if ((req.get('Accept') || '').includes('application/json')) {
+      return res.status(429).json({ ok: false, code: 'rate_limited', message });
+    }
+    req.session.flash_error = message;
+    res.redirect(req.get('Referer') || '/auctions');
+  },
+});
+app.post('/auctions/:id/items/:itemId/bids', bidLimiter);
 
 // Routes
 app.use('/', require('./routes/index'));
 app.use('/stripe', require('./routes/stripe'));
+app.use('/auctions', require('./routes/auctions'));
 
 // Admin routes (multer already applied above, before CSRF)
 app.use('/admin', require('./routes/admin'));

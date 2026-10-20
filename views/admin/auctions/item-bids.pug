@@ -1,0 +1,61 @@
+extends ../layout
+include _nav
+
+block page_title
+  | #{item.title} — Bids
+
+block content
+  +auctionNav(auction, 'items')
+
+  p
+    | Starting bid #{formatMoney(item.starting_bid_cents)} ·
+    if item.current_bid_cents != null
+      |  current bid #{formatMoney(item.current_bid_cents)} ·
+    |  #{item.bid_count} live #{item.bid_count === 1 ? 'bid' : 'bids'}
+    |  · 
+    a(href=`/admin/auctions/${auction.id}/items/${item.id}`) Edit item
+
+  if phase === 'closed'
+    p.flash.flash-error Bidding has closed. Removing a bid now changes the winner; if winner emails have gone out, contact the bidders yourself.
+
+  .admin-panel
+    if bids.length === 0
+      p.text-muted No bids yet.
+    else
+      table.admin-table#item-bids
+        thead
+          tr
+            th Amount
+            th Bidder
+            th Placed
+            th Status
+            th
+        tbody
+          each b in bids
+            tr(data-bid-id=b.id class=b.removed_at ? 'auction-bid-removed' : null)
+              td= formatMoney(b.amount_cents)
+              td
+                | ##{b.paddle_number} #{b.bidder_name}
+                br
+                small.text-muted= b.bidder_email
+              td= formatDenver(b.placed_at)
+              td
+                if b.removed_at
+                  +badge('voided', 'Removed')
+                  br
+                  small.text-muted #{b.removed_reason} — #{b.removed_by_email || 'admin'}, #{formatDenver(b.removed_at)}
+                else
+                  +badge('active', 'Live')
+              td
+                if !b.removed_at
+                  button.btn-danger.btn-tiny(type="button" data-dialog-open=`#remove-bid-${b.id}`) Remove
+                  dialog.modal(id=`remove-bid-${b.id}` aria-labelledby=`remove-bid-${b.id}-title`)
+                    form.remove-bid(method="POST" action=`/admin/auctions/${auction.id}/bids/${b.id}/remove` data-spinner="Removing…")
+                      h3.modal-title(id=`remove-bid-${b.id}-title`) Remove bid
+                      p.text-muted #{formatMoney(b.amount_cents)} by ##{b.paddle_number} #{b.bidder_name}. The bid stays in this history as removed, and the item's high bid falls back to the next highest live bid. No one is emailed.
+                      .form-group
+                        label(for=`remove-reason-${b.id}`) Reason
+                        input.form-control(id=`remove-reason-${b.id}` type="text" name="reason" required placeholder="e.g. Bidder asked to retract a typo")
+                      .form-actions
+                        button.btn-danger(type="submit") Remove bid
+                        button.btn-outline(type="button" data-dialog-close) Cancel

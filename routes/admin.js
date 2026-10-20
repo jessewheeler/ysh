@@ -36,19 +36,9 @@ const nflSchedule = require('../services/nflSchedule');
 const logger = require('../services/logger');
 const isDevOrTest = ['development', 'test', 'dev'].includes(process.env.NODE_ENV);
 
-async function handleUpload(file, folder) {
-  if (storage.isConfigured()) {
-    return storage.uploadFile(file.buffer, file.originalname, folder);
-  }
-  const localName = `${Date.now()}-${Math.round(Math.random() * 1e6)}${path.extname(file.originalname)}`;
-  // server.js mkdirs this at boot, but the write is what needs it: data/ is gitignored,
-  // so anything that reaches here without booting the server (Jest, a CLI script) hit
-  // ENOENT and reported it as an upload failure.
-  const dir = path.join(__dirname, '..', 'data', 'uploads');
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, localName), file.buffer);
-  return `/uploads/${localName}`;
-}
+// Kept as a local name because every upload route calls it; the logic lives in services/uploads.js
+// so the auction routes can share it.
+const handleUpload = (file, folder) => require('../services/uploads').saveUpload(file, folder);
 
 // --- Login / Logout ---
 router.get('/login', (req, res) => {
@@ -156,6 +146,10 @@ router.post('/logout', (req, res) => {
 // --- All routes below require admin ---
 router.use(requireAdmin);
 
+// Silent auction admin (issue #119). Mounted here so it inherits requireAdmin; the /admin
+// multer and CSRF middleware in server.js already ran.
+router.use('/auctions', require('./adminAuctions'));
+
 // --- Dashboard ---
 router.get('/dashboard', async (req, res, next) => {
   try {
@@ -166,6 +160,7 @@ router.get('/dashboard', async (req, res, next) => {
       stats,
       recentMembers,
       recentPayments,
+      auctionSummary: await require('../services/auctionDashboard').getSummary(),
     });
   } catch (err) {
     next(err);
@@ -1367,10 +1362,7 @@ router.get('/campaigns/:id/qr.svg', async (req, res, next) => {
 
 // --- Events & game-day check-in (issue #114) ---
 function csvDownload(res, filename, rows, columns, headers) {
-  const { toCsv } = require('../services/csv');
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  res.send(toCsv(rows, columns, headers));
+  require('../services/csv').sendCsv(res, filename, rows, columns, headers);
 }
 
 function householdName(row) {

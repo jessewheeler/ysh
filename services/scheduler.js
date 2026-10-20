@@ -2,11 +2,14 @@ const cron = require('node-cron');
 const logger = require('./logger');
 const membershipExpiry = require('./membershipExpiry');
 const nflSchedule = require('./nflSchedule');
+const auctionNotifier = require('./auctionNotifier');
 const { runWithActor } = require('../db/audit-context');
 
 const DEFAULT_EXPIRY_CRON = '0 3 * * *';
 // Mondays at 4 AM: after the weekend's games, when the league announces flex changes.
 const DEFAULT_SCHEDULE_SYNC_CRON = '0 4 * * 1';
+// Every minute: winner emails go out within a minute of an auction closing.
+const DEFAULT_AUCTION_CLOSE_CRON = '* * * * *';
 const TIMEZONE = 'America/Denver';
 
 /**
@@ -58,7 +61,16 @@ function start() {
     }));
   }
 
+  if (process.env.AUCTION_CLOSE_JOB_ENABLED === 'true') {
+    tasks.push(scheduleJob({
+      name: 'Auction close job',
+      schedule: process.env.AUCTION_CLOSE_JOB_CRON || DEFAULT_AUCTION_CLOSE_CRON,
+      actorEmail: 'cron:auction-close',
+      run: () => auctionNotifier.closeDueAuctions(new Date()),
+    }));
+  }
+
   return tasks.filter(Boolean);
 }
 
-module.exports = { start, DEFAULT_EXPIRY_CRON, DEFAULT_SCHEDULE_SYNC_CRON };
+module.exports = { start, DEFAULT_EXPIRY_CRON, DEFAULT_SCHEDULE_SYNC_CRON, DEFAULT_AUCTION_CLOSE_CRON };
