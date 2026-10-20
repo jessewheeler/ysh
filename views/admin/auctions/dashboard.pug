@@ -1,0 +1,128 @@
+extends ../layout
+include _nav
+
+block page_title
+  | #{auction.title}
+
+block content
+  +auctionNav(auction, 'dashboard')
+
+  section.auction-dashboard(
+    data-admin-auction-stream=`/admin/auctions/${auction.id}/stream`
+    data-ends-at=auction.ends_at
+    data-starts-at=auction.starts_at
+    data-phase=phase)
+    p.auction-dash-status
+      +phaseBadge(phase)
+      if phase === 'upcoming'
+        |  Opens #{formatDenver(auction.starts_at)} · closes #{formatDenver(auction.ends_at)}
+      else if phase === 'live'
+        |  Closes #{formatDenver(auction.ends_at)}
+        span.auction-countdown(data-countdown)
+      else if phase === 'closed'
+        |  Closed #{formatDenver(auction.ends_at)}
+      else
+        |  Not public yet — publish it from Settings.
+      span.live-indicator(data-live-status hidden)
+      a.btn-sm.auction-refresh(href=`/admin/auctions/${auction.id}/dashboard`) Refresh
+
+    .stats-grid
+      a.stat-card(href=`/admin/auctions/${auction.id}/winners`)
+        .stat-number(data-stat="committed")= formatMoneyShort(totals.committedCents)
+        .stat-label Committed (high bids)
+      a.stat-card(href=`/admin/auctions/${auction.id}/items`)
+        .stat-number(data-stat="bids")= totals.bids
+        .stat-label Bids
+      a.stat-card(href=`/admin/auctions/${auction.id}/bidders`)
+        .stat-number(data-stat="bidders")= totals.bidders
+        .stat-label Bidders
+      a.stat-card(href=`/admin/auctions/${auction.id}/items`)
+        .stat-number
+          span(data-stat="items-with-bids")= totals.itemsWithBids
+          | /#{totals.items}
+        .stat-label Items with bids
+      .stat-card
+        .stat-number(data-stat="avg-bids")= totals.avgBidsPerItem
+        .stat-label Avg bids per item
+      .stat-card
+        .stat-number(data-stat="outbid-emails")= totals.outbidEmails
+        .stat-label Outbid emails sent
+
+    .admin-grid
+      .admin-panel
+        h3 Recent bids
+        table.admin-table#recent-bids
+          thead
+            tr
+              th Time
+              th Item
+              th Amount
+              th Bidder
+          tbody(data-recent-bids)
+            each b in recentBids
+              tr
+                td.nowrap= formatDenverShort(b.placed_at)
+                td: a(href=`/admin/auctions/${auction.id}/items/${b.item_id}/bids` title="Manage bids")= b.item_title
+                td.nowrap= formatMoney(b.amount_cents)
+                td ##{b.paddle_number} #{b.bidder_name}
+        if !recentBids.length
+          p.text-muted(data-recent-bids-empty) No bids yet.
+
+      .admin-panel
+        h3 Top bidders
+        table.admin-table#top-bidders(hidden=!topBidders.length)
+          thead
+            tr
+              th Bidder
+              th Winning
+              th Committed
+          tbody(data-top-bidders)
+            each t in topBidders
+              tr
+                td ##{t.paddle} #{t.name}
+                td= t.items
+                td= formatMoney(t.cents)
+        if !topBidders.length
+          p.text-muted(data-top-bidders-empty) Nobody is winning anything yet.
+
+    .admin-panel
+      h3
+        | Items
+        span.auction-sort
+          | Sort by: 
+          a(href=`?sort=amount` class=sort === 'amount' ? 'active' : null) current bid
+          |  · 
+          a(href=`?sort=bids` class=sort === 'bids' ? 'active' : null) bid count
+      table.admin-table#item-leaderboard
+        thead
+          tr
+            th Item
+            th Starting
+            th Current
+            th Over start
+            th Bids
+            th High bidder
+        tbody
+          each i in leaderboard
+            tr(data-item-id=i.id class=i.current_bid_cents == null ? 'auction-no-bids' : null)
+              td: a(href=`/admin/auctions/${auction.id}/items/${i.id}/bids`)= i.title
+              td= formatMoney(i.starting_bid_cents)
+              td(data-field="current")= i.current_bid_cents != null ? formatMoney(i.current_bid_cents) : '—'
+              td(data-field="over")= i.over_starting_pct != null ? `${i.over_starting_pct}%` : '—'
+              td(data-field="bid-count")= i.bid_count
+              td(data-field="high-bidder")
+                if i.high_bidder_name
+                  | ##{i.high_paddle} #{i.high_bidder_name}
+                else
+                  +badge('attention', 'No bids')
+
+    if phase === 'closed'
+      .admin-panel
+        h3 Winner emails
+        p
+          | #{totals.winnerEmailsSent} of #{totals.itemsWithBids} sold items have had their winner emailed.
+          if auction.winners_notified_at
+            |  Winner notification started #{formatDenver(auction.winners_notified_at)}.
+        p: a.btn-outline(href=`/admin/auctions/${auction.id}/winners`) View winners
+
+  script(src="/js/admin-auction.js" defer)

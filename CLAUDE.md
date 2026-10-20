@@ -44,13 +44,19 @@ db/repos/                    # Data-access layer (one file per table)
   events.js                  #   game-day events (ESPN-synced or manual)
   checkIns.js                #   per-person event check-ins + raffle tickets
   archivedMembers.js         #   family members set aside by a downgrade (no email of their own)
+  auctions.js auctionItems.js auctionBidders.js auctionBids.js  # silent auction (incl. photos, paddles, outbid throttle)
   announcements.js bios.js gallery.js emailLog.js settings.js
-routes/                      # Express routers (index, admin, stripe)
+routes/                      # Express routers (index, admin, stripe, auctions, adminAuctions)
 services/                    # Business logic
   members.js stripe.js email.js card.js  # core domain services
   activation.js              #   THE place a member is activated for a membership period
   admin.js                   #   admin-specific operations
   attention.js               #   thresholds + current period for the needs-attention filter
+  auctions.js                #   silent auction rules: phase, form parsing, minimum next bid, nav cache
+  auctionBids.js             #   placing (compare-and-swap, hard close) and removing bids
+  auctionHub.js              #   in-process SSE fan-out (single instance only — see docs/auction.md)
+  auctionNotifier.js         #   live broadcasts, throttled outbid email, close job + winner emails
+  auctionDashboard.js        #   admin auction dashboard totals
   auth.js                    #   password hashing / OTP
   campaigns.js               #   UTM link building, QR (PNG/SVG), campaign validation
   checkIn.js                 #   household check-in: enrollment per person, ticket rules
@@ -65,9 +71,11 @@ services/                    # Business logic
   nflSchedule.js             #   Seahawks schedule sync from ESPN's public API → events
   payments.js                #   payment processing / history
   renewal.js                 #   renewal token generation + bulk reminders
-  scheduler.js               #   node-cron registration, armed by EXPIRY_JOB_ENABLED / SCHEDULE_SYNC_ENABLED
+  scheduler.js               #   node-cron registration, armed by EXPIRY_JOB_ENABLED / SCHEDULE_SYNC_ENABLED / AUCTION_CLOSE_JOB_ENABLED
   sender.js                  #   Sender.net subscriber list sync (one-way, YSH → Sender)
   storage.js                 #   file upload/delete (S3-compatible)
+  timezone.js                #   America/Denver datetime-local <-> UTC ISO, formatDenver
+  uploads.js                 #   saveUpload: B2 when configured, else data/uploads
 middleware/                  # Express middleware
   auth.js                    #   requireAdmin, requireSuperAdmin, captureActor (ALS)
   campaign.js                #   captureCampaign — ?utm_campaign= → first-touch session + visit
@@ -157,7 +165,7 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
 
 - SQLite via better-sqlite3, WAL mode, foreign keys ON
 - Schema defined in `db/schema.js`, applied by `db/migrate.js`
-- Tables: members, payments, announcements, gallery_images, bios, site_settings, emails_log, membership_cards, admins, audit_log, membership_periods, membership_years, campaigns, campaign_visits, contact_submissions, events, check_ins, archived_members
+- Tables: members, payments, announcements, gallery_images, bios, site_settings, emails_log, membership_cards, admins, audit_log, membership_periods, membership_years, campaigns, campaign_visits, contact_submissions, events, check_ins, archived_members, auctions, auction_items, auction_item_photos, auction_bidders, auction_paddles, auction_bids, auction_outbid_notices
 - `audit_log` captures table_name, record_id, action (INSERT/UPDATE/DELETE), actor_id, actor_email, old_values (JSON), new_values (JSON), changed_at
 - `created_by`/`updated_by` FK columns on all mutable tables; actor propagated via AsyncLocalStorage in `db/audit-context.js`
 - Sensitive fields (`otp_hash`, `renewal_token`) are stripped from audit JSON snapshots
@@ -217,6 +225,14 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
   Only the downgrade archives. The single Remove button and the public renew form still delete
 - `generateMemberNumber` takes the larger of the year's member count and the highest issued suffix.
   Count alone reissues a held number as soon as anyone is deleted
+- Silent auction (issue #119) is documented in `docs/auction.md`. Bids go only through
+  `services/auctionBids.js#placeBid`: a compare-and-swap on `auction_items` that also checks the
+  auction is open, so the hard close at `ends_at` holds for in-flight requests. Auction timestamps
+  are TEXT UTC ISO strings entered as Montana time via `services/timezone.js`. Public pages and SSE
+  payloads carry paddle numbers ("Bidder #N"), never bidder names or emails. Live updates fan out
+  in process memory (`services/auctionHub.js`), which assumes one web instance. The global `/admin`
+  multer is `upload.fields([image, photos])`; it sets `req.file` from `image` so single-upload
+  routes are unchanged
 - Campaign tracking is documented in `docs/campaign-tracking.md`
 - The Needs attention member filter is documented in `docs/needs-attention-signals.md` — read it
   before changing a signal predicate or threshold, and note that neither Jest nor Robot exercises

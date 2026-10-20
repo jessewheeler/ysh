@@ -51,6 +51,10 @@ class ServerManager:
         # property. A syntactically valid ID keeps the tag rendering so the analytics
         # suite still exercises the real code path.
         env['GA_MEASUREMENT_ID'] = 'G-ROBOTTEST0'
+        # Keep uploads (auction photos, gallery images) on local disk. Without this a
+        # developer's .env would send every Robot upload to the real Backblaze bucket.
+        for var in ('B2_ENDPOINT', 'B2_REGION', 'B2_BUCKET', 'B2_KEY_ID', 'B2_APP_KEY', 'B2_PUBLIC_URL'):
+            env[var] = ''
 
         self.process = subprocess.Popen(
             ['node', 'server.js'],

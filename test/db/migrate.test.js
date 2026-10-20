@@ -341,3 +341,58 @@ describe("payments status CHECK widened to 'voided' (issue #108)", () => {
     expect(after).toContain("'voided'");
   });
 });
+
+describe('emails_log CHECK widened to the auction email types (issue #119)', () => {
+  /** Puts back the emails_log a database from before #119 had: no auction types, created_by added later. */
+  async function seedOldEmailsLog() {
+    await migrate();
+    db.prepare("INSERT INTO members (first_name, last_name, email) VALUES ('A','B','admin@y.com')").run();
+    const adminId = db.prepare('SELECT id FROM members LIMIT 1').get().id;
+    db.exec(`
+      DROP TABLE emails_log;
+      CREATE TABLE emails_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        to_email TEXT NOT NULL,
+        to_name TEXT,
+        subject TEXT,
+        body_html TEXT,
+        email_type TEXT CHECK (email_type IN ('welcome', 'payment_confirmation', 'card_delivery', 'blast', 'contact', 'otp', 'renewal_reminder')),
+        status TEXT NOT NULL DEFAULT 'sent',
+        error TEXT,
+        member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      ALTER TABLE emails_log ADD COLUMN created_by INTEGER REFERENCES members(id) ON DELETE SET NULL;
+    `);
+    db.prepare("INSERT INTO emails_log (id, to_email, email_type, created_by) VALUES (42, 'a@b.com', 'blast', ?)").run(adminId);
+    return { adminId };
+  }
+
+  test('rebuilds the table keeping rows and created_by, and accepts the auction types', async () => {
+    const { adminId } = await seedOldEmailsLog();
+    expect(() => db.prepare("INSERT INTO emails_log (to_email, email_type) VALUES ('a@b.com', 'auction_outbid')").run()).toThrow();
+
+    await migrate();
+
+    expect(db.prepare('SELECT * FROM emails_log WHERE id = 42').get()).toMatchObject({ email_type: 'blast', created_by: adminId });
+    for (const type of ['auction_otp', 'auction_outbid', 'auction_winner']) {
+      expect(() => db.prepare("INSERT INTO emails_log (to_email, email_type) VALUES ('a@b.com', ?)").run(type)).not.toThrow();
+    }
+    const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='emails_log'").all().map(r => r.name);
+    expect(indexes).toEqual(expect.arrayContaining(['idx_emails_log_member_type', 'idx_emails_log_status']));
+  });
+
+  test('a second run leaves the rebuilt table alone', async () => {
+    await seedOldEmailsLog();
+    await migrate();
+    await migrate();
+    expect(db.prepare('SELECT COUNT(*) AS n FROM emails_log').get().n).toBe(1);
+  });
+
+  test('creates the auction tables', async () => {
+    await migrate();
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'auction%'").all().map(r => r.name);
+    expect(tables.sort()).toEqual(['auction_bidders', 'auction_bids', 'auction_item_photos', 'auction_items',
+      'auction_outbid_notices', 'auction_paddles', 'auctions']);
+  });
+});

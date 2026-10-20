@@ -1,0 +1,20 @@
+//- Tabs shared by every page about one auction.
+mixin auctionNav(auction, current)
+  nav.auction-subnav(aria-label="Auction sections")
+    a(href=`/admin/auctions/${auction.id}/dashboard` class=current === 'dashboard' ? 'active' : null) Dashboard
+    a(href=`/admin/auctions/${auction.id}/items` class=current === 'items' ? 'active' : null) Items
+    a(href=`/admin/auctions/${auction.id}/bidders` class=current === 'bidders' ? 'active' : null) Bidders
+    a(href=`/admin/auctions/${auction.id}/winners` class=current === 'winners' ? 'active' : null) Winners
+    a(href=`/admin/auctions/${auction.id}/edit` class=current === 'edit' ? 'active' : null) Settings
+    a(href=`/auctions/${auction.id}` target="_blank" rel="noopener") Public page ↗
+
+mixin phaseBadge(phase)
+  case phase
+    when 'live'
+      +badge('active', 'Live')
+    when 'upcoming'
+      +badge('pending', 'Upcoming')
+    when 'closed'
+      +badge('cancelled', 'Closed')
+    default
+      +badge('expired', 'Draft')

@@ -346,6 +346,103 @@ async function sendOtpEmail({ to, toName, otp }) {
   });
 }
 
+// Auction bidders sign in with the same kind of one-time code as admins, but the admin email's
+// subject says "Admin", so they get their own.
+async function sendBidderOtpEmail({ to, toName, otp }) {
+  const html = `
+    <h2 style="color:#002a5c;">Your Auction Sign-In Code</h2>
+    <p>Hi ${escapeHtml(toName)},</p>
+    <p>Use this code to sign in and bid in the Yellowstone Sea Hawkers silent auction:</p>
+    <p style="font-size:32px; font-weight:bold; letter-spacing:8px; color:#002a5c; text-align:center; margin:20px 0;">${escapeHtml(otp)}</p>
+    <p>This code expires in 10 minutes. If you didn't request this, you can safely ignore this email.</p>
+  `;
+  await sendEmail({
+    to,
+    toName,
+    subject: 'Your YSH Auction Sign-In Code',
+    html,
+    email_type: 'auction_otp',
+  });
+}
+
+function auctionMoney(cents) {
+  return `$${(Number(cents) / 100).toLocaleString('en-US')}`;
+}
+
+// Every auction email repeats the shipping and handling notice (issue #119).
+function shippingNoticeHtml(text) {
+  return `<p style="margin:20px 0; padding:12px 16px; border-left:4px solid #002a5c; background:#eef3fa; font-size:14px;">
+      <strong>Shipping &amp; handling:</strong> ${escapeHtml(text).replace(/\n/g, '<br>')}</p>`;
+}
+
+function auctionButton(href, label) {
+  return `<p style="text-align:center; margin:30px 0;">
+      <a href="${escapeHtml(href)}" style="background:#002a5c; color:#fff; padding:14px 28px; text-decoration:none; border-radius:4px; font-size:16px; font-weight:bold; display:inline-block;">${escapeHtml(label)}</a>
+    </p>`;
+}
+
+/**
+ * Tells a bidder someone has taken the lead on an item they were winning. Throttled by
+ * services/auctionNotifier.js so a bidding war doesn't flood their inbox.
+ */
+async function sendOutbidEmail({ bidder, auction, item, currentBidCents, minNextCents, itemUrl, closesAt }) {
+  const html = `
+    <h2 style="color:#002a5c;">You've been outbid</h2>
+    <p>Hi ${escapeHtml(bidder.name)},</p>
+    <p>Someone has placed a higher bid on <strong>${escapeHtml(item.title)}</strong> in the ${escapeHtml(auction.title)}.</p>
+    <table style="margin:20px 0; font-size:14px;">
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Current bid:</td><td>${auctionMoney(currentBidCents)}</td></tr>
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Minimum to retake the lead:</td><td>${auctionMoney(minNextCents)}</td></tr>
+      <tr><td style="padding:5px 15px 5px 0; font-weight:bold;">Bidding closes:</td><td>${escapeHtml(closesAt)}</td></tr>
+    </table>
+    ${auctionButton(itemUrl, 'Bid again')}
+    ${shippingNoticeHtml(auction.shipping_notice)}
+    <p style="font-size:13px; color:#666;">You'll get at most one of these emails per item every few minutes, however busy the bidding gets.</p>
+  `;
+  await sendEmail({
+    to: bidder.email,
+    toName: bidder.name,
+    subject: `You've been outbid on "${item.title}"`,
+    html,
+    email_type: 'auction_outbid',
+    member_id: bidder.member_id || null,
+  });
+}
+
+/** One email per winning bidder listing everything they won. */
+async function sendAuctionWinnerEmail({ bidder, auction, items }) {
+  const rows = items.map(i => `
+      <tr>
+        <td style="padding:6px 15px 6px 0; border-bottom:1px solid #eee;">${escapeHtml(i.title)}</td>
+        <td style="padding:6px 0; border-bottom:1px solid #eee; text-align:right; font-weight:bold;">${auctionMoney(i.current_bid_cents)}</td>
+      </tr>`).join('');
+  const total = items.reduce((sum, i) => sum + Number(i.current_bid_cents), 0);
+  const html = `
+    <h2 style="color:#002a5c;">You won!</h2>
+    <p>Hi ${escapeHtml(bidder.name)},</p>
+    <p>Congratulations — bidding in the ${escapeHtml(auction.title)} has closed, and you had the winning bid on:</p>
+    <table style="margin:20px 0; font-size:14px; width:100%; border-collapse:collapse;">
+      ${rows}
+      <tr>
+        <td style="padding:8px 15px 0 0; font-weight:bold;">Total</td>
+        <td style="padding:8px 0 0; text-align:right; font-weight:bold;">${auctionMoney(total)}</td>
+      </tr>
+    </table>
+    <p>A club officer will contact you to arrange payment and either local pickup or shipping. Payment isn't taken online.</p>
+    ${shippingNoticeHtml(auction.shipping_notice)}
+    <p>Thank you for supporting the Yellowstone Sea Hawkers!</p>
+    <p style="color:#69be28; font-weight:bold; font-size:18px;">Go Hawks!</p>
+  `;
+  await sendEmail({
+    to: bidder.email,
+    toName: bidder.name,
+    subject: `You won in the ${auction.title}`,
+    html,
+    email_type: 'auction_winner',
+    member_id: bidder.member_id || null,
+  });
+}
+
 async function sendRenewalReminderEmail(member, renewalLink) {
   const expiryDisplay = member.expiry_date
       ? new Date(member.expiry_date).toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'})
@@ -396,6 +493,9 @@ async function sendContactEmail({ name, email, message }) {
 }
 
 module.exports = {
+  sendBidderOtpEmail,
+  sendOutbidEmail,
+  sendAuctionWinnerEmail,
   sendWelcomeEmail,
   sendPaymentConfirmation,
   sendCardEmail,

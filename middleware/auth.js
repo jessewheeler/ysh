@@ -31,4 +31,31 @@ function requireSuperAdmin(req, res, next) {
   res.redirect('/admin/login');
 }
 
-module.exports = {requireAdmin, requireSuperAdmin, captureActor};
+/**
+ * Auction bidders sign in with an emailed code (routes/auctions.js). A fetch() bid gets a 401 it
+ * can act on; a plain form post is sent to sign in and brought back afterwards.
+ */
+function requireBidder(req, res, next) {
+  if (req.session && req.session.bidderId) return next();
+  const back = req.get('Referer');
+  let returnTo = req.originalUrl;
+  if (req.method !== 'GET' && back) {
+    try {
+      returnTo = new URL(back).pathname;
+    } catch (_e) {
+      returnTo = '/auctions';
+    }
+  }
+  if (!returnTo.startsWith('/auctions/')) returnTo = '/auctions';
+  if ((req.get('Accept') || '').includes('application/json')) {
+    return res.status(401).json({
+      ok: false, code: 'login_required', message: 'Please sign in to bid.',
+      loginUrl: `/auctions/login?returnTo=${encodeURIComponent(returnTo)}`,
+    });
+  }
+  req.session.bidderReturnTo = returnTo;
+  req.session.flash_error = 'Please sign in to bid.';
+  res.redirect('/auctions/login');
+}
+
+module.exports = {requireAdmin, requireSuperAdmin, requireBidder, captureActor};

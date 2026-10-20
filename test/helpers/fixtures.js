@@ -246,6 +246,60 @@ function insertEvent(db, overrides = {}) {
     return {...e, id: info.lastInsertRowid};
 }
 
+/** A published auction that opened an hour ago and closes in two hours, unless overridden. */
+function insertAuction(db, overrides = {}) {
+    const now = Date.now();
+    const a = {
+        title: 'Holiday Silent Auction',
+        description: null,
+        status: 'published',
+        starts_at: new Date(now - 60 * 60 * 1000).toISOString(),
+        ends_at: new Date(now + 2 * 60 * 60 * 1000).toISOString(),
+        min_increment_cents: 500,
+        shipping_notice: 'Shipping and handling costs are the winning bidder\'s responsibility.',
+        ...overrides,
+    };
+    const info = db.prepare(
+        `INSERT INTO auctions (title, description, status, starts_at, ends_at, min_increment_cents, shipping_notice)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(a.title, a.description, a.status, a.starts_at, a.ends_at, a.min_increment_cents, a.shipping_notice);
+    return {...a, id: info.lastInsertRowid};
+}
+
+function insertAuctionItem(db, overrides = {}) {
+    const i = {
+        auction_id: null,
+        title: 'Signed Seahawks Helmet',
+        description: 'Signed by the 2013 Legion of Boom.',
+        starting_bid_cents: 2000,
+        sort_order: 0,
+        withdrawn: 0,
+        ...overrides,
+    };
+    const info = db.prepare(
+        `INSERT INTO auction_items (auction_id, title, description, starting_bid_cents, sort_order, withdrawn)
+         VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(i.auction_id, i.title, i.description, i.starting_bid_cents, i.sort_order, i.withdrawn);
+    return {...i, id: info.lastInsertRowid};
+}
+
+/** A bidder who has already proven their email. */
+function insertBidder(db, overrides = {}) {
+    const b = {
+        email: `bidder${Math.floor(Math.random() * 1e9)}@example.com`,
+        name: 'Barb Bidder',
+        phone: '406-555-0100',
+        verified_at: new Date().toISOString(),
+        blocked_at: null,
+        member_id: null,
+        ...overrides,
+    };
+    const info = db.prepare(
+        `INSERT INTO auction_bidders (email, name, phone, verified_at, blocked_at, member_id) VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(b.email, b.name, b.phone, b.verified_at, b.blocked_at, b.member_id);
+    return {...b, id: info.lastInsertRowid};
+}
+
 module.exports = {
     buildMember,
     insertMember,
@@ -263,5 +317,8 @@ module.exports = {
     insertFamilyMembership,
     insertPeriod,
     enrollMember,
-    insertEvent
+    insertEvent,
+    insertAuction,
+    insertAuctionItem,
+    insertBidder,
 };

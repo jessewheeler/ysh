@@ -1,0 +1,52 @@
+extends ../layout
+include _nav
+
+block page_title
+  | #{auction ? 'Auction Settings' : 'New Auction'}
+
+block content
+  if auction
+    +auctionNav(auction, 'edit')
+
+  form(method="POST" action=(auction ? `/admin/auctions/${auction.id}` : '/admin/auctions'))
+    .form-group
+      label(for="title") Title
+      input#title(type="text" name="title" value=values.title || '' required placeholder="e.g. 2026 Holiday Silent Auction")
+
+    .form-group
+      label(for="description") Description
+      textarea#description(name="description" rows="3" placeholder="Shown at the top of the auction page")= values.description || ''
+
+    .form-row
+      .form-group
+        label(for="starts_at") Bidding opens (Montana time)
+        input#starts_at(type="datetime-local" name="starts_at" value=values.starts_at || '' required)
+      .form-group
+        label(for="ends_at") Bidding closes (Montana time)
+        input#ends_at(type="datetime-local" name="ends_at" value=values.ends_at || '' required)
+    p.text-muted
+      | Every item closes at the same moment. A bid that arrives at or after the closing time is refused.
+
+    .form-group
+      label(for="min_increment") Minimum bid increment ($)
+      input#min_increment(type="number" name="min_increment" min="1" step="1" value=values.min_increment || '')
+      p.text-muted Each new bid must beat the current one by at least this much. Bids are whole dollars.
+
+    .form-group
+      label(for="shipping_notice") Shipping &amp; handling notice
+      textarea#shipping_notice(name="shipping_notice" rows="3" required)= values.shipping_notice || ''
+      p.text-muted
+        | Shown on the auction page, every item page, each bid confirmation, and in outbid and winner
+        | emails. Bidders tick a box acknowledging it before their first bid.
+
+    .form-group
+      label(for="status") Visibility
+      select#status(name="status")
+        option(value="draft" selected=values.status !== 'published') Draft — only admins can preview it
+        option(value="published" selected=values.status === 'published') Published — public, in the site navigation
+
+    +formActions(auction ? 'Save Auction' : 'Create Auction', auction ? `/admin/auctions/${auction.id}/dashboard` : '/admin/auctions')
+
+  if auction && auction.status === 'draft'
+    .danger-zone
+      +confirmForm(`/admin/auctions/${auction.id}/delete`, 'Delete this auction and all of its items and photos?', 'Delete Auction', true)

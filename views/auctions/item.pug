@@ -1,0 +1,120 @@
+extends ../layout
+include _mixins
+
+block content
+  section.section.auction-page(
+    data-auction-stream=`/auctions/${auction.id}/stream`
+    data-auction-id=auction.id
+    data-ends-at=auction.ends_at
+    data-starts-at=auction.starts_at
+    data-phase=phase
+    data-my-paddle=myPaddle || '')
+    .container
+      p.auction-back: a(href=`/auctions/${auction.id}`) ← All items in #{auction.title}
+
+      .auction-live-status(data-live-status hidden)
+
+      .auction-item(data-item-id=item.id)
+        .auction-gallery
+          if photos.length
+            .auction-gallery-main
+              img(src=photos[0].url alt=item.title data-gallery-main)
+            if photos.length > 1
+              .auction-gallery-strip(role="list")
+                each photo, i in photos
+                  button.auction-thumb(type="button" role="listitem" data-gallery-thumb=photo.url aria-label=`Show photo ${i + 1}` aria-current=i === 0 ? 'true' : null)
+                    img(src=photo.url alt="" loading="lazy")
+          else
+            .auction-card-img.auction-card-img--empty No photo
+
+        .auction-item-info
+          h2= item.title
+          p.auction-meta
+            +phaseBadge(phase)
+            if phase === 'closed'
+              |  Bidding closed #{formatDenver(auction.ends_at)}.
+            else if phase === 'upcoming'
+              |  Bidding opens #{formatDenver(auction.starts_at)}.
+            else
+              |  Closes #{formatDenver(auction.ends_at)}
+              span.auction-countdown(data-countdown)
+
+          if item.description
+            .auction-item-description
+              each para in item.description.split(/\n\s*\n/)
+                p= para
+
+          +shippingNotice(auction.shipping_notice, true)
+
+          .auction-bid-box
+            p.auction-bid-current
+              span.auction-label(data-field="current-label")= state.current_bid_cents != null ? 'Current bid' : 'Starting bid'
+              strong(data-field="current")
+                +money(state.current_bid_cents != null ? state.current_bid_cents : state.starting_bid_cents)
+            p.auction-bid-sub
+              span(data-field="bid-count")= state.bid_count
+              span(data-field="bid-noun")= state.bid_count === 1 ? ' bid' : ' bids'
+              span(data-field="high-paddle")= state.high_paddle ? ` · High bidder #${state.high_paddle}` : ''
+            p.auction-status(data-field="status" role="status")
+              if myPaddle && state.high_paddle === myPaddle
+                | You're the high bidder.
+
+            if confirmation
+              .auction-confirmation(role="status")
+                p
+                  strong
+                    | Your bid of
+                    | 
+                    +money(confirmation.amountCents)
+                    |  is the high bid.
+                  |  You are Bidder ##{confirmation.paddle}.
+                +shippingNotice(auction.shipping_notice, true)
+            .auction-confirmation(data-bid-confirmation hidden role="status")
+
+            if phase === 'live'
+              if bidder
+                form.auction-bid-form(method="POST" action=`/auctions/${auction.id}/items/${item.id}/bids` data-bid-form)
+                  input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+                  label(for="bid-amount") Your bid (whole dollars)
+                  .auction-bid-row
+                    span.auction-dollar $
+                    input#bid-amount(type="number" name="amount" inputmode="numeric" step="1"
+                      min=state.min_next_cents / 100 placeholder=state.min_next_cents / 100 required data-field="amount")
+                    button.btn(type="submit") Place bid
+                  p.form-hint
+                    | Minimum bid: $
+                    span(data-field="min-next")= (state.min_next_cents / 100).toLocaleString('en-US')
+                  if !myPaddle
+                    label.checkbox-label.auction-ack
+                      input(type="checkbox" name="shipping_ack" value="1" required data-field="ack")
+                      |  I understand shipping and handling costs are my responsibility.
+                  p.auction-bid-error(data-bid-error role="alert" hidden)
+              else
+                a.btn.btn-full(href=`/auctions/login?returnTo=${encodeURIComponent('/auctions/' + auction.id + '/items/' + item.id)}`) Sign in to bid
+
+          if phase === 'live'
+            //- Phones only (CSS): the current bid and a jump to the form, always in thumb reach.
+            .auction-mobile-bar
+              span.auction-mobile-price
+                span.auction-label(data-field="current-label")= state.current_bid_cents != null ? 'Current bid' : 'Starting bid'
+                strong(data-field="current")
+                  +money(state.current_bid_cents != null ? state.current_bid_cents : state.starting_bid_cents)
+              if bidder
+                a.btn(href="#bid-amount") Bid
+              else
+                a.btn(href=`/auctions/login?returnTo=${encodeURIComponent('/auctions/' + auction.id + '/items/' + item.id)}`) Sign in to bid
+
+          h3.auction-history-heading Bid history
+          if bids.length
+            ol.auction-history(data-bid-history)
+              each bid in bids
+                li
+                  span Bidder ##{bid.paddle_number}
+                  strong
+                    +money(bid.amount_cents)
+                  time(datetime=bid.placed_at)= formatDenver(bid.placed_at)
+          else
+            p.text-muted(data-bid-history-empty) No bids yet — be the first!
+            ol.auction-history(data-bid-history)
+
+  script(src="/js/auction.js" defer)

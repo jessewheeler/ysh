@@ -1,0 +1,22 @@
+//- Shared silent auction markup (issue #119).
+
+//- The shipping and handling notice. It appears on the auction page, every item page and the
+//- bid confirmation, so a winner can't say they weren't told.
+mixin shippingNotice(text, compact)
+  aside.auction-shipping(role="note" class=compact ? 'auction-shipping--compact' : null)
+    strong Shipping &amp; handling:
+    |  #{text}
+
+mixin money(cents)
+  | $#{(Number(cents) / 100).toLocaleString('en-US')}
+
+mixin phaseBadge(phase)
+  case phase
+    when 'live'
+      span.auction-badge.auction-badge--live Live
+    when 'upcoming'
+      span.auction-badge.auction-badge--upcoming Opens soon
+    when 'closed'
+      span.auction-badge.auction-badge--closed Closed
+    default
+      span.auction-badge Draft preview

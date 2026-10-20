@@ -2,7 +2,7 @@ jest.mock('../../db/database', () => require('../helpers/setupDb'));
 
 const db = require('../../db/database');
 const authService = require('../../services/auth');
-const { insertAdmin } = require('../helpers/fixtures');
+const { insertAdmin, insertBidder } = require('../helpers/fixtures');
 const bcrypt = require('bcrypt');
 
 beforeEach(() => {
@@ -102,5 +102,55 @@ describe('verifyOtp', () => {
 
     const cleared = testDb.prepare('SELECT * FROM members WHERE id = ?').get(admin.id);
     expect(cleared.otp_hash).toBeNull();
+  });
+});
+
+describe('bidder OTP (silent auction)', () => {
+  test('stores the code on auction_bidders, not members', async () => {
+    const testDb = db.__getCurrentDb();
+    const bidder = insertBidder(testDb, { email: 'bid@test.com', verified_at: null });
+
+    const otp = await authService.generateAndStoreBidderOtp(bidder.id);
+    expect(otp).toBe('000000');
+
+    const row = testDb.prepare('SELECT * FROM auction_bidders WHERE id = ?').get(bidder.id);
+    expect(row.otp_hash).toBeTruthy();
+    expect(row.otp_attempts).toBe(0);
+    expect(testDb.prepare('SELECT COUNT(*) AS n FROM members WHERE otp_hash IS NOT NULL').get().n).toBe(0);
+  });
+
+  test('accepts the right code once and clears it', async () => {
+    const testDb = db.__getCurrentDb();
+    const bidder = insertBidder(testDb, { email: 'bid@test.com' });
+    await authService.generateAndStoreBidderOtp(bidder.id);
+    const fresh = testDb.prepare('SELECT * FROM auction_bidders WHERE id = ?').get(bidder.id);
+
+    expect(await authService.verifyBidderOtp(fresh, '000000')).toEqual({ success: true });
+    const cleared = testDb.prepare('SELECT * FROM auction_bidders WHERE id = ?').get(bidder.id);
+    expect(cleared.otp_hash).toBeNull();
+  });
+
+  test('counts wrong codes and locks out after five', async () => {
+    const testDb = db.__getCurrentDb();
+    const bidder = insertBidder(testDb, { email: 'bid@test.com' });
+    await authService.generateAndStoreBidderOtp(bidder.id);
+    const read = () => testDb.prepare('SELECT * FROM auction_bidders WHERE id = ?').get(bidder.id);
+
+    for (let i = 0; i < 5; i++) {
+      expect((await authService.verifyBidderOtp(read(), '123456')).success).toBe(false);
+    }
+    expect(read().otp_attempts).toBe(5);
+    const locked = await authService.verifyBidderOtp(read(), '000000');
+    expect(locked).toEqual({ success: false, error: 'Too many attempts. Please request a new code.' });
+  });
+
+  test('refuses an expired code', async () => {
+    const testDb = db.__getCurrentDb();
+    const bidder = insertBidder(testDb, { email: 'bid@test.com' });
+    const hash = await bcrypt.hash('000000', 4);
+    testDb.prepare('UPDATE auction_bidders SET otp_hash = ?, otp_expires_at = ? WHERE id = ?')
+      .run(hash, new Date(Date.now() - 1000).toISOString(), bidder.id);
+    const row = testDb.prepare('SELECT * FROM auction_bidders WHERE id = ?').get(bidder.id);
+    expect((await authService.verifyBidderOtp(row, '000000')).error).toMatch(/expired/);
   });
 });

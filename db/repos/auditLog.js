@@ -3,6 +3,7 @@ const db = require('../database');
 // Fields to strip from old/new value snapshots (sensitive secrets, hashes)
 const OMIT_FIELDS = {
     members: ['otp_hash', 'renewal_token'],
+    auction_bidders: ['otp_hash'],
 };
 
 function sanitize(tableName, row) {

@@ -30,6 +30,10 @@ block content
     a.stat-card(href="/admin/emails")
       .stat-number= stats.emailsSent
       .stat-label Emails Sent
+    if auctionSummary
+      a.stat-card(href=`/admin/auctions/${auctionSummary.id}/dashboard`)
+        .stat-number= formatMoneyShort(auctionSummary.committedCents)
+        .stat-label= `Auction${auctionSummary.phase === 'live' ? ' (live)' : ''}: ${auctionSummary.bids} bids`
 
   .admin-grid
     .admin-panel

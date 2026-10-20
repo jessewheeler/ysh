@@ -1,0 +1,57 @@
+extends ../layout
+include _nav
+
+block page_title
+  | #{auction.title} — Winners
+
+block content
+  +auctionNav(auction, 'winners')
+
+  .admin-toolbar
+    .actionbar-group
+      a.btn-outline(href=`/admin/auctions/${auction.id}/winners.csv`) Download Winners (CSV)
+      if phase === 'closed'
+        form(method="POST" action=`/admin/auctions/${auction.id}/send-winner-emails` data-confirm="Email every winner who hasn't been emailed yet?" data-spinner="Sending…")
+          button.btn(type="submit") Send Winner Emails
+
+  if phase === 'closed'
+    p.text-muted
+      | With the auction close job enabled, winners are emailed within a minute of bidding closing.
+      | This button sends to anyone not emailed yet — for example after a failed send.
+
+  if phase !== 'closed'
+    p.text-muted These are the current high bidders. Results are final when bidding closes #{formatDenver(auction.ends_at)}.
+
+  .admin-panel
+    if items.length === 0
+      p.text-muted No items.
+    else
+      table.admin-table#winners-table
+        thead
+          tr
+            th Item
+            th Winning bid
+            th Winner
+            th Contact
+            th Emailed
+        tbody
+          each i in items
+            tr(data-item-id=i.id)
+              td= i.title
+              td= i.current_bid_cents != null ? formatMoney(i.current_bid_cents) : '—'
+              td
+                if i.high_bidder_name
+                  | ##{i.high_paddle} #{i.high_bidder_name}
+                else
+                  +badge('attention', 'Unsold')
+              td
+                if i.high_bidder_email
+                  a(href=`mailto:${i.high_bidder_email}`)= i.high_bidder_email
+                  if i.high_bidder_phone
+                    br
+                    a(href=`tel:${i.high_bidder_phone}`)= i.high_bidder_phone
+              td= i.winner_emailed_at ? formatDenver(i.winner_emailed_at) : '—'
+
+  p.text-muted.page-footnote
+    | Payment isn't collected online. Contact each winner to arrange payment and pickup or shipping;
+    | shipping and handling is at the winner's expense.

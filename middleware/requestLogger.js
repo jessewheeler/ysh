@@ -34,6 +34,9 @@ const morganMiddleware = morgan(
   {
     stream: logger.stream,
     skip: (req) => {
+      // Auction event streams stay open for as long as a page is, so morgan would log each
+      // one on disconnect with a response time in hours. They aren't interesting either way.
+      if (/\/stream(\?|$)/.test(req.url)) return true;
       // Skip logging for static assets in production
       if (process.env.NODE_ENV === 'production') {
         return req.url.startsWith('/css') ||

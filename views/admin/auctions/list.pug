@@ -1,0 +1,36 @@
+extends ../layout
+include _nav
+
+block page_title
+  | Silent Auctions
+
+block content
+  .admin-toolbar
+    .actionbar-group
+      a.btn(href="/admin/auctions/new") + New Auction
+
+  .admin-panel
+    if auctions.length === 0
+      p.text-muted
+        | No auctions yet. Create one, add items with photos and starting bids, then publish it.
+        | It appears in the site's navigation until bidding closes.
+    else
+      table.admin-table#auctions-table
+        thead
+          tr
+            th Auction
+            th Status
+            th Opens
+            th Closes
+            th Items
+            th Bids
+        tbody
+          each a in auctions
+            tr(data-auction-id=a.id)
+              td: a(href=`/admin/auctions/${a.id}/dashboard`)= a.title
+              td
+                +phaseBadge(a.phase)
+              td= formatDenver(a.starts_at)
+              td= formatDenver(a.ends_at)
+              td= a.item_count
+              td= a.bid_count

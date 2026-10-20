@@ -1,0 +1,50 @@
+extends ../layout
+include _nav
+
+block page_title
+  | #{auction.title} — Items
+
+block content
+  +auctionNav(auction, 'items')
+
+  .admin-toolbar
+    .actionbar-group
+      a.btn(href=`/admin/auctions/${auction.id}/items/new`) + Add Item
+
+  .admin-panel
+    if items.length === 0
+      p.text-muted No items yet. Add one with a starting bid, a description and photos.
+    else
+      table.admin-table#items-table
+        thead
+          tr
+            th Item
+            th Photos
+            th Starting
+            th Current
+            th Bids
+            th High bidder
+            th
+        tbody
+          each i in items
+            tr(data-item-id=i.id)
+              td
+                a(href=`/admin/auctions/${auction.id}/items/${i.id}`)= i.title
+                if i.withdrawn
+                  | 
+                  +badge('cancelled', 'Withdrawn')
+              td= i.photo_count
+              td= formatMoney(i.starting_bid_cents)
+              td= i.current_bid_cents != null ? formatMoney(i.current_bid_cents) : '—'
+              td: a(href=`/admin/auctions/${auction.id}/items/${i.id}/bids`)= i.bid_count
+              td
+                if i.high_bidder_name
+                  | ##{i.high_paddle} #{i.high_bidder_name}
+                  br
+                  small.text-muted #{i.high_bidder_email} · #{i.high_bidder_phone || 'no phone'}
+                else
+                  | —
+              td
+                .row-actions
+                  a.btn-sm(href=`/admin/auctions/${auction.id}/items/${i.id}`) Edit
+                  +confirmForm(`/admin/auctions/${auction.id}/items/${i.id}/withdraw`, i.withdrawn ? 'Put this item back in the auction?' : 'Withdraw this item? Bidders will no longer see it or be able to bid.', i.withdrawn ? 'Reinstate' : 'Withdraw', !i.withdrawn)

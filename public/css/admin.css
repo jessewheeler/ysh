@@ -1781,3 +1781,120 @@ dialog.modal .form-actions {
   width: 5rem;
   padding: 0.4rem 0.5rem;
 }
+
+/* ── Silent auction admin (issue #119) ─────────────────────────────────────── */
+.auction-subnav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.auction-subnav a {
+    padding: 0.5rem 0.9rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -1px;
+}
+
+.auction-subnav a.active {
+    color: var(--navy);
+    font-weight: 700;
+    border-bottom-color: var(--navy);
+}
+
+.auction-dash-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.auction-refresh {
+    margin-left: auto;
+}
+
+.auction-countdown {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.live-indicator::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 0.35rem;
+    border-radius: 50%;
+    background: var(--green);
+}
+
+.live-indicator.is-reconnecting::before {
+    background: #e0a800;
+}
+
+.auction-sort {
+    font-size: 0.85rem;
+    font-weight: 400;
+    margin-left: 0.75rem;
+}
+
+.auction-sort a.active {
+    font-weight: 700;
+}
+
+.auction-no-bids td {
+    background: #fffbea;
+}
+
+.auction-bid-removed td {
+    color: var(--text-faint);
+    text-decoration: line-through;
+}
+
+.auction-bid-removed td:nth-child(4),
+.auction-bid-removed td:nth-child(4) * {
+    text-decoration: none;
+}
+
+.auction-photo-admin {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+}
+
+.auction-photo-admin li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.auction-photo-admin img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.danger-zone {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.auction-flash td {
+    animation: auction-row-flash 1.2s ease;
+}
+
+@keyframes auction-row-flash {
+    0% { background-color: #fff6bf; }
+    100% { background-color: transparent; }
+}
+
+.nowrap {
+    white-space: nowrap;
+}

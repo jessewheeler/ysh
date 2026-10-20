@@ -33,6 +33,13 @@ class DatabaseManager:
     def reset_database(self):
         """Delete all rows in FK-safe order and re-seed minimal data."""
         tables = [
+            'auction_outbid_notices',
+            'auction_bids',
+            'auction_paddles',
+            'auction_item_photos',
+            'auction_items',
+            'auction_bidders',
+            'auctions',
             'check_ins',
             'events',
             'membership_cards',
@@ -344,6 +351,80 @@ class DatabaseManager:
             (to_email, email_type, status,
              int(member_id) if member_id is not None else None,
              created_at.strftime('%Y-%m-%d %H:%M:%S')),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def seed_auction(self, title='Robot Silent Auction', start_offset_min=-60, end_offset_min=120,
+                     status='published', shipping_notice=None, min_increment_cents=500):
+        """Insert an auction and return its ID. Offsets are minutes from now (negative = past)."""
+        now = datetime.utcnow()
+
+        def iso(minutes):
+            return (now + timedelta(minutes=float(minutes))).strftime('%Y-%m-%dT%H:%M:%S.000Z')
+
+        notice = shipping_notice or "Shipping and handling costs are the winning bidder's responsibility."
+        cursor = self.conn.execute(
+            'INSERT INTO auctions (title, status, starts_at, ends_at, min_increment_cents, shipping_notice) '
+            'VALUES (?, ?, ?, ?, ?, ?)',
+            (title, status, iso(start_offset_min), iso(end_offset_min), int(min_increment_cents), notice),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def seed_auction_item(self, auction_id, title='Robot Signed Helmet', starting_bid_cents=2000,
+                          photos=0, description='A robot-tested collectible.'):
+        """Insert an auction item with `photos` placeholder photos, and return its ID."""
+        cursor = self.conn.execute(
+            'INSERT INTO auction_items (auction_id, title, description, starting_bid_cents) VALUES (?, ?, ?, ?)',
+            (int(auction_id), title, description, int(starting_bid_cents)),
+        )
+        item_id = cursor.lastrowid
+        images = ['/img/logo.png', '/img/tbd.jpg', '/img/ysh_gallery.jpg']
+        for i in range(int(photos)):
+            self.conn.execute(
+                'INSERT INTO auction_item_photos (item_id, url, sort_order) VALUES (?, ?, ?)',
+                (item_id, images[i % len(images)], i + 1),
+            )
+        self.conn.commit()
+        return item_id
+
+    def seed_bidder(self, email='bidder@example.com', name='Robot Bidder', phone='406-555-0100'):
+        """Insert a verified auction bidder and return their ID."""
+        cursor = self.conn.execute(
+            'INSERT INTO auction_bidders (email, name, phone, verified_at) VALUES (?, ?, ?, ?)',
+            (email, name, phone, datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.000Z')),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def seed_bid(self, item_id, bidder_id, amount_cents):
+        """Record a bid the way services/auctionBids.js would: paddle, bid row, item high bid."""
+        item = self.conn.execute('SELECT auction_id FROM auction_items WHERE id = ?', (int(item_id),)).fetchone()
+        auction_id = item['auction_id']
+        now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.000Z')
+        paddle = self.conn.execute(
+            'SELECT paddle_number FROM auction_paddles WHERE auction_id = ? AND bidder_id = ?',
+            (auction_id, int(bidder_id)),
+        ).fetchone()
+        if paddle is None:
+            nxt = self.conn.execute(
+                'SELECT COALESCE(MAX(paddle_number), 0) + 1 FROM auction_paddles WHERE auction_id = ?',
+                (auction_id,),
+            ).fetchone()[0]
+            self.conn.execute(
+                'INSERT INTO auction_paddles (auction_id, bidder_id, paddle_number, shipping_ack_at) '
+                'VALUES (?, ?, ?, ?)',
+                (auction_id, int(bidder_id), nxt, now),
+            )
+        cursor = self.conn.execute(
+            'INSERT INTO auction_bids (item_id, bidder_id, amount_cents, placed_at) VALUES (?, ?, ?, ?)',
+            (int(item_id), int(bidder_id), int(amount_cents), now),
+        )
+        self.conn.execute(
+            'UPDATE auction_items SET current_bid_cents = ?, high_bidder_id = ?, bid_count = bid_count + 1 '
+            'WHERE id = ?',
+            (int(amount_cents), int(bidder_id), int(item_id)),
         )
         self.conn.commit()
         return cursor.lastrowid

@@ -76,6 +76,9 @@ async function migrate() {
       'ALTER TABLE payments ADD COLUMN IF NOT EXISTS voided_at TEXT',
       'ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_status_check',
       "ALTER TABLE payments ADD CONSTRAINT payments_status_check CHECK (status IN ('pending','completed','failed','refunded','voided'))",
+      // emails_log: silent auction email types (issue #119). Same DROP IF EXISTS + ADD pairing.
+      'ALTER TABLE emails_log DROP CONSTRAINT IF EXISTS emails_log_email_type_check',
+      "ALTER TABLE emails_log ADD CONSTRAINT emails_log_email_type_check CHECK (email_type IN ('welcome','payment_confirmation','card_delivery','blast','contact','otp','renewal_reminder','auction_otp','auction_outbid','auction_winner'))",
     ];
     for (const sql of pgAlters) {
       await db.exec(sql);
@@ -142,14 +145,19 @@ async function migrate() {
   // then runs incremental ALTER TABLEs for existing databases missing newer columns.
   await db.exec(SCHEMA);
 
-  // Migrate emails_log CHECK constraint to include 'otp' and 'renewal_reminder' types.
-  // SQLite can't ALTER constraints, so we swap the table if it lacks the latest type.
+  // Migrate emails_log CHECK constraint to the latest list of email types (the silent auction
+  // types, issue #119, are the newest). SQLite can't ALTER constraints, so the table is swapped
+  // when its DDL lacks the newest type. created_by is carried across when the old table has it —
+  // it is otherwise only added by the ALTER further down, and a rebuild that dropped it would
+  // lose who sent each existing email.
   const emailsLogSchema = await db.get(
     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
   );
-  if (emailsLogSchema && !emailsLogSchema.sql.includes("'renewal_reminder'")) {
+  if (emailsLogSchema && !emailsLogSchema.sql.includes("'auction_winner'")) {
+    const hasCreatedBy = (await db.all('PRAGMA table_info(emails_log)')).some(c => c.name === 'created_by');
     await db.exec(`
-      CREATE TABLE IF NOT EXISTS emails_log_new (
+      DROP TABLE IF EXISTS emails_log_new;
+      CREATE TABLE emails_log_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         to_email TEXT NOT NULL,
         to_name TEXT,
@@ -157,16 +165,20 @@ async function migrate() {
         body_html TEXT,
         email_type TEXT CHECK (email_type IN
                                ('welcome', 'payment_confirmation', 'card_delivery', 'blast', 'contact', 'otp',
-                                'renewal_reminder')),
+                                'renewal_reminder', 'auction_otp', 'auction_outbid', 'auction_winner')),
         status TEXT NOT NULL DEFAULT 'sent',
         error TEXT,
         member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TEXT DEFAULT (datetime('now')),
+        created_by INTEGER REFERENCES members(id) ON DELETE SET NULL
       );
-      INSERT INTO emails_log_new (id, to_email, to_name, subject, body_html, email_type, status, error, member_id, created_at)
-      SELECT id, to_email, to_name, subject, body_html, email_type, status, error, member_id, created_at FROM emails_log;
+      INSERT INTO emails_log_new (id, to_email, to_name, subject, body_html, email_type, status, error, member_id, created_at, created_by)
+      SELECT id, to_email, to_name, subject, body_html, email_type, status, error, member_id, created_at,
+             ${hasCreatedBy ? 'created_by' : 'NULL'} FROM emails_log;
       DROP TABLE emails_log;
       ALTER TABLE emails_log_new RENAME TO emails_log;
+      CREATE INDEX IF NOT EXISTS idx_emails_log_member_type ON emails_log(member_id, email_type);
+      CREATE INDEX IF NOT EXISTS idx_emails_log_status ON emails_log(status, created_at);
     `);
   }
 
