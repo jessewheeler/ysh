@@ -121,6 +121,27 @@ Every Admin Page Fits A Phone
         Page Should Not Scroll Sideways    ${path}
     END
 
+Sidebar Scrolls To Logout On A Short Phone
+    [Documentation]    Issue #120. Below 768px the sidebar is a fixed drawer pinned to the
+    ...    viewport height. Without its own overflow-y the bottom of the menu (the super-admin
+    ...    links, View Site, Logout) was clipped and swiping scrolled the page behind instead.
+    ...    600px tall so the full super-admin menu overflows with room to spare.
+    Login As Admin
+    Set Viewport Size    ${PHONE_WIDTH}    600
+    Navigate To    /admin/dashboard
+    Click    .admin-sidebar-toggle
+    Wait For Elements State    .admin-wrapper.sidebar-open    attached    timeout=5s
+    ${scrollable}=    Evaluate JavaScript    .admin-sidebar
+    ...    (el) => el.scrollHeight > el.clientHeight && getComputedStyle(el).overflowY === 'auto'
+    Should Be True    ${scrollable}    the open sidebar overflows the viewport but cannot scroll
+    Evaluate JavaScript    .admin-sidebar    (el) => { el.scrollTop = el.scrollHeight; }
+    ${gap}=    Evaluate JavaScript    .sidebar-logout
+    ...    (el) => window.innerHeight - el.getBoundingClientRect().bottom
+    Should Be True    ${gap} >= 0    Logout sits ${gap}px past the bottom of the screen
+    Click    .sidebar-nav a[href="/admin/audit"]
+    Wait For Elements State    .audit-table, .admin-page-title    visible    timeout=10s
+    Get Url    contains    /admin/audit
+
 *** Keywords ***
 Use Phone Viewport
     Set Viewport Size    ${PHONE_WIDTH}    ${PHONE_HEIGHT}

@@ -815,6 +815,12 @@ a.stat-card:hover {
     bottom: 0;
     z-index: 1000;
     transition: left 0.2s;
+    /* Pinned to the viewport height, so the drawer has to scroll itself or the bottom of the
+       menu (super-admin links, Logout) is unreachable on a phone (#120). */
+    overflow-y: auto;
+    overscroll-behavior: contain;   /* don't hand the swipe to the page behind at either end */
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .sidebar-open .admin-sidebar {
