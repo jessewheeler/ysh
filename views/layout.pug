@@ -22,6 +22,12 @@ html(lang="en")
             li: a(href="/man-crush-monday") Man Crush Monday
         li: a(href="/#news") Club News
         li: a(href="/membership") Membership
+        if navAuction
+          li
+            a.nav-auction(href=`/auctions/${navAuction.id}`)
+              | Auction
+              if navAuction.phase === 'live'
+                span.nav-live-badge Live
         li.dropdown
           a.dropdown-toggle(href="/#charitable") Charitable Work
           button.dropdown-caret(type="button" aria-label="Show Charitable Work pages" aria-expanded="false" aria-controls="menu-charitable")
