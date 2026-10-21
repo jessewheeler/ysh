@@ -11,9 +11,10 @@ mixin money(cents)
   | $#{(Number(cents) / 100).toLocaleString('en-US')}
 
 mixin phaseBadge(phase)
+  //- A live auction gets no pill: the "closes in" countdown says it.
   case phase
     when 'live'
-      span.auction-badge.auction-badge--live Live
+      - break
     when 'upcoming'
       span.auction-badge.auction-badge--upcoming Opens soon
     when 'closed'

@@ -1787,7 +1787,7 @@ dialog.modal .form-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
-    margin-bottom: 1.25rem;
+    margin-bottom: 1.5rem;
     border-bottom: 1px solid var(--border);
 }
 
@@ -1803,6 +1803,24 @@ dialog.modal .form-actions {
     color: var(--navy);
     font-weight: 700;
     border-bottom-color: var(--navy);
+}
+
+/* One 1.5rem rhythm between every block on the dashboard: status row, stat cards (and
+   the gaps between them), panel rows. The blocks' own margins are dropped so they can't
+   stack into a double gap. */
+.auction-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.auction-dashboard > *,
+.auction-dashboard > .admin-grid > .admin-panel {
+    margin: 0;
+}
+
+.auction-dashboard .stats-grid {
+    gap: 1.5rem;
 }
 
 .auction-dash-status {

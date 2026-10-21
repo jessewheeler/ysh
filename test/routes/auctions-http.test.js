@@ -54,12 +54,16 @@ beforeEach(() => {
 });
 
 describe('pages', () => {
-  test('the nav links to a published auction and the landing page shows the shipping notice', async () => {
+  test('the Charitable Work menu links to a published auction and the landing page shows the shipping notice', async () => {
     const home = await request(app).get('/').expect(200);
-    expect(home.text).toContain(`href="/auctions/${auction.id}"`);
+    const charitableMenu = home.text.match(/<ul class="dropdown-menu" id="menu-charitable">([\s\S]*?)<\/ul>/);
+    expect(charitableMenu[1]).toContain(`href="/auctions/${auction.id}"`);
+    expect(home.text).not.toContain('nav-live-badge');
 
     const res = await request(app).get(`/auctions/${auction.id}`).expect(200);
     expect(res.text).toContain('Holiday Silent Auction');
+    // A live auction has no "Live" pill; the countdown says it.
+    expect(res.text).not.toContain('auction-badge');
     expect(res.text).toContain('Signed Helmet');
     expect(res.text).toContain(NOTICE);
   });
