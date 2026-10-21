@@ -51,6 +51,7 @@ Admin Creates An Auction With A Two-Photo Item And Publishes It
     Get Element Count    ul.auction-photo-admin li    ==    2
 
     Navigate To    /
+    Hover    a.dropdown-toggle[href="/#charitable"]
     Click    a.nav-auction
     Wait For Elements State    .auction-grid    visible    timeout=10s
     Get Text    .auction-shipping    contains    Shipping and handling costs

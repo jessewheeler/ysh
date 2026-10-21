@@ -1639,19 +1639,6 @@ footer {
    Mobile first: one column of cards and a bid bar pinned to the bottom of the
    item page on phones; a grid and side-by-side gallery/info from 768px up. */
 
-.nav-live-badge {
-    display: inline-block;
-    margin-left: 0.35rem;
-    padding: 0.05rem 0.4rem;
-    border-radius: 999px;
-    background: var(--green);
-    color: var(--navy-dark);
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    vertical-align: middle;
-}
-
 .auction-narrow {
     max-width: var(--measure-form);
 }
@@ -1674,6 +1661,7 @@ footer {
     font-weight: 700;
     color: var(--navy);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .auction-badge {
@@ -1688,7 +1676,6 @@ footer {
     letter-spacing: 0.03em;
 }
 
-.auction-badge--live { background: var(--green); color: var(--navy-dark); }
 .auction-badge--upcoming { background: #fff3cd; color: #6b5200; }
 .auction-badge--closed { background: var(--navy); color: #fff; }
 
