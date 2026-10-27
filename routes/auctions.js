@@ -6,7 +6,6 @@
 const express = require('express');
 const router = express.Router();
 const { requireBidder } = require('../middleware/auth');
-const { requireCaptcha } = require('../middleware/captcha');
 const authService = require('../services/auth');
 const auctions = require('../services/auctions');
 const auctionBids = require('../services/auctionBids');
@@ -89,7 +88,9 @@ router.get('/login', (req, res) => {
   res.render('auctions/login', { values: req.session.bidderPending || {} });
 });
 
-router.post('/login', requireCaptcha('/auctions/login'), async (req, res, next) => {
+// No captcha: the board dropped it after the 2026-10-26 test. The emailed code already proves
+// the address, and the OTP send and attempt limits cap abuse.
+router.post('/login', async (req, res, next) => {
   try {
     const email = String(req.body.email || '').trim().toLowerCase();
     const name = String(req.body.name || '').trim();
@@ -103,6 +104,14 @@ router.post('/login', requireCaptcha('/auctions/login'), async (req, res, next) 
     if (errors.length) {
       res.locals.flash_error = errors.join(' ');
       return res.status(400).render('auctions/login', { values });
+    }
+
+    // Honeypot: only a bot fills the hidden "website" field. Answer as if a code went out, so
+    // the bot learns nothing, but send no email and create no bidder.
+    if (String(req.body.website || '').trim()) {
+      logger.warn('Auction sign-in honeypot tripped', { ip: req.ip });
+      req.session.flash_success = `We sent a sign-in code to ${maskEmail(email)}.`;
+      return res.redirect('/auctions/login');
     }
 
     let bidder = await biddersRepo.findByEmail(email);
@@ -177,6 +186,20 @@ router.post('/logout', (req, res) => {
 
 // --- Auction and item pages ---
 
+/** Current state of every item, plus the viewer's paddle: what a live page needs to catch up. */
+async function buildSnapshot(auction, bidderId) {
+  const [items, paddle] = await Promise.all([
+    itemsRepo.listByAuction(auction.id),
+    bidderId ? bidsRepo.getPaddle(auction.id, bidderId) : null,
+  ]);
+  return {
+    server_now: new Date().toISOString(),
+    auction: { id: auction.id, phase: auctions.phase(auction), starts_at: auction.starts_at, ends_at: auction.ends_at },
+    items: items.map(i => auctions.publicItemState(i, auction.min_increment_cents)),
+    my_paddle: paddle ? paddle.paddle_number : null,
+  };
+}
+
 router.get('/:id', async (req, res, next) => {
   try {
     const auction = await loadAuction(req);
@@ -188,6 +211,7 @@ router.get('/:id', async (req, res, next) => {
       phase: auctions.phase(auction),
       items: items.map(i => ({ ...i, state: auctions.publicItemState(i, auction.min_increment_cents) })),
       myPaddle: myPaddle ? myPaddle.paddle_number : null,
+      outbidWindow: auctions.outbidEmailWindow(auction),
       formatDenver,
     });
   } catch (err) {
@@ -218,6 +242,7 @@ router.get('/:id/items/:itemId', async (req, res, next) => {
       bids,
       myPaddle: paddle ? paddle.paddle_number : null,
       confirmation,
+      outbidWindow: auctions.outbidEmailWindow(auction),
       formatDenver,
     });
   } catch (err) {
@@ -232,19 +257,23 @@ router.get('/:id/stream', async (req, res, next) => {
     const auction = await loadAuction(req);
     if (!auction) return notFound(res);
     const bidderId = req.session.bidderId || null;
-    const [items, paddle] = await Promise.all([
-      itemsRepo.listByAuction(auction.id),
-      bidderId ? bidsRepo.getPaddle(auction.id, bidderId) : null,
-    ]);
     require('../services/auctionHub').open(req, res, auction.id, {
       bidderId,
-      snapshot: {
-        server_now: new Date().toISOString(),
-        auction: { id: auction.id, phase: auctions.phase(auction), starts_at: auction.starts_at, ends_at: auction.ends_at },
-        items: items.map(i => auctions.publicItemState(i, auction.min_increment_cents)),
-        my_paddle: paddle ? paddle.paddle_number : null,
-      },
+      snapshot: await buildSnapshot(auction, bidderId),
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// The same snapshot as plain JSON. auction.js polls this when the event stream isn't getting
+// through (seen on a work PC behind a proxy at the 2026-10-26 test).
+router.get('/:id/state', async (req, res, next) => {
+  try {
+    const auction = await loadAuction(req);
+    if (!auction) return res.status(404).json({ error: 'Not found' });
+    res.set('Cache-Control', 'no-store');
+    res.json(await buildSnapshot(auction, req.session.bidderId || null));
   } catch (err) {
     next(err);
   }

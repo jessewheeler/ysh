@@ -77,9 +77,21 @@ test('heartbeats keep idle streams open', () => {
     const a = fakeRes();
     hub.subscribe(1, a);
     jest.advanceTimersByTime(hub.HEARTBEAT_MS);
-    expect(a.text()).toBe(': ping\n\n');
+    expect(a.text()).toBe('event: ping\ndata: {}\n\n');
   } finally {
     hub._reset();
     jest.useRealTimers();
   }
+});
+
+test('open() pads the stream past buffering proxies before the snapshot', () => {
+  const res = {
+    ...fakeRes(),
+    status() { return this; }, set() { return this; }, flushHeaders() {}, on() {},
+  };
+  hub.open({}, res, 1, { snapshot: { items: [] } });
+  const text = res.text();
+  expect(text.startsWith('retry: 5000\n\n' + hub.STREAM_PADDING)).toBe(true);
+  expect(hub.STREAM_PADDING.length).toBeGreaterThanOrEqual(2048);
+  expect(text).toContain('event: snapshot');
 });

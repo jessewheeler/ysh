@@ -22,8 +22,13 @@ block content
             |  Bidding closes #{formatDenver(auction.ends_at)}
             span.auction-countdown(data-countdown aria-live="off")
         if auction.description
-          p.auction-description= auction.description
+          //- Each line the admin typed is its own paragraph; one <p> ran it all together.
+          .auction-description
+            each para in auction.description.split(/\r?\n\s*/).filter(Boolean)
+              p= para
         +shippingNotice(auction.shipping_notice)
+        if phase !== 'closed'
+          +outbidNotice(outbidWindow)
         p.auction-account
           if bidder
             | Signed in as #{bidder.name}
@@ -42,7 +47,7 @@ block content
       else
         ul.auction-grid
           each item in items
-            li.auction-card(data-item-id=item.id)
+            li.auction-card(data-item-id=item.id data-item-title=item.title)
               a.auction-card-link(href=`/auctions/${auction.id}/items/${item.id}`)
                 if item.cover_url
                   img.auction-card-img(src=item.cover_url alt=item.title loading="lazy")

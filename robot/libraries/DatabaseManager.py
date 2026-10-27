@@ -389,6 +389,11 @@ class DatabaseManager:
         self.conn.commit()
         return item_id
 
+    def withdraw_auction_item(self, item_id):
+        """Mark an auction item withdrawn, as the admin Withdraw button does."""
+        self.conn.execute('UPDATE auction_items SET withdrawn = 1 WHERE id = ?', (int(item_id),))
+        self.conn.commit()
+
     def seed_bidder(self, email='bidder@example.com', name='Robot Bidder', phone='406-555-0100'):
         """Insert a verified auction bidder and return their ID."""
         cursor = self.conn.execute(

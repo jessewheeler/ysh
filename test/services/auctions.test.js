@@ -22,6 +22,49 @@ describe('phase', () => {
   });
 });
 
+describe('outbidEmailsOpen', () => {
+  // Battle of the Birds: opens Sun Nov 1 noon MST, closes Sun Nov 8 4:00 PM MST (23:00Z).
+  const botb = { status: 'published', starts_at: '2026-11-01T19:00:00.000Z', ends_at: '2026-11-08T23:00:00.000Z' };
+  test.each([
+    ['opening day', '2026-11-01T19:30:00.000Z', true],
+    ['11:59 PM the night before closing (06:59Z on closing day)', '2026-11-08T06:59:00.000Z', true],
+    ['midnight Montana time on closing day', '2026-11-08T07:00:00.000Z', false],
+    ['closing afternoon', '2026-11-08T22:00:00.000Z', false],
+    ['after the close', '2026-11-08T23:30:00.000Z', false],
+    ['before it opens', '2026-11-01T18:00:00.000Z', false],
+  ])('%s: %s', (_label, now, expected) => {
+    expect(auctions.outbidEmailsOpen(botb, new Date(now))).toBe(expected);
+  });
+
+  test('uses daylight time in summer: closing day starts at 06:00Z', () => {
+    const july = { status: 'published', starts_at: '2026-07-01T18:00:00.000Z', ends_at: '2026-07-10T23:00:00.000Z' };
+    expect(auctions.outbidEmailsOpen(july, new Date('2026-07-10T05:59:00.000Z'))).toBe(true);
+    expect(auctions.outbidEmailsOpen(july, new Date('2026-07-10T06:00:00.000Z'))).toBe(false);
+  });
+
+  test('a draft never sends', () => {
+    expect(auctions.outbidEmailsOpen({ ...botb, status: 'draft' }, new Date('2026-11-03T18:00:00Z'))).toBe(false);
+  });
+});
+
+describe('outbidEmailWindow', () => {
+  test('names the last email day and closing day', () => {
+    expect(auctions.outbidEmailWindow({ starts_at: '2026-11-01T19:00:00.000Z', ends_at: '2026-11-08T23:00:00.000Z' }))
+      .toEqual({ closingDay: 'Sunday, November 8', lastEmailDay: 'Saturday, November 7' });
+  });
+
+  test('an auction that opens on its closing day sends no emails', () => {
+    expect(auctions.outbidEmailWindow({ starts_at: '2026-11-08T17:00:00.000Z', ends_at: '2026-11-08T23:00:00.000Z' }))
+      .toEqual({ closingDay: 'Sunday, November 8', lastEmailDay: null });
+  });
+
+  test('a close just after midnight UTC still counts the Montana date', () => {
+    // 5:30 PM MST Nov 8 is 00:30Z Nov 9.
+    expect(auctions.outbidEmailWindow({ starts_at: '2026-11-01T19:00:00.000Z', ends_at: '2026-11-09T00:30:00.000Z' }).closingDay)
+      .toBe('Sunday, November 8');
+  });
+});
+
 describe('parseAuctionForm', () => {
   const body = {
     title: ' Holiday Auction ', starts_at: '2026-12-01T18:00', ends_at: '2026-12-05T20:00',

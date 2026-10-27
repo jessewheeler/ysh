@@ -115,4 +115,26 @@ function formatDenverShort(value) {
   return d ? shortFormatter.format(d).replace(/\u202f/g, ' ') : '';
 }
 
-module.exports = { TIMEZONE, denverInputToUtcIso, utcToDenverInput, formatDenver, formatDenverShort, toDate };
+/** 'YYYY-MM-DD' Denver calendar date of an instant, or '' when unparseable. */
+function denverDate(value) {
+  const d = toDate(value);
+  if (!d) return '';
+  const p = denverParts(d);
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
+}
+
+const dayLabelFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric',
+});
+
+/** 'YYYY-MM-DD' (a calendar date, no zone) -> "Sunday, November 8". `offsetDays` shifts it. */
+function formatDayLabel(ymd, offsetDays = 0) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
+  if (!m) return '';
+  // Noon UTC keeps the shifted date clear of any day boundary.
+  return dayLabelFormatter.format(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + offsetDays, 12)));
+}
+
+module.exports = {
+  TIMEZONE, denverInputToUtcIso, utcToDenverInput, formatDenver, formatDenverShort, toDate, denverDate, formatDayLabel,
+};

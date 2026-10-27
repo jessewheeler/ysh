@@ -7,6 +7,16 @@ mixin shippingNotice(text, compact)
     strong Shipping &amp; handling:
     |  #{text}
 
+//- When outbid emails go out (services/auctions.js#outbidEmailsOpen). Stated up front so
+//- nobody expects an email on closing day.
+mixin outbidNotice(win, compact)
+  aside.auction-outbid-notice(role="note" data-outbid-notice class=compact ? 'auction-outbid-notice--compact' : null)
+    strong Outbid alerts:
+    if win.lastEmailDay
+      |  We'll email you when you're outbid through #{win.lastEmailDay}. On closing day, #{win.closingDay}, the emails stop, so keep this page open; it updates live.
+    else
+      |  Outbid emails are off for this auction. Keep this page open; it updates live.
+
 mixin money(cents)
   | $#{(Number(cents) / 100).toLocaleString('en-US')}
 

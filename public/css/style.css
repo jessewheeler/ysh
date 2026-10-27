@@ -1679,11 +1679,21 @@ footer {
 .auction-badge--upcoming { background: #fff3cd; color: #6b5200; }
 .auction-badge--closed { background: var(--navy); color: #fff; }
 
+/* Full container width, so its right edge lines up with the notices and item grid below. */
 .auction-description {
-    max-width: 48rem;
+    margin: 1.25rem 0 1.5rem;
 }
 
-.auction-shipping {
+.auction-description p {
+    margin: 0 0 0.9rem;
+}
+
+.auction-description p:last-child {
+    margin-bottom: 0;
+}
+
+.auction-shipping,
+.auction-outbid-notice {
     margin: 1rem 0;
     padding: 0.75rem 1rem;
     border-left: 4px solid var(--navy);
@@ -1692,7 +1702,8 @@ footer {
     color: var(--text);
 }
 
-.auction-shipping--compact {
+.auction-shipping--compact,
+.auction-outbid-notice--compact {
     font-size: 0.9rem;
     padding: 0.6rem 0.8rem;
 }

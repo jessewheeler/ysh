@@ -18,7 +18,9 @@ const logger = require('./logger');
 
 function outbidThrottleMs() {
   const minutes = Number(process.env.AUCTION_OUTBID_EMAIL_MINUTES);
-  return (Number.isFinite(minutes) && minutes >= 0 ? minutes : 10) * 60 * 1000;
+  // Default 0: every outbid gets its email (until closing day; see auctions.outbidEmailsOpen).
+  // The claim row still stops two racing bids from sending the same email twice.
+  return (Number.isFinite(minutes) && minutes >= 0 ? minutes : 0) * 60 * 1000;
 }
 
 function baseUrl() {
@@ -49,11 +51,11 @@ async function adminPayload(auctionId, itemId) {
 }
 
 /**
- * Emails the bidder who just lost the lead, at most once per item per throttle window.
- * Returns true when an email was sent.
+ * Emails the bidder who just lost the lead, except on closing day and at most once per item
+ * per throttle window (none by default). Returns true when an email was sent.
  */
 async function maybeSendOutbidEmail({ auction, item, bidderId, now = new Date() }) {
-  if (auctions.phase(auction, now) !== 'live') return false;
+  if (!auctions.outbidEmailsOpen(auction, now)) return false;
   const claimed = await bidsRepo.claimOutbidNotice(
     item.id, bidderId, now.toISOString(), new Date(now.getTime() - outbidThrottleMs()).toISOString()
   );
@@ -69,6 +71,7 @@ async function maybeSendOutbidEmail({ auction, item, bidderId, now = new Date() 
       minNextCents: auctions.minNextCents(item, auction.min_increment_cents),
       itemUrl: `${baseUrl()}/auctions/${auction.id}/items/${item.id}`,
       closesAt: formatDenver(auction.ends_at),
+      closingDay: auctions.outbidEmailWindow(auction).closingDay,
     });
     return true;
   } catch (err) {

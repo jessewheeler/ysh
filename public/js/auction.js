@@ -13,6 +13,8 @@
 
   var serverOffsetMs = 0;
   var myPaddle = root.getAttribute('data-my-paddle') || '';
+  // Each item's high paddle as last seen, so polling can tell when this bidder lost the lead.
+  var highByItem = {};
 
   function dollars(cents) {
     return '$' + (Number(cents) / 100).toLocaleString('en-US');
@@ -93,6 +95,7 @@
   }
 
   function applyState(state) {
+    highByItem[state.item_id] = state.high_paddle == null ? '' : String(state.high_paddle);
     document.querySelectorAll('[data-item-id="' + state.item_id + '"]').forEach(function (scope) {
       var shown = state.current_bid_cents != null ? state.current_bid_cents : state.starting_bid_cents;
       var before = (scope.querySelector('[data-field="current"]') || {}).textContent;
@@ -274,12 +277,155 @@
     flash(li);
   }
 
+  // ── Polling fallback ──────────────────────────────────────────────────────
+  // Some networks (a work PC behind a proxy, at the 2026-10-26 test) hold the event stream
+  // open without passing events through. The server sends a named ping every 20s, so silence
+  // means the stream is blocked: poll /state instead, and keep trying the stream.
+  var stateUrl = streamUrl ? streamUrl.replace(/\/stream$/, '/state') : null;
+  var POLL_MS = 10000;
+  var FIRST_EVENT_MS = 10000;
+  var SILENCE_MS = 60000;
+  var connectedAt = 0;
+  var streamHeardAt = 0;
+  var pollTimer = null;
+  var forcePolling = /[?&]live=poll(&|$)/.test(window.location.search);
+  // Stream attempts that never delivered anything. After a few, stop reopening it and just
+  // poll: behind a proxy that never closes them, each attempt could linger on the server.
+  var MAX_SILENT_STREAMS = 3;
+  var silentStreams = 0;
+  var lastPolled = {};
+
+  // Start from the high bidders the server rendered, so the first poll can spot an outbid.
+  document.querySelectorAll('[data-item-id] [data-field="high-paddle"]').forEach(function (el) {
+    var scope = el.closest('[data-item-id]');
+    var m = /#(\d+)/.exec(el.textContent || '');
+    highByItem[scope.getAttribute('data-item-id')] = m ? m[1] : '';
+  });
+
+  function withdrawItem(itemId) {
+    document.querySelectorAll('.auction-card[data-item-id="' + itemId + '"]').forEach(function (el) { el.remove(); });
+    if (document.querySelector('.auction-item[data-item-id="' + itemId + '"]')) {
+      showBanner('This item has been withdrawn from the auction.');
+      document.querySelectorAll('[data-bid-form], .auction-mobile-bar').forEach(function (f) { f.remove(); });
+    }
+  }
+
+  function itemTitle(itemId) {
+    var el = document.querySelector('[data-item-id="' + itemId + '"][data-item-title]');
+    return el ? el.getAttribute('data-item-title') : 'an item';
+  }
+
+  // The stream tells a bidder they were outbid; polling has to work it out from the high paddle.
+  function applyPolledState(state) {
+    // Unchanged since the last poll: leave the page alone, so an "outbid" status stays put.
+    var key = JSON.stringify(state);
+    if (lastPolled[state.item_id] === key) return;
+    lastPolled[state.item_id] = key;
+    var before = highByItem[state.item_id];
+    var now = state.high_paddle == null ? '' : String(state.high_paddle);
+    applyState(state);
+    if (myPaddle && before === String(myPaddle) && now && now !== String(myPaddle)) {
+      showBanner('You\'ve been outbid on ' + itemTitle(state.item_id) + ' \u2014 it\'s now '
+        + dollars(state.current_bid_cents) + '. Bid ' + dollars(state.min_next_cents) + ' or more to retake the lead.',
+        '/auctions/' + root.getAttribute('data-auction-id') + '/items/' + state.item_id, state.item_id);
+      document.querySelectorAll('[data-item-id="' + state.item_id + '"] [data-field="status"]').forEach(function (el) {
+        el.textContent = 'You\'ve been outbid.';
+        el.classList.add('is-outbid');
+      });
+    }
+    highByItem[state.item_id] = now;
+  }
+
+  function poll() {
+    if (!stateUrl || root.getAttribute('data-phase') === 'closed') return;
+    fetch(stateUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) return;
+        serverOffsetMs = Date.parse(data.server_now) - Date.now();
+        if (data.my_paddle) {
+          myPaddle = String(data.my_paddle);
+          root.setAttribute('data-my-paddle', myPaddle);
+        }
+        if (data.auction) {
+          endsAt = Date.parse(data.auction.ends_at);
+          if (data.auction.phase === 'closed') {
+            markClosed();
+            stopPolling();
+          } else if (data.auction.phase !== root.getAttribute('data-phase')) {
+            // An admin moved the dates; the stream's 'auction' event reloads the same way.
+            window.location.reload();
+            return;
+          }
+        }
+        var items = data.items || [];
+        items.forEach(applyPolledState);
+        // /state leaves withdrawn items out; anything shown here but missing from it is gone.
+        var present = {};
+        items.forEach(function (it) { present[it.item_id] = true; });
+        document.querySelectorAll('.auction-card[data-item-id], .auction-item[data-item-id]').forEach(function (el) {
+          var id = el.getAttribute('data-item-id');
+          if (!present[id]) withdrawItem(id);
+        });
+      })
+      .catch(function () { /* try again next round */ });
+  }
+
+  function startPolling() {
+    if (pollTimer || !stateUrl) return;
+    root.setAttribute('data-live-mode', 'polling');
+    poll();
+    pollTimer = setInterval(poll, POLL_MS);
+  }
+
+  function stopPolling() {
+    if (!pollTimer) return;
+    clearInterval(pollTimer);
+    pollTimer = null;
+    root.setAttribute('data-live-mode', 'stream');
+  }
+
+  function heardStream() {
+    streamHeardAt = Date.now();
+    silentStreams = 0;
+    stopPolling();
+  }
+
+  // Every few seconds: is the stream alive? If not, poll, and reopen the stream now and then.
+  setInterval(function () {
+    if (!streamUrl || !window.EventSource || forcePolling || root.getAttribute('data-phase') === 'closed') return;
+    var now = Date.now();
+    var silent = streamHeardAt
+      ? now - streamHeardAt > SILENCE_MS
+      : connectedAt && now - connectedAt > FIRST_EVENT_MS;
+    if (!silent) return;
+    startPolling();
+    if (now - connectedAt <= SILENCE_MS) return;
+    if (!streamHeardAt) silentStreams += 1;
+    if (silentStreams >= MAX_SILENT_STREAMS) {
+      // Give up on the stream for this page; polling carries on.
+      if (source) source.close();
+      return;
+    }
+    connect();
+  }, 5000);
+
   function connect() {
-    if (!streamUrl || !window.EventSource) return;
+    if (!streamUrl) return;
+    // ?live=poll forces the fallback, for tests and for anyone the stream never reaches.
+    if (!window.EventSource || forcePolling) {
+      startPolling();
+      return;
+    }
     if (source) source.close();
     source = new window.EventSource(streamUrl);
+    connectedAt = Date.now();
+    streamHeardAt = 0;
+
+    source.addEventListener('ping', heardStream);
 
     source.addEventListener('snapshot', function (e) {
+      heardStream();
       var data = JSON.parse(e.data);
       serverOffsetMs = Date.parse(data.server_now) - Date.now();
       if (data.my_paddle) {
@@ -294,12 +440,14 @@
     });
 
     source.addEventListener('bid', function (e) {
+      heardStream();
       var data = JSON.parse(e.data);
       applyState(data);
       addHistoryRow(data);
     });
 
     source.addEventListener('outbid', function (e) {
+      heardStream();
       var data = JSON.parse(e.data);
       showBanner('You\'ve been outbid on ' + data.item_title + ' — it\'s now ' + dollars(data.current_bid_cents)
         + '. Bid ' + dollars(data.min_next_cents) + ' or more to retake the lead.', data.url, data.item_id);
@@ -310,13 +458,9 @@
     });
 
     source.addEventListener('item', function (e) {
+      heardStream();
       var data = JSON.parse(e.data);
-      if (!data.withdrawn) return;
-      document.querySelectorAll('.auction-card[data-item-id="' + data.item_id + '"]').forEach(function (el) { el.remove(); });
-      if (document.querySelector('.auction-item[data-item-id="' + data.item_id + '"]')) {
-        showBanner('This item has been withdrawn from the auction.');
-        document.querySelectorAll('[data-bid-form], .auction-mobile-bar').forEach(function (f) { f.remove(); });
-      }
+      if (data.withdrawn) withdrawItem(data.item_id);
     });
 
     source.addEventListener('auction', function (e) {

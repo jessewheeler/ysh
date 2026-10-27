@@ -13,6 +13,7 @@
  */
 
 const HEARTBEAT_MS = 20 * 1000;
+const STREAM_PADDING = `:${' '.repeat(2048)}\n\n`;
 const MAX_CONNECTIONS = Number(process.env.AUCTION_SSE_MAX) || 1000;
 
 // auctionId -> Set<{ res, bidderId, admin }>
@@ -41,11 +42,12 @@ function write(conn, chunk) {
 
 function ensureHeartbeat() {
   if (heartbeat) return;
-  // A comment line every 20s keeps Render's proxy (and phone carriers) from timing out an
-  // idle stream. unref() so the timer never holds Jest or a script open.
+  // A ping every 20s keeps Render's proxy (and phone carriers) from timing out an idle stream.
+  // It's a named event, not a comment, so the page can tell a quiet stream from a blocked one
+  // and fall back to polling. unref() so the timer never holds Jest or a script open.
   heartbeat = setInterval(() => {
     for (const set of channels.values()) {
-      for (const conn of set) write(conn, ': ping\n\n');
+      for (const conn of set) write(conn, 'event: ping\ndata: {}\n\n');
     }
   }, HEARTBEAT_MS);
   heartbeat.unref();
@@ -123,6 +125,9 @@ function open(_req, res, auctionId, { bidderId = null, admin = false, snapshot }
   });
   res.flushHeaders();
   res.write('retry: 5000\n\n');
+  // Some proxies and security software hold a response until a few KB arrive. Padding up
+  // front gets the stream past them so events flow from the first one.
+  res.write(STREAM_PADDING);
   sendTo(res, 'snapshot', snapshot);
   // res, not req: the response's 'close' is what reliably fires when the browser disconnects.
   res.on('close', unsubscribe);
@@ -135,4 +140,4 @@ function _reset() {
   heartbeat = null;
 }
 
-module.exports = { open, subscribe, broadcast, broadcastAdmin, sendToBidder, sendTo, connectionCount, _reset, HEARTBEAT_MS };
+module.exports = { STREAM_PADDING, open, subscribe, broadcast, broadcastAdmin, sendToBidder, sendTo, connectionCount, _reset, HEARTBEAT_MS };

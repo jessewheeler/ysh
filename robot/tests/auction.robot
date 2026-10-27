@@ -211,6 +211,55 @@ Outbid Bidder Sees The New Price And A Banner Without Reloading
     ${still_here}=    Evaluate JavaScript    ${None}    () => window.__noReload === true
     Should Be True    ${still_here}
 
+Outbid Bidder Sees The Banner When The Page Falls Back To Polling
+    [Documentation]    At the 2026-10-26 test, live updates never reached a work PC behind a proxy.
+    ...    The page polls /state when the stream is silent; ?live=poll forces that path here.
+    ${auction}=    Seed Auction
+    ${item}=    Seed Auction Item    ${auction}    title=Game Ball    starting_bid_cents=2000
+    ${alice_ctx}=    Get Context Ids    CURRENT
+    Navigate To    /auctions/login?returnTo=/auctions/${auction}/items/${item}
+    Sign In As Bidder    email=alice@example.com    name=Alice
+    Fill Text    input[name="amount"]    20
+    Check Checkbox    input[name="shipping_ack"]
+    Click    [data-bid-form] button[type="submit"]
+    Wait For Elements State    [data-bid-confirmation]    visible    timeout=10s
+    Navigate To    /auctions/${auction}/items/${item}?live=poll
+    Wait For Elements State    [data-auction-id][data-live-mode="polling"]    attached    timeout=10s
+    Evaluate JavaScript    ${None}    () => { window.__noReload = true; }
+
+    New Context    userAgent=${BROWSER_USER_AGENT}
+    New Page    ${BASE_URL}/auctions/login?returnTo=/auctions/${auction}/items/${item}
+    Sign In As Bidder    email=bob@example.com    name=Bob
+    Fill Text    input[name="amount"]    30
+    Check Checkbox    input[name="shipping_ack"]
+    Click    [data-bid-form] button[type="submit"]
+    Wait For Elements State    [data-bid-confirmation]    visible    timeout=10s
+
+    Switch Context    ${alice_ctx}[0]
+    Wait For Elements State    [data-live-status]    visible    timeout=20s
+    Get Text    [data-live-status]    contains    You've been outbid on Game Ball
+    Get Text    .auction-bid-box [data-field="current"]    ==    $30
+    ${still_here}=    Evaluate JavaScript    ${None}    () => window.__noReload === true
+    Should Be True    ${still_here}
+
+A Withdrawn Item Disappears From A Polling Page
+    [Documentation]    The stream announces a withdrawal with an 'item' event; a polling page has to
+    ...    notice the item has dropped out of /state.
+    ${auction}=    Seed Auction
+    ${keep}=    Seed Auction Item    ${auction}    title=Game Ball
+    ${gone}=    Seed Auction Item    ${auction}    title=Pulled Jersey
+    Navigate To    /auctions/${auction}?live=poll
+    Get Element Count    .auction-card    ==    2
+    Withdraw Auction Item    ${gone}
+    Wait For Elements State    .auction-card[data-item-id="${gone}"]    detached    timeout=20s
+    Get Element Count    .auction-card    ==    1
+
+Item Page States When Outbid Emails Stop
+    ${auction}=    Seed Auction
+    ${item}=    Seed Auction Item    ${auction}    title=Game Ball
+    Navigate To    /auctions/${auction}/items/${item}
+    Get Text    [data-outbid-notice]    contains    Outbid alerts:
+
 Admin Dashboard Updates Live When A Bid Lands
     ${auction}=    Seed Auction
     ${item}=    Seed Auction Item    ${auction}    title=Signed Jersey    starting_bid_cents=5000

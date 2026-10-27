@@ -68,6 +68,9 @@ test. Name and phone are saved only after the code is verified, so typing someon
 can't rename them. A bidder whose email matches a member is linked through
 `auction_bidders.member_id`.
 
+There is no captcha. The board dropped it after the 2026-10-26 test: the emailed code already
+proves the address, and the limits below cap abuse.
+
 Rate limits are set for a crowd sharing one venue Wi-Fi address (`server.js`). Only form posts
 count, and page loads don't.
 - Sign-in posts: 150 per IP address per 15 minutes.
@@ -96,8 +99,17 @@ Every open auction page holds a `GET /auctions/:id/stream` Server-Sent Events re
 | `closed` | everyone | sent by the close job |
 | `admin_bid` / `admin_refresh` | admin dashboards (`/admin/auctions/:id/stream`) | totals, the leaderboard row and the bid with the bidder's name |
 
-A heartbeat comment goes out every 20 seconds so Render's proxy doesn't cut idle streams. Phones
+A `ping` event goes out every 20 seconds so Render's proxy doesn't cut idle streams, and the
+stream opens with 2 KB of padding to get past proxies that buffer small responses. Phones
 reconnect when the page becomes visible again, and the snapshot catches them up.
+
+**Polling fallback.** At the 2026-10-26 test the stream never reached a work PC behind a proxy:
+the countdown ran but prices only changed on refresh. `public/js/auction.js` now falls back to
+polling `GET /auctions/:id/state` (the same snapshot, as JSON) every 10 seconds when no snapshot
+arrives within 10 seconds or the stream goes quiet for 60, and keeps retrying the stream. While
+polling it works out the outbid banner from the item's high paddle. Bid history rows aren't
+added while polling; they appear on the next page load. Add `?live=poll` to an auction URL to
+force polling (the Robot test does).
 
 **This works only while one Node process serves every connection.** That is true today:
 `render.yaml` runs a single instance with a persistent disk, and Render can't scale a disk-backed
@@ -110,10 +122,13 @@ Don't put compression middleware in front of the stream routes, because it buffe
 
 ## Emails
 
-- **Outbid** (`auction_outbid`): sent to the bidder who lost the lead, at most once per item per
-  `AUCTION_OUTBID_EMAIL_MINUTES` (default 10). The throttle row in `auction_outbid_notices` is
-  claimed before sending, so two racing bids send one email. Not sent after the close or on an
-  admin removal.
+- **Outbid** (`auction_outbid`): sent to the bidder who lost the lead on every outbid, **except on
+  closing day** (the Montana date of `ends_at`), when bidding is heaviest and the emails would
+  pile up (`services/auctions.js#outbidEmailsOpen`; board decision at the 2026-10-26 test). The
+  auction and item pages say so (`outbidNotice` mixin), and so does the email. An auction that
+  opens on its closing day sends none. `AUCTION_OUTBID_EMAIL_MINUTES` (default 0) can still
+  throttle to one per item per window. The row in `auction_outbid_notices` is claimed before
+  sending, so two racing bids send one email. Not sent after the close or on an admin removal.
 - **Winner** (`auction_winner`): one per winning bidder, listing what they won. It is sent by the
   close job, or by **Send Winner Emails** on the admin Winners page. An item is marked
   `winner_emailed_at` only after its email goes out, so re-running sends just the failures.
