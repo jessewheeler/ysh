@@ -382,10 +382,11 @@ function auctionButton(href, label) {
 }
 
 /**
- * Tells a bidder someone has taken the lead on an item they were winning. Throttled by
- * services/auctionNotifier.js so a bidding war doesn't flood their inbox.
+ * Tells a bidder someone has taken the lead on an item they were winning. Sent on every outbid
+ * except on closing day (services/auctions.js#outbidEmailsOpen); AUCTION_OUTBID_EMAIL_MINUTES
+ * can additionally throttle it in services/auctionNotifier.js.
  */
-async function sendOutbidEmail({ bidder, auction, item, currentBidCents, minNextCents, itemUrl, closesAt }) {
+async function sendOutbidEmail({ bidder, auction, item, currentBidCents, minNextCents, itemUrl, closesAt, closingDay }) {
   const html = `
     <h2 style="color:#002a5c;">You've been outbid</h2>
     <p>Hi ${escapeHtml(bidder.name)},</p>
@@ -397,7 +398,7 @@ async function sendOutbidEmail({ bidder, auction, item, currentBidCents, minNext
     </table>
     ${auctionButton(itemUrl, 'Bid again')}
     ${shippingNoticeHtml(auction.shipping_notice)}
-    <p style="font-size:13px; color:#666;">You'll get at most one of these emails per item every few minutes, however busy the bidding gets.</p>
+    <p style="font-size:13px; color:#666;">We email you when you're outbid until closing day. On ${escapeHtml(closingDay || 'closing day')} there are no outbid emails, so keep the auction page open to see live updates.</p>
   `;
   await sendEmail({
     to: bidder.email,

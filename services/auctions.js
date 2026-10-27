@@ -4,7 +4,7 @@
  * services/auctionBids.js.
  */
 const auctionsRepo = require('../db/repos/auctions');
-const { denverInputToUtcIso } = require('./timezone');
+const { denverInputToUtcIso, denverDate, formatDayLabel } = require('./timezone');
 
 const DEFAULT_SHIPPING_NOTICE =
   'Shipping and handling costs are the winning bidder\'s responsibility. Winners will be contacted '
@@ -19,6 +19,27 @@ function phase(auction, now = new Date()) {
   if (nowIso < auction.starts_at) return 'upcoming';
   if (nowIso >= auction.ends_at) return 'closed';
   return 'live';
+}
+
+/**
+ * Whether an outbid right now earns an email. Every outbid does while the auction is live,
+ * except on closing day (Montana date), when bidding is heaviest and the emails would pile up.
+ * Board decision at the 2026-10-26 bidding test. The live banner is unaffected.
+ */
+function outbidEmailsOpen(auction, now = new Date()) {
+  return phase(auction, now) === 'live' && denverDate(now) < denverDate(auction.ends_at);
+}
+
+/**
+ * Labels for the outbid email notice: the closing day, and the last day emails go out
+ * (null when the auction opens on its closing day, so it never sends any).
+ */
+function outbidEmailWindow(auction) {
+  const closing = denverDate(auction.ends_at);
+  return {
+    closingDay: formatDayLabel(closing),
+    lastEmailDay: denverDate(auction.starts_at) < closing ? formatDayLabel(closing, -1) : null,
+  };
 }
 
 /** Whole dollars ("25", "$25", "25.00") -> cents, or null when not a positive whole number. */
@@ -120,6 +141,8 @@ module.exports = {
   DEFAULT_SHIPPING_NOTICE,
   DEFAULT_INCREMENT_CENTS,
   phase,
+  outbidEmailsOpen,
+  outbidEmailWindow,
   parseWholeDollars,
   parseAuctionForm,
   parseItemForm,

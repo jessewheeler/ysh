@@ -1,13 +1,11 @@
 const eventsRepo = require('../db/repos/events');
 const periodsRepo = require('../db/repos/membershipPeriods');
+const { denverDate } = require('./timezone');
 
 // The club meets in Montana. Game days are defined by local date: a 6:20 PM Sunday night
 // kickoff is 00:20Z Monday, and checking in against the UTC date would miss it.
 const TIMEZONE = 'America/Denver';
 
-const DATE_FMT = new Intl.DateTimeFormat('en-CA', {
-  timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',
-});
 const TIME_FMT = new Intl.DateTimeFormat('en-US', {
   timeZone: TIMEZONE, hour: 'numeric', minute: '2-digit',
 });
@@ -16,7 +14,8 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** 'YYYY-MM-DD' in America/Denver for a Date or ISO string (default: now). */
 function localDate(when = new Date()) {
-  return DATE_FMT.format(when instanceof Date ? when : new Date(when));
+  // One implementation of the Denver date, shared with the auction rules.
+  return denverDate(when instanceof Date ? when : new Date(when));
 }
 
 /**

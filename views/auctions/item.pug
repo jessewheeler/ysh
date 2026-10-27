@@ -14,7 +14,7 @@ block content
 
       .auction-live-status(data-live-status hidden)
 
-      .auction-item(data-item-id=item.id)
+      .auction-item(data-item-id=item.id data-item-title=item.title)
         .auction-gallery
           if photos.length
             .auction-gallery-main
@@ -45,6 +45,8 @@ block content
                 p= para
 
           +shippingNotice(auction.shipping_notice, true)
+          if phase !== 'closed'
+            +outbidNotice(outbidWindow, true)
 
           .auction-bid-box
             p.auction-bid-current

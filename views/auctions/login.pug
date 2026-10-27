@@ -18,7 +18,8 @@ block content
           label(for="phone") Phone
           input#phone(type="tel" name="phone" value=values.phone || '' required autocomplete="tel" inputmode="tel")
           p.form-hint So we can reach you if you win.
-        if hcaptchaSiteKey
-          .form-group
-            .h-captcha(data-sitekey=hcaptchaSiteKey)
+        //- Honeypot in place of a captcha: hidden from people, filled in by form-spamming bots.
+        .form-group(aria-hidden="true" style="position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden;")
+          label(for="website") Leave this empty
+          input#website(type="text" name="website" value="" tabindex="-1" autocomplete="off")
         button.btn.btn-full(type="submit") Email me a code

@@ -35,7 +35,8 @@ beforeEach(() => {
   hub._reset();
   jest.clearAllMocks();
   delete process.env.AUCTION_OUTBID_EMAIL_MINUTES;
-  auction = insertAuction(t());
+  // Closes in three days: outbid emails stop on closing day, so a same-day close would send none.
+  auction = insertAuction(t(), { ends_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() });
   item = insertAuctionItem(t(), { auction_id: auction.id, title: 'Helmet', starting_bid_cents: 2000 });
   alice = insertBidder(t(), { email: 'alice@example.com', name: 'Alice' });
   bob = insertBidder(t(), { email: 'bob@example.com', name: 'Bob' });
@@ -85,26 +86,52 @@ describe('onBidPlaced', () => {
     expect(args.auction.shipping_notice).toMatch(/shipping and handling/i);
   });
 
-  test('throttles outbid emails per item per bidder', async () => {
+  test('every outbid sends an email by default', async () => {
+    await bidAndNotify(alice, 20);
+    await bidAndNotify(bob, 25);
+    await bidAndNotify(alice, 30);
+    await bidAndNotify(bob, 35);
+    expect(email.sendOutbidEmail.mock.calls.map(c => c[0].bidder.name)).toEqual(['Alice', 'Bob', 'Alice']);
+    expect(t().prepare('SELECT sent_count FROM auction_outbid_notices WHERE bidder_id = ?').get(alice.id).sent_count).toBe(2);
+  });
+
+  test('AUCTION_OUTBID_EMAIL_MINUTES still throttles per item per bidder when set', async () => {
+    process.env.AUCTION_OUTBID_EMAIL_MINUTES = '10';
     await bidAndNotify(alice, 20);
     await bidAndNotify(bob, 25);
     await bidAndNotify(alice, 30);
     await bidAndNotify(bob, 35); // Alice outbid again within the window: no second email
     expect(email.sendOutbidEmail.mock.calls.map(c => c[0].bidder.name)).toEqual(['Alice', 'Bob']);
 
-    // Once the window has passed she hears about it again.
     t().prepare('UPDATE auction_outbid_notices SET last_sent_at = ? WHERE bidder_id = ?')
       .run(new Date(Date.now() - 11 * 60 * 1000).toISOString(), alice.id);
     await bidAndNotify(alice, 40);
     await bidAndNotify(bob, 45);
     expect(email.sendOutbidEmail.mock.calls.filter(c => c[0].bidder.name === 'Alice')).toHaveLength(2);
-    expect(t().prepare('SELECT sent_count FROM auction_outbid_notices WHERE bidder_id = ?').get(alice.id).sent_count).toBe(2);
+  });
+
+  test('no outbid email on closing day (Montana date), but one the day before', async () => {
+    const botb = { ...auction, starts_at: '2026-11-01T19:00:00.000Z', ends_at: '2026-11-08T23:00:00.000Z' };
+    const send = now => notifier.maybeSendOutbidEmail({
+      auction: botb, item: { id: item.id, current_bid_cents: 2500, starting_bid_cents: 2000 }, bidderId: alice.id, now: new Date(now),
+    });
+    expect(await send('2026-11-08T07:00:00.000Z')).toBe(false); // midnight MST, closing day
+    expect(email.sendOutbidEmail).not.toHaveBeenCalled();
+    expect(await send('2026-11-08T06:59:00.000Z')).toBe(true); // 11:59 PM the night before
+    expect(email.sendOutbidEmail.mock.calls[0][0].closingDay).toBe('Sunday, November 8');
+  });
+
+  test('the email names closing day', async () => {
+    await bidAndNotify(alice, 20);
+    await bidAndNotify(bob, 25);
+    expect(email.sendOutbidEmail.mock.calls[0][0].closingDay).toMatch(/^[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}$/);
   });
 
   test('the throttle is per item: being outbid on another item still emails', async () => {
     const jersey = insertAuctionItem(t(), { auction_id: auction.id, title: 'Jersey' });
     await bidAndNotify(alice, 20);
     await bidAndNotify(bob, 25);
+    process.env.AUCTION_OUTBID_EMAIL_MINUTES = '10';
     await bidAndNotify(alice, 20, jersey);
     await bidAndNotify(bob, 25, jersey);
     expect(email.sendOutbidEmail.mock.calls.map(c => c[0].item.title)).toEqual(['Helmet', 'Jersey']);

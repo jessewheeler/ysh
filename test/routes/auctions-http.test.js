@@ -401,3 +401,72 @@ describe('live updates (Server-Sent Events)', () => {
     expect(hub.connectionCount()).toBe(0);
   });
 });
+
+describe('changes from the 2026-10-26 bidding test', () => {
+  test('bidder sign-in shows no captcha even when hCaptcha is configured', async () => {
+    process.env.HCAPTCHA_SITE_KEY = 'site-key';
+    try {
+      const res = await request(app).get('/auctions/login').expect(200);
+      expect(res.text).not.toContain('h-captcha');
+    } finally {
+      delete process.env.HCAPTCHA_SITE_KEY;
+    }
+  });
+
+  test('a filled honeypot looks like success but sends nothing and creates no bidder', async () => {
+    const emailSvc = require('../../services/email');
+    emailSvc.sendBidderOtpEmail.mockClear();
+    const agent = request.agent(app);
+    const page = await agent.get('/auctions/login').expect(200);
+    expect(page.text).toContain('name="website"');
+    const res = await agent.post('/auctions/login').type('form').send({
+      _csrf: tokenFrom(page.text), name: 'Spam Bot', email: 'victim@example.com', phone: '406-555-0100', website: 'http://spam.example',
+    }).expect(302);
+    expect(res.headers.location).toBe('/auctions/login');
+    expect(emailSvc.sendBidderOtpEmail).not.toHaveBeenCalled();
+    expect(db.__getCurrentDb().prepare('SELECT COUNT(*) AS n FROM auction_bidders').get().n).toBe(0);
+  });
+
+  test('the auction and item pages say when outbid emails stop', async () => {
+    const t = db.__getCurrentDb();
+    const botb = insertAuction(t, { starts_at: '2026-11-01T19:00:00.000Z', ends_at: '2099-11-08T23:00:00.000Z' });
+    const ball = insertAuctionItem(t, { auction_id: botb.id, title: 'Game Ball' });
+    const page = await request(app).get(`/auctions/${botb.id}`).expect(200);
+    expect(page.text).toContain('data-outbid-notice');
+    expect(page.text).toMatch(/through Saturday, November 7\. On closing day, Sunday, November 8, the emails stop/);
+    const itemPage = await request(app).get(`/auctions/${botb.id}/items/${ball.id}`).expect(200);
+    expect(itemPage.text).toContain('data-outbid-notice');
+    expect(itemPage.text).toContain('data-item-title="Game Ball"');
+  });
+
+  test('the auction description keeps its paragraphs', async () => {
+    const t = db.__getCurrentDb();
+    t.prepare('UPDATE auctions SET description = ? WHERE id = ?').run('First paragraph.\r\n\r\nSecond paragraph.', auction.id);
+    const res = await request(app).get(`/auctions/${auction.id}`).expect(200);
+    expect(res.text).toMatch(/<div class="auction-description"><p>First paragraph\.<\/p><p>Second paragraph\.<\/p><\/div>/);
+  });
+
+  test('/state returns the stream snapshot as JSON, with my paddle only when signed in', async () => {
+    const anon = await request(app).get(`/auctions/${auction.id}/state`).expect(200).expect('Content-Type', /json/);
+    expect(anon.headers['cache-control']).toBe('no-store');
+    expect(anon.body).toMatchObject({
+      auction: { id: auction.id, phase: 'live' },
+      items: [expect.objectContaining({ item_id: item.id, starting_bid_cents: 2000, high_paddle: null })],
+      my_paddle: null,
+    });
+    expect(Date.parse(anon.body.server_now)).not.toBeNaN();
+
+    const { agent } = await loginAsBidder({ returnTo: `/auctions/${auction.id}/items/${item.id}` });
+    const page = await agent.get(`/auctions/${auction.id}/items/${item.id}`);
+    await agent.post(`/auctions/${auction.id}/items/${item.id}/bids`).type('form')
+      .send({ _csrf: tokenFrom(page.text), amount: '20', shipping_ack: '1' });
+    const mine = await agent.get(`/auctions/${auction.id}/state`).expect(200);
+    expect(mine.body.my_paddle).toBe(1);
+    expect(mine.body.items[0].high_paddle).toBe(1);
+  });
+
+  test('/state is a 404 for a draft auction', async () => {
+    const draft = insertAuction(db.__getCurrentDb(), { status: 'draft' });
+    await request(app).get(`/auctions/${draft.id}/state`).expect(404);
+  });
+});
