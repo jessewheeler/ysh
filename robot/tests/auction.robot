@@ -54,7 +54,8 @@ Admin Creates An Auction With A Two-Photo Item And Publishes It
     Hover    a.dropdown-toggle[href="/#charitable"]
     Click    a.nav-auction
     Wait For Elements State    .auction-grid    visible    timeout=10s
-    Get Text    .auction-shipping    contains    Shipping and handling costs
+    # The shipping notice lives on item pages, not the auction overview.
+    Get Element Count    .auction-shipping    ==    0
     Get Text    .auction-card    contains    Signed Helmet
     Get Text    .auction-card    contains    $150
     Click    .auction-card a
@@ -254,11 +255,16 @@ A Withdrawn Item Disappears From A Polling Page
     Wait For Elements State    .auction-card[data-item-id="${gone}"]    detached    timeout=20s
     Get Element Count    .auction-card    ==    1
 
-Item Page States When Outbid Emails Stop
+Item Page States When Outbid Emails Stop Once Signed In
     ${auction}=    Seed Auction
     ${item}=    Seed Auction Item    ${auction}    title=Game Ball
     Navigate To    /auctions/${auction}/items/${item}
+    Get Element Count    [data-outbid-notice]    ==    0
+    Navigate To    /auctions/login?returnTo=/auctions/${auction}/items/${item}
+    Sign In As Bidder
     Get Text    [data-outbid-notice]    contains    Outbid alerts:
+    Navigate To    /auctions/${auction}
+    Get Element Count    [data-outbid-notice]    ==    0
 
 Admin Dashboard Updates Live When A Bid Lands
     ${auction}=    Seed Auction

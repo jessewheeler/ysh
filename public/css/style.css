@@ -1716,6 +1716,11 @@ footer {
     color: var(--text-muted);
 }
 
+.auction-signin {
+    text-align: center;
+    margin: 1.5rem 0;
+}
+
 .auction-page .inline-form {
     display: inline;
 }
@@ -1753,8 +1758,14 @@ footer {
     padding: 0;
     margin: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1.25rem;
+}
+
+@media (max-width: 1024px) {
+    .auction-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 .auction-card {

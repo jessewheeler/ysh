@@ -65,7 +65,8 @@ describe('pages', () => {
     // A live auction has no "Live" pill; the countdown says it.
     expect(res.text).not.toContain('auction-badge');
     expect(res.text).toContain('Signed Helmet');
-    expect(res.text).toContain(NOTICE);
+    // The shipping notice is on item pages only.
+    expect(res.text).not.toContain(NOTICE);
   });
 
   test('/auctions redirects to the current auction', async () => {
@@ -427,16 +428,22 @@ describe('changes from the 2026-10-26 bidding test', () => {
     expect(db.__getCurrentDb().prepare('SELECT COUNT(*) AS n FROM auction_bidders').get().n).toBe(0);
   });
 
-  test('the auction and item pages say when outbid emails stop', async () => {
+  test('only a signed-in bidder sees when outbid emails stop, and only on item pages', async () => {
     const t = db.__getCurrentDb();
     const botb = insertAuction(t, { starts_at: '2026-11-01T19:00:00.000Z', ends_at: '2099-11-08T23:00:00.000Z' });
     const ball = insertAuctionItem(t, { auction_id: botb.id, title: 'Game Ball' });
-    const page = await request(app).get(`/auctions/${botb.id}`).expect(200);
-    expect(page.text).toContain('data-outbid-notice');
-    expect(page.text).toMatch(/through Saturday, November 7\. On closing day, Sunday, November 8, the emails stop/);
-    const itemPage = await request(app).get(`/auctions/${botb.id}/items/${ball.id}`).expect(200);
+    const itemUrl = `/auctions/${botb.id}/items/${ball.id}`;
+
+    const anonItem = await request(app).get(itemUrl).expect(200);
+    expect(anonItem.text).not.toContain('data-outbid-notice');
+    expect(anonItem.text).toContain('data-item-title="Game Ball"');
+
+    const { agent } = await loginAsBidder();
+    const itemPage = await agent.get(itemUrl).expect(200);
     expect(itemPage.text).toContain('data-outbid-notice');
-    expect(itemPage.text).toContain('data-item-title="Game Ball"');
+    expect(itemPage.text).toMatch(/through Saturday, November 7\. On closing day, Sunday, November 8, the emails stop/);
+    const page = await agent.get(`/auctions/${botb.id}`).expect(200);
+    expect(page.text).not.toContain('data-outbid-notice');
   });
 
   test('the auction description keeps its paragraphs', async () => {
