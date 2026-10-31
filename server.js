@@ -71,6 +71,8 @@ const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isTest ? 1000 : 10,
   message: 'Too many login attempts. Please try again later.',
+  // Only submissions are attempts; loading the form shouldn't count against anyone.
+  skip: (req) => req.method === 'GET',
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -224,9 +226,9 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(injectLocals);
 
 // Apply rate limiters to specific routes
+// One mount covers /admin/login/verify and /resend too; mounting those again counted each
+// request twice, so a single sign-in used up most of the budget.
 app.use('/admin/login', loginLimiter);
-app.use('/admin/login/verify', loginLimiter);
-app.use('/admin/login/resend', loginLimiter);
 app.use('/membership', formLimiter);
 app.use('/contact', formLimiter);
 // Bidder sign-in. Unlike admin login, a whole room of people at a watch party may sign in from
