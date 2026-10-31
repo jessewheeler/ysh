@@ -26,19 +26,17 @@ block content
           .auction-description
             each para in auction.description.split(/\r?\n\s*/).filter(Boolean)
               p= para
-        +shippingNotice(auction.shipping_notice)
-        if phase !== 'closed'
-          +outbidNotice(outbidWindow)
-        p.auction-account
-          if bidder
+        if bidder
+          p.auction-account
             | Signed in as #{bidder.name}
             if myPaddle
               |  · Bidder ##{myPaddle}
             form.inline-form(method="POST" action="/auctions/logout")
               input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
               button.btn-link(type="submit") Sign out
-          else if phase !== 'closed'
-            a(href=`/auctions/login?returnTo=${encodeURIComponent('/auctions/' + auction.id)}`) Sign in to bid
+        if !bidder && phase !== 'closed'
+          p.auction-signin
+            a.btn(href=`/auctions/login?returnTo=${encodeURIComponent('/auctions/' + auction.id)}`) Sign in to bid
 
       .auction-live-status(data-live-status hidden)
 
