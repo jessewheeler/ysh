@@ -1,0 +1,60 @@
+extends ../layout
+
+block page_title
+  | Donation Funds
+
+block content
+  .admin-toolbar
+    a.btn-outline(href="/admin/donations") &larr; Donations
+
+  p.text-muted
+    | Funds are the choices in the "Where should it go?" dropdown on the donate page, in sort order.
+    |  Retiring a fund removes it from the dropdown and keeps every donation already made to it.
+
+  .admin-panel
+    h3 Funds
+    if funds.length
+      table#donation-funds.admin-table
+        thead
+          tr
+            th Name and Order
+            th Status
+            th Actions
+        tbody
+          each fund in funds
+            tr(data-fund-id=fund.id)
+              td
+                form.fund-form(method="POST" action=`/admin/donations/funds/${fund.id}` data-spinner="Saving…")
+                  label.sr-only(for=`fund-name-${fund.id}`) Fund name
+                  input(id=`fund-name-${fund.id}` type="text" name="name" value=fund.name required maxlength="80")
+                  label.sr-only(for=`fund-order-${fund.id}`) Sort order
+                  input.fund-order(id=`fund-order-${fund.id}` type="number" name="sort_order" value=fund.sort_order min="0" max="9999")
+                  button.btn-sm(type="submit") Save
+              td
+                if fund.is_active
+                  +badge('active', 'active')
+                else
+                  +badge('expired', 'retired')
+              td
+                form.inline-form(
+                  method="POST"
+                  action=`/admin/donations/funds/${fund.id}/active`
+                  data-confirm=(fund.is_active ? `Retire "${fund.name}"? Donors will no longer be able to choose it.` : null)
+                )
+                  input(type="hidden" name="is_active" value=(fund.is_active ? '0' : '1'))
+                  button(type="submit" class=(fund.is_active ? 'btn-sm btn-danger' : 'btn-sm'))= fund.is_active ? 'Retire' : 'Restore'
+    else
+      p.text-muted No funds yet. The donate page stays closed until there is at least one active fund.
+
+  .admin-panel
+    h3 Add a Fund
+    form#new-fund-form(method="POST" action="/admin/donations/funds" data-spinner="Adding…")
+      .form-grid
+        .form-group
+          label(for="new-fund-name") Name *
+          input#new-fund-name(type="text" name="name" required maxlength="80")
+        .form-group
+          label(for="new-fund-order") Sort Order
+          input#new-fund-order(type="number" name="sort_order" value=(funds.length + 1) min="0" max="9999")
+      .form-actions
+        button.btn(type="submit") Add Fund

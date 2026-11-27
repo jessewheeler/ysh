@@ -4,6 +4,7 @@ const settingsRepo = require('../db/repos/settings');
 const emailLogRepo = require('../db/repos/emailLog');
 const cardsRepo = require('../db/repos/cards');
 const logger = require('./logger');
+const { formatDenver } = require('./timezone');
 
 const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@yellowstoneseahawkers.com';
@@ -474,6 +475,41 @@ async function sendRenewalReminderEmail(member, renewalLink) {
   });
 }
 
+// Thank-you for a named donation (issue #126). Never called for an anonymous gift: we hold no
+// address for one, and logging the send would store it. Stripe's own receipt covers those.
+async function sendDonationConfirmation({ donorName, donorEmail, fundName, giftCents, feeCoverCents = 0, amountCents, memberId = null }) {
+  const money = cents => `$${(cents / 100).toFixed(2)}`;
+  const labelStyle = 'padding:8px 15px 8px 0; font-weight:bold; border-bottom:1px solid #eee;';
+  const valueStyle = 'padding:8px 0; border-bottom:1px solid #eee;';
+  const rows = [
+    ['Donation', money(giftCents)],
+    feeCoverCents > 0 ? ['Card processing fee you covered', money(feeCoverCents)] : null,
+    feeCoverCents > 0 ? ['Total charged', money(amountCents)] : null,
+    fundName ? ['Supporting', fundName] : null,
+    ['Date', formatDenver(new Date())],
+  ].filter(Boolean);
+  const rowsHtml = rows
+    .map(([label, text]) => `<tr><td style="${labelStyle}">${escapeHtml(label)}:</td><td style="${valueStyle}">${escapeHtml(text)}</td></tr>`)
+    .join('');
+
+  const html = `
+    <h2 style="color:#002a5c;">Thank You for Your Donation!</h2>
+    <p>Hi ${escapeHtml(donorName)},</p>
+    <p>We've received your donation to the Yellowstone Sea Hawkers. Thank you for your support!</p>
+    <table style="margin:20px 0; font-size:14px; border-collapse:collapse;">${rowsHtml}</table>
+    <p>Your gift supports our charitable work in the Yellowstone County community.</p>
+    <p style="color:#69be28; font-weight:bold; font-size:18px;">Go Hawks!</p>
+  `;
+  await sendEmail({
+    to: donorEmail,
+    toName: donorName,
+    subject: 'Thank You for Your Donation — Yellowstone Sea Hawkers',
+    html,
+    email_type: 'donation_confirmation',
+    member_id: memberId,
+  });
+}
+
 async function sendContactEmail({ name, email, message }) {
   const contactTo = await getContactEmail();
   const html = `
@@ -505,5 +541,6 @@ module.exports = {
   sendOtpEmail,
   sendContactEmail,
   sendRenewalReminderEmail,
+  sendDonationConfirmation,
   htmlToText,
 };

@@ -1,6 +1,7 @@
 const memberRepo = require('../db/repos/members');
 const paymentRepo = require('../db/repos/payments');
 const emailLogRepo = require('../db/repos/emailLog');
+const donationRepo = require('../db/repos/donations');
 const periodsRepo = require('../db/repos/membershipPeriods');
 const membershipYearsRepo = require('../db/repos/membershipYears');
 
@@ -8,11 +9,12 @@ async function getStats() {
   const currentPeriod = await periodsRepo.getCurrent();
   const currentPeriodId = currentPeriod ? currentPeriod.id : null;
 
-  const [counts, currentPeriodEnrollment, totalRevenue, emailsSent] = await Promise.all([
+  const [counts, currentPeriodEnrollment, totalRevenue, emailsSent, donations] = await Promise.all([
     memberRepo.countByView(currentPeriodId),
     currentPeriodId ? membershipYearsRepo.countByPeriod(currentPeriodId) : 0,
     paymentRepo.sumCompletedCents(),
-    emailLogRepo.countAll()
+    emailLogRepo.countAll(),
+    donationRepo.summary()
   ]);
 
   return {
@@ -25,6 +27,9 @@ async function getStats() {
     currentPeriodLabel: currentPeriod ? currentPeriod.label : null,
     totalRevenue,
     emailsSent,
+    // Gifts only: what donors added to cover card fees is not money raised.
+    totalDonations: donations.giftCents,
+    donationCount: donations.count,
   };
 }
 

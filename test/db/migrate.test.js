@@ -396,3 +396,136 @@ describe('emails_log CHECK widened to the auction email types (issue #119)', () 
       'auction_outbid_notices', 'auction_paddles', 'auctions']);
   });
 });
+
+describe('donations (issue #126)', () => {
+  test('seeds the default funds once, and never puts back one an admin changed', async () => {
+    await migrate();
+    expect(db.prepare('SELECT name FROM donation_funds ORDER BY sort_order').all().map(r => r.name)).toEqual([
+      'General Fund', 'Heart Wheels', 'Battle of the Birds', 'Charity Partner of the Year',
+    ]);
+
+    db.prepare("UPDATE donation_funds SET name = 'Where Needed Most' WHERE name = 'General Fund'").run();
+    db.prepare("UPDATE donation_funds SET is_active = 0 WHERE name = 'Heart Wheels'").run();
+    await migrate();
+
+    const funds = db.prepare('SELECT name, is_active FROM donation_funds ORDER BY sort_order').all();
+    expect(funds).toHaveLength(4);
+    expect(funds[0]).toEqual({ name: 'Where Needed Most', is_active: 1 });
+    expect(funds[1]).toEqual({ name: 'Heart Wheels', is_active: 0 });
+  });
+
+  test('emails_log accepts donation_confirmation alongside the auction types', async () => {
+    await migrate();
+    const insert = db.prepare("INSERT INTO emails_log (to_email, email_type) VALUES ('a@b.co', ?)");
+    for (const type of ['donation_confirmation', 'auction_otp', 'auction_outbid', 'auction_winner', 'renewal_reminder']) {
+      expect(() => insert.run(type)).not.toThrow();
+    }
+    expect(() => insert.run('not_a_type')).toThrow(/CHECK/i);
+  });
+
+  test('an emails_log from before #126 is rebuilt without losing its auction rows', async () => {
+    await migrate();
+    // The table as issue #119 left it: auction types, no donation_confirmation.
+    db.exec(`
+      DROP TABLE emails_log;
+      CREATE TABLE emails_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        to_email TEXT NOT NULL,
+        to_name TEXT,
+        subject TEXT,
+        body_html TEXT,
+        email_type TEXT CHECK (email_type IN
+          ('welcome', 'payment_confirmation', 'card_delivery', 'blast', 'contact', 'otp',
+           'renewal_reminder', 'auction_otp', 'auction_outbid', 'auction_winner')),
+        status TEXT NOT NULL DEFAULT 'sent',
+        error TEXT,
+        member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        created_by INTEGER REFERENCES members(id) ON DELETE SET NULL
+      );
+      INSERT INTO emails_log (to_email, email_type) VALUES ('bidder@example.com', 'auction_outbid');
+      INSERT INTO emails_log (to_email, email_type) VALUES ('winner@example.com', 'auction_winner');
+    `);
+
+    await migrate();
+
+    expect(db.prepare('SELECT to_email, email_type FROM emails_log ORDER BY id').all()).toEqual([
+      { to_email: 'bidder@example.com', email_type: 'auction_outbid' },
+      { to_email: 'winner@example.com', email_type: 'auction_winner' },
+    ]);
+    expect(() => db.prepare(
+      "INSERT INTO emails_log (to_email, email_type) VALUES ('d@b.co', 'donation_confirmation')"
+    ).run()).not.toThrow();
+  });
+
+  /** The donations table exactly as the unmerged feature/donate-button branch created it. */
+  function seedOldDonations() {
+    db.exec(`
+      DROP TABLE donations;
+      CREATE TABLE donations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        donor_name TEXT NOT NULL,
+        donor_email TEXT NOT NULL,
+        stripe_session_id TEXT,
+        stripe_payment_intent TEXT,
+        amount_cents INTEGER NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'usd',
+        status TEXT NOT NULL DEFAULT 'pending'
+          CHECK(status IN ('pending','completed','failed','refunded')),
+        member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX idx_donations_stripe_session ON donations(stripe_session_id);
+      CREATE INDEX idx_donations_member ON donations(member_id);
+    `);
+  }
+
+  test('a donations table left by the old branch is rebuilt to the current shape with its rows', async () => {
+    await migrate();
+    db.prepare("INSERT INTO members (first_name, last_name, email) VALUES ('A','B','x@y.com')").run();
+    const memberId = db.prepare('SELECT id FROM members LIMIT 1').get().id;
+    seedOldDonations();
+    db.prepare(
+      "INSERT INTO donations (id, donor_name, donor_email, stripe_session_id, amount_cents, status, member_id, created_at) VALUES (5, 'Old Donor', 'old@example.com', 'cs_old', 2500, 'completed', ?, '2026-06-06 12:00:00')"
+    ).run(memberId);
+
+    await migrate();
+
+    expect(db.prepare('SELECT * FROM donations').all()).toEqual([
+      expect.objectContaining({
+        id: 5,
+        donor_name: 'Old Donor',
+        donor_email: 'old@example.com',
+        is_anonymous: 0,
+        fund_id: null,
+        gift_cents: 2500,
+        fee_cover_cents: 0,
+        amount_cents: 2500,
+        status: 'completed',
+        stripe_session_id: 'cs_old',
+        member_id: memberId,
+        created_at: '2026-06-06 12:00:00',
+      }),
+    ]);
+    // The rebuilt table takes an anonymous gift, which the old NOT NULL columns could not.
+    expect(() => db.prepare(
+      'INSERT INTO donations (is_anonymous, gift_cents, amount_cents) VALUES (1, 1200, 1200)'
+    ).run()).not.toThrow();
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map(r => r.name);
+    expect(tables).not.toContain('donations_pre126');
+    const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'donations'").all().map(r => r.name);
+    expect(indexes).toEqual(expect.arrayContaining(['idx_donations_stripe_session', 'idx_donations_member']));
+  });
+
+  test('rebuilding the old donations table is idempotent', async () => {
+    await migrate();
+    seedOldDonations();
+    db.prepare("INSERT INTO donations (donor_name, donor_email, amount_cents) VALUES ('Old Donor', 'old@example.com', 1000)").run();
+
+    await migrate();
+    await migrate();
+
+    expect(db.prepare('SELECT gift_cents FROM donations').all()).toEqual([{ gift_cents: 1000 }]);
+  });
+});

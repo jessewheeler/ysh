@@ -300,6 +300,48 @@ function insertBidder(db, overrides = {}) {
     return {...b, id: info.lastInsertRowid};
 }
 
+// Donations (issue #126). The test DB runs schema.js only, not migrate.js, so no fund is
+// seeded: a test that needs one inserts it.
+function insertDonationFund(db, overrides = {}) {
+  const f = {
+    name: overrides.name || 'General Fund',
+    sort_order: overrides.sort_order === undefined ? 1 : overrides.sort_order,
+    is_active: overrides.is_active === undefined ? 1 : overrides.is_active,
+  };
+  const info = db.prepare(
+    'INSERT INTO donation_funds (name, sort_order, is_active) VALUES (?, ?, ?)'
+  ).run(f.name, f.sort_order, f.is_active);
+  return { ...f, id: info.lastInsertRowid };
+}
+
+// An anonymous donation gets no name, email or member, whatever the overrides say: the
+// table's CHECK would reject it otherwise.
+function insertDonation(db, overrides = {}) {
+  const anonymous = overrides.is_anonymous ? 1 : 0;
+  const gift = overrides.gift_cents === undefined ? 1200 : overrides.gift_cents;
+  const feeCover = overrides.fee_cover_cents || 0;
+  const d = {
+    donor_name: anonymous ? null : (overrides.donor_name || 'John Donor'),
+    donor_email: anonymous ? null : (overrides.donor_email || 'donor@example.com'),
+    is_anonymous: anonymous,
+    fund_id: overrides.fund_id || null,
+    gift_cents: gift,
+    fee_cover_cents: feeCover,
+    amount_cents: gift + feeCover,
+    status: overrides.status || 'completed',
+    stripe_session_id: overrides.stripe_session_id || null,
+    stripe_payment_intent: overrides.stripe_payment_intent || null,
+    member_id: anonymous ? null : (overrides.member_id || null),
+  };
+  const info = db.prepare(
+    `INSERT INTO donations (donor_name, donor_email, is_anonymous, fund_id, gift_cents, fee_cover_cents,
+                            amount_cents, status, stripe_session_id, stripe_payment_intent, member_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`
+  ).run(d.donor_name, d.donor_email, d.is_anonymous, d.fund_id, d.gift_cents, d.fee_cover_cents,
+    d.amount_cents, d.status, d.stripe_session_id, d.stripe_payment_intent, d.member_id, overrides.created_at || null);
+  return { ...d, id: info.lastInsertRowid };
+}
+
 module.exports = {
     buildMember,
     insertMember,
@@ -321,4 +363,6 @@ module.exports = {
     insertAuction,
     insertAuctionItem,
     insertBidder,
+    insertDonationFund,
+    insertDonation,
 };

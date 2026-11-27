@@ -107,6 +107,10 @@ block content
               else
                 a.btn(href=`/auctions/login?returnTo=${encodeURIComponent('/auctions/' + auction.id + '/items/' + item.id)}`) Sign in to bid
 
+          p.auction-donate
+            | Not bidding? You can still give.
+            a(href="/donate?fund=battle-of-the-birds") Make a donation
+
           h3.auction-history-heading Bid history
           if bids.length
             ol.auction-history(data-bid-history)

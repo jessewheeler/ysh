@@ -252,6 +252,34 @@ block content
         else
           p.text-muted No enrollment history.
 
+      //- Donations tied to this member (issue #126): gifts made with an email that matches
+      //- theirs. Anonymous gifts are never linked, so they never appear here.
+      .admin-panel
+        h3 Donation History
+        if donations.length
+          p.text-muted Lifetime giving: #[strong#member-donations-total= formatMoney(donationsTotalCents)]
+          table#member-donations.admin-table
+            thead
+              tr
+                th Date
+                th Fund
+                th Gift
+                th Fee Cover
+                th Total
+                th Status
+            tbody
+              each d in donations
+                tr
+                  td= formatDate(d.created_at)
+                  td= d.fund_name || '—'
+                  td= formatMoney(d.gift_cents)
+                  td= d.fee_cover_cents ? formatMoney(d.fee_cover_cents) : '—'
+                  td= formatMoney(d.amount_cents)
+                  td
+                    +badge(d.status, d.status)
+        else
+          p.text-muted No donations linked to this member.
+
       .admin-panel
         h3 Recent Emails
         if emails.length

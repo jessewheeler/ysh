@@ -27,6 +27,11 @@ block content
     a.stat-card(href="/admin/payments")
       .stat-number= formatMoneyShort(stats.totalRevenue)
       .stat-label Total Revenue
+    //- Shown once there is a completed donation, so the row stays as it was until then.
+    if stats.donationCount
+      a.stat-card(href="/admin/donations")
+        .stat-number= formatMoneyShort(stats.totalDonations)
+        .stat-label= `Donations (${stats.donationCount})`
     a.stat-card(href="/admin/emails")
       .stat-number= stats.emailsSent
       .stat-label Emails Sent

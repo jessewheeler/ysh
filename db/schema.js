@@ -83,6 +83,49 @@ const SCHEMA = `
                                                       ON DELETE SET NULL
   );
 
+  -- Donations (issue #126). A fund is what a donor earmarks a gift for. Funds are retired
+  -- (is_active = 0), never deleted, so donations.fund_id always resolves.
+  CREATE TABLE IF NOT EXISTS donation_funds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    created_by INTEGER REFERENCES members(id) ON DELETE SET NULL,
+    updated_by INTEGER REFERENCES members(id) ON DELETE SET NULL
+  );
+
+  -- amount_cents is what Stripe charged: gift_cents (what the donor chose) plus
+  -- fee_cover_cents (what they opted to add for the card fee). An anonymous gift stores no
+  -- donor name or email and is never linked to a member; Stripe holds what it collected.
+  CREATE TABLE IF NOT EXISTS donations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    donor_name TEXT,
+    donor_email TEXT,
+    is_anonymous INTEGER NOT NULL DEFAULT 0,
+    fund_id INTEGER REFERENCES donation_funds(id) ON DELETE SET NULL,
+    gift_cents INTEGER NOT NULL,
+    fee_cover_cents INTEGER NOT NULL DEFAULT 0,
+    amount_cents INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'usd',
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','completed','failed','refunded')),
+    stripe_session_id TEXT,
+    stripe_payment_intent TEXT,
+    member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    CONSTRAINT donations_donor_check CHECK (
+      (is_anonymous = 1 AND donor_name IS NULL AND donor_email IS NULL AND member_id IS NULL)
+      OR (is_anonymous = 0 AND donor_name IS NOT NULL AND donor_email IS NOT NULL)
+    )
+  );
+  -- Only indexes on columns the pre-#126 donations table already had. A database that ran the
+  -- old feature/donate-button branch has that table, CREATE TABLE IF NOT EXISTS above skips
+  -- it, and an index on a column it lacks would fail here before migrate.js can add it.
+  CREATE INDEX IF NOT EXISTS idx_donations_stripe_session ON donations(stripe_session_id);
+  CREATE INDEX IF NOT EXISTS idx_donations_member ON donations(member_id);
+
   CREATE TABLE IF NOT EXISTS announcements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -205,7 +248,8 @@ const SCHEMA = `
     'renewal_reminder',
     'auction_otp',
     'auction_outbid',
-    'auction_winner'
+    'auction_winner',
+    'donation_confirmation'
   )),
     status TEXT NOT NULL DEFAULT 'sent',
     error TEXT,
