@@ -37,6 +37,9 @@ block content
         if !bidder && phase !== 'closed'
           p.auction-signin
             a.btn(href=`/auctions/login?returnTo=${encodeURIComponent('/auctions/' + auction.id)}`) Sign in to bid
+        p.auction-donate
+          | Not bidding? You can still give.
+          a(href="/donate?fund=battle-of-the-birds") Make a donation
 
       .auction-live-status(data-live-status hidden)
 

@@ -42,6 +42,8 @@ class DatabaseManager:
             'auctions',
             'check_ins',
             'events',
+            'donations',
+            'donation_funds',
             'membership_cards',
             'emails_log',
             'membership_years',
@@ -63,6 +65,7 @@ class DatabaseManager:
         self.seed_settings()
         self.seed_admin()
         self.seed_period()
+        self.seed_default_donation_funds()
 
     def seed_settings(self):
         """Insert default site_settings."""
@@ -430,6 +433,52 @@ class DatabaseManager:
             'UPDATE auction_items SET current_bid_cents = ?, high_bidder_id = ?, bid_count = bid_count + 1 '
             'WHERE id = ?',
             (int(amount_cents), int(bidder_id), int(item_id)),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def seed_default_donation_funds(self):
+        """Re-create the funds db/migrate.js seeds on a fresh install (issue #126)."""
+        for order, name in enumerate(
+            ['General Fund', 'Heart Wheels', 'Battle of the Birds', 'Charity Partner of the Year'],
+            start=1,
+        ):
+            self.seed_donation_fund(name=name, sort_order=order)
+
+    def seed_donation_fund(self, name='Robot Fund', sort_order=1, is_active=1):
+        """Insert a donation fund and return the row ID."""
+        cursor = self.conn.execute(
+            'INSERT INTO donation_funds (name, sort_order, is_active) VALUES (?, ?, ?)',
+            (name, int(sort_order), int(is_active)),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def get_donation_fund_id(self, name):
+        """Return the id of the donation fund with this name."""
+        row = self.conn.execute('SELECT id FROM donation_funds WHERE name = ?', (name,)).fetchone()
+        if row is None:
+            raise AssertionError(f'No donation fund named {name!r}')
+        return row[0]
+
+    def seed_donation(self, fund_id, gift_cents=1200, fee_cover_cents=0, status='completed',
+                      donor_name='Robot Donor', donor_email='robot_donor@example.com',
+                      member_id=None, is_anonymous=0):
+        """Insert a donation and return the row ID.
+
+        An anonymous donation is stored with no name, email or member, as the app does.
+        """
+        anonymous = 1 if str(is_anonymous) in ('1', 'True', 'true') else 0
+        cursor = self.conn.execute(
+            '''INSERT INTO donations
+               (donor_name, donor_email, is_anonymous, fund_id, gift_cents, fee_cover_cents,
+                amount_cents, status, member_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (None if anonymous else donor_name,
+             None if anonymous else donor_email,
+             anonymous, int(fund_id), int(gift_cents), int(fee_cover_cents),
+             int(gift_cents) + int(fee_cover_cents), status,
+             None if anonymous or member_id is None else int(member_id)),
         )
         self.conn.commit()
         return cursor.lastrowid

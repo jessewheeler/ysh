@@ -8,7 +8,7 @@ Member-management web app: Express 5, Pug templates, better-sqlite3, Stripe paym
 npm run dev             # Start dev server (nodemon)
 npm run lint            # ESLint
 npm test                # Jest (~830 tests, --forceExit)
-./robot/run_tests.sh    # Robot Framework end-to-end tests (~115 tests, Playwright)
+./robot/run_tests.sh    # Robot Framework end-to-end tests (~140 tests, Playwright)
 ./scripts/dev.sh        # Install deps + start dev server
 ./scripts/check.sh      # Full check: lint + Jest + Robot end-to-end — run this before declaring work done
 
@@ -45,6 +45,7 @@ db/repos/                    # Data-access layer (one file per table)
   checkIns.js                #   per-person event check-ins + raffle tickets
   archivedMembers.js         #   family members set aside by a downgrade (no email of their own)
   auctions.js auctionItems.js auctionBidders.js auctionBids.js  # silent auction (incl. photos, paddles, outbid throttle)
+  donations.js donationFunds.js  # donations and the funds a donor earmarks one for
   announcements.js bios.js gallery.js emailLog.js settings.js
 routes/                      # Express routers (index, admin, stripe, auctions, adminAuctions)
 services/                    # Business logic
@@ -75,6 +76,7 @@ services/                    # Business logic
   sender.js                  #   Sender.net subscriber list sync (one-way, YSH → Sender)
   storage.js                 #   file upload/delete (S3-compatible)
   timezone.js                #   America/Denver datetime-local <-> UTC ISO, formatDenver
+  donations.js               #   donation presets, opt-in fee cover maths, donate form validation
   uploads.js                 #   saveUpload: B2 when configured, else data/uploads
 middleware/                  # Express middleware
   auth.js                    #   requireAdmin, requireSuperAdmin, captureActor (ALS)
@@ -165,7 +167,7 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
 
 - SQLite via better-sqlite3, WAL mode, foreign keys ON
 - Schema defined in `db/schema.js`, applied by `db/migrate.js`
-- Tables: members, payments, announcements, gallery_images, bios, site_settings, emails_log, membership_cards, admins, audit_log, membership_periods, membership_years, campaigns, campaign_visits, contact_submissions, events, check_ins, archived_members, auctions, auction_items, auction_item_photos, auction_bidders, auction_paddles, auction_bids, auction_outbid_notices
+- Tables: members, payments, announcements, gallery_images, bios, site_settings, emails_log, membership_cards, admins, audit_log, membership_periods, membership_years, campaigns, campaign_visits, contact_submissions, events, check_ins, archived_members, auctions, auction_items, auction_item_photos, auction_bidders, auction_paddles, auction_bids, auction_outbid_notices, donation_funds, donations
 - `audit_log` captures table_name, record_id, action (INSERT/UPDATE/DELETE), actor_id, actor_email, old_values (JSON), new_values (JSON), changed_at
 - `created_by`/`updated_by` FK columns on all mutable tables; actor propagated via AsyncLocalStorage in `db/audit-context.js`
 - Sensitive fields (`otp_hash`, `renewal_token`) are stripped from audit JSON snapshots
@@ -233,6 +235,29 @@ end-to-end tests in a real browser. `./scripts/check.sh` runs all of them.
   in process memory (`services/auctionHub.js`), which assumes one web instance. The global `/admin`
   multer is `upload.fields([image, photos])`; it sets `req.file` from `image` so single-upload
   routes are unchanged
+- Donations (issue #126): `/donate` takes a one-off gift through Stripe Checkout. Rules live in
+  `services/donations.js`; the webhook branch is `completeDonation` in `routes/stripe.js`.
+  - `donations.amount_cents` is what Stripe charged: `gift_cents` (what the donor chose) plus
+    `fee_cover_cents`. The fee cover is **opt-in** and always recomputed on the server as
+    `ceil((gift + 30) / (1 - 0.029)) - gift`; `public/js/donate.js` repeats the sum only to show it.
+    Money raised is `gift_cents`, never `amount_cents`.
+  - An **anonymous** gift stores no donor name or email and is never linked to a member (a table
+    CHECK enforces it). Stripe collects an email on its own page; the webhook must read the donor
+    from our row and never copy `session.customer_details` into a table, `emails_log` or a log line.
+    No confirmation email is sent for one, because logging the send would store the address.
+  - A named gift is tied to a member when the donor's email matches (`memberRepo.findByEmailIgnoreCase`),
+    at checkout and again at completion. It is not back-linked if the donor joins later.
+  - `donation_funds` rows are retired (`is_active = 0`), never deleted, so `donations.fund_id`
+    always resolves. `db/migrate.js` seeds four funds into an empty table only. Managing funds is
+    super-admin only; reading `/admin/donations` is open to every admin. `/donate?fund=<id or
+    name-slug>` preselects a fund.
+  - The admin fee figures are an **estimate** at 2.9% + 30¢ per charge, not Stripe's actual fee.
+  - The `emails_log` type list exists in three places that must stay identical: `db/schema.js`, the
+    `pgAlters` DROP/ADD and the SQLite rebuild in `db/migrate.js`. The rebuild's guard tests for the
+    newest type, so adding a type means changing the guard too.
+  - `migrateDonationsShape` (SQLite) and the `donations` block in `pgAlters` upgrade a table left by
+    the unmerged `feature/donate-button` branch. `schema.js` therefore only indexes donation columns
+    that old table already had.
 - Campaign tracking is documented in `docs/campaign-tracking.md`
 - The Needs attention member filter is documented in `docs/needs-attention-signals.md` — read it
   before changing a signal predicate or threshold, and note that neither Jest nor Robot exercises

@@ -231,6 +231,16 @@ app.use(injectLocals);
 app.use('/admin/login', loginLimiter);
 app.use('/membership', formLimiter);
 app.use('/contact', formLimiter);
+// Donations (issue #126). Only the form post counts, and the ceiling is higher than
+// formLimiter's: the donate page is linked from the auction, so a watch party full of people
+// may give from one venue Wi-Fi address. The captcha is what stops scripted card testing.
+app.post('/donate', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTest ? 1000 : 60,
+  message: 'Too many submissions. Please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
 // Bidder sign-in. Unlike admin login, a whole room of people at a watch party may sign in from
 // one venue Wi-Fi address, so the per-IP ceiling is generous and only form posts count (page
 // loads don't). Guessing is already capped at five wrong codes per code (services/auth.js);

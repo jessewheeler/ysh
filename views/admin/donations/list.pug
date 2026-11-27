@@ -1,0 +1,91 @@
+extends ../layout
+
+block page_title
+  | Donations
+
+block content
+  if adminRole === 'super_admin'
+    .admin-toolbar
+      a.btn-outline(href="/admin/donations/funds") Manage Funds
+
+  //- Completed donations only. Fees are an estimate at Stripe's standard card rate
+  //- (services/donations.js), not what Stripe actually charged.
+  .stats-grid
+    .stat-card
+      .stat-number#donations-count= summary.count
+      .stat-label Donations
+    .stat-card
+      .stat-number#donations-gifts= formatMoneyShort(summary.giftCents)
+      .stat-label Given
+    .stat-card
+      .stat-number#donations-fee-cover= formatMoneyShort(summary.feeCoverCents)
+      .stat-label Fees Covered by Donors
+    .stat-card
+      .stat-number#donations-fee-absorbed= formatMoneyShort(fees.absorbedCents)
+      .stat-label Est. Fees We Absorbed
+
+  p.text-muted
+    | Card fees are estimated at 2.9% + 30¢ per donation (about #{formatMoney(fees.estimatedFeeCents)} so far).
+    |  Stripe's actual fee on a given card can differ slightly.
+
+  .admin-panel
+    h3 By Fund
+    if byFund.length
+      table#donations-by-fund.admin-table
+        thead
+          tr
+            th Fund
+            th Donations
+            th Given
+        tbody
+          each f in byFund
+            tr
+              td
+                = f.fundName
+                if f.fundId && !f.isActive
+                  |
+                  +badge('expired', 'retired')
+              td= f.count
+              td= formatMoney(f.giftCents)
+    else
+      p.text-muted No funds yet.
+
+  .admin-panel
+    h3 All Donations
+    if donations.length
+      table#donations-list.admin-table
+        thead
+          tr
+            th Date
+            th Donor
+            th Fund
+            th Gift
+            th Fee Cover
+            th Total
+            th Status
+        tbody
+          each d in donations
+            tr
+              td= formatDate(d.created_at)
+              td
+                if d.is_anonymous
+                  em Anonymous
+                else if d.member_id && d.member_first_name
+                  a(href=`/admin/members/${d.member_id}`)= d.donor_name
+                  |
+                  +badge('active', 'member')
+                else
+                  = d.donor_name
+                if !d.is_anonymous
+                  br
+                  small.text-muted= d.donor_email
+              td= d.fund_name || '—'
+              td= formatMoney(d.gift_cents)
+              td= d.fee_cover_cents ? formatMoney(d.fee_cover_cents) : '—'
+              td= formatMoney(d.amount_cents)
+              td
+                +badge(d.status, d.status)
+
+      +pagination(page, totalPages, total, (n) => `/admin/donations?page=${n}`)
+    else
+      p.text-muted No donations yet.

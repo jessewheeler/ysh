@@ -8,6 +8,8 @@ const {duesForType, surchargeFor} = require('../services/membershipPeriods');
 const logger = require('../services/logger');
 const { requireCaptcha } = require('../middleware/captcha');
 const mcmService = require('../services/mcm');
+const donationFundsRepo = require('../db/repos/donationFunds');
+const donationsService = require('../services/donations');
 
 // Homepage
 router.get('/', async (req, res, next) => {
@@ -462,6 +464,76 @@ router.post('/renew/:token', async (req, res) => {
     req.session.flash_error = 'Something went wrong. Please try again.';
     res.redirect(`/renew/${req.params.token}`);
   }
+});
+
+// --- Donations (issue #126) ---
+
+// ?fund=<id> preselects a fund, so the auction and charitable pages can link straight to theirs.
+router.get('/donate', async (req, res, next) => {
+  try {
+    const funds = await donationFundsRepo.listActive();
+    // By id, or by the fund's name as a slug ("battle-of-the-birds") so a template can link
+    // to a fund without knowing its id. An unknown or retired fund falls back to the first.
+    const wanted = String(req.query.fund || '').toLowerCase();
+    const slug = name => String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const requested = wanted && funds.find(f => String(f.id) === wanted || slug(f.name) === wanted);
+    res.render('donate', {
+      funds,
+      selectedFundId: requested ? requested.id : (funds[0] ? funds[0].id : null),
+      presets: donationsService.PRESET_CENTS,
+      defaultCents: donationsService.DEFAULT_CENTS,
+      feePercent: donationsService.FEE_PERCENT,
+      feeFixedCents: donationsService.FEE_FIXED_CENTS,
+      defaultFeeCoverCents: donationsService.feeCoverCents(donationsService.DEFAULT_CENTS),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/donate', requireCaptcha('/donate'), async (req, res) => {
+  try {
+    const funds = await donationFundsRepo.listActive();
+    const donation = donationsService.validateDonation(req.body, funds);
+    if (donation.error) {
+      req.session.flash_error = donation.error;
+      return res.redirect('/donate');
+    }
+
+    // Tie the gift to a member when the donor's email is on the roster. Never for an
+    // anonymous gift: there is no email to match, and it must stay unlinked.
+    const member = donation.isAnonymous ? null : await memberRepo.findByEmailIgnoreCase(donation.donorEmail);
+
+    const {createDonationCheckoutSession} = require('../services/stripe');
+    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const session = await createDonationCheckoutSession({
+      donorName: donation.donorName,
+      donorEmail: donation.donorEmail,
+      isAnonymous: donation.isAnonymous,
+      fundId: donation.fundId,
+      fundName: donation.fundName,
+      giftCents: donation.giftCents,
+      feeCoverCents: donation.feeCoverCents,
+      memberId: member ? member.id : null,
+      baseUrl,
+    });
+
+    res.redirect(303, session.url);
+  } catch (err) {
+    const log = req.logger || logger;
+    // Message only: the request body may hold a donor's name and email.
+    log.error('Donate POST error', {error: err.message, stack: err.stack});
+    req.session.flash_error = 'Something went wrong. Please try again.';
+    res.redirect('/donate');
+  }
+});
+
+router.get('/donate/success', (_req, res) => {
+  res.render('donate-success');
+});
+
+router.get('/donate/cancel', (_req, res) => {
+  res.render('donate-cancel');
 });
 
 module.exports = router;

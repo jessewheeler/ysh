@@ -7,6 +7,16 @@ async function findById(id) {
   return await db.get('SELECT * FROM members WHERE id = ?', id);
 }
 
+// Case-insensitive variant for matching an address typed by someone else (a donor) against
+// the roster. Same primary-first ordering as findByEmail.
+async function findByEmailIgnoreCase(email) {
+  if (!email) return undefined;
+  return await db.get(
+    'SELECT * FROM members WHERE LOWER(email) = ? ORDER BY primary_member_id IS NULL DESC LIMIT 1',
+    String(email).trim().toLowerCase()
+  );
+}
+
 async function findByEmail(email) {
   // Prefer primary members (primary_member_id IS NULL) so family primaries are
   // returned before sub-members who may share the same email address.
@@ -694,6 +704,7 @@ async function createWithFamily({ primaryMember, familyMembers = [], membershipT
 module.exports = {
   findById,
   findByEmail,
+  findByEmailIgnoreCase,
   findAdminByEmail,
   create,
   update,

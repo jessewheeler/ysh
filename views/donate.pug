@@ -1,0 +1,74 @@
+extends layout
+
+block content
+  section.section.alt-bg
+    .container
+      h2.text-center Donate to the Yellowstone Sea Hawkers
+      p.text-center.text-muted.donate-intro Your gift supports the charitable work our chapter does in Yellowstone County. Pick where you'd like it to go.
+
+      if !funds.length
+        p.text-center Online donations aren't open right now. Please #[a(href="/#contact") contact us] and we'll help.
+      else
+        //- The data attributes carry the fee rate to public/js/donate.js, which keeps the fee
+        //- label current. The server recomputes the fee on submit and trusts none of it.
+        form#donate-form.contact-form(
+          method="POST"
+          action="/donate"
+          data-fee-percent=feePercent
+          data-fee-fixed-cents=feeFixedCents
+        )
+          input(type="hidden" name="_csrf" value=(typeof csrfToken !== 'undefined' ? csrfToken : ''))
+
+          .form-group
+            label(for="fund_id") Where should it go?
+            select#fund_id.form-control(name="fund_id" required)
+              each fund in funds
+                option(value=fund.id selected=(fund.id === selectedFundId))= fund.name
+
+          .form-group
+            span.form-label#donate-amount-label Donation amount
+            .donate-presets(role="radiogroup" aria-labelledby="donate-amount-label")
+              each cents in presets
+                label.donate-preset
+                  input(type="radio" name="amount_preset" value=cents checked=(cents === defaultCents))
+                  span $#{cents / 100}
+              label.donate-preset
+                input(type="radio" name="amount_preset" value="custom")
+                span Other
+
+          #custom-amount-group.form-group(hidden)
+            label(for="amount_custom") Other amount ($)
+            input#amount_custom.form-control(type="number" name="amount_custom" min="1" max="10000" step="0.01" inputmode="decimal" placeholder="12.00")
+
+          .form-group
+            label.donate-check
+              input#cover_fee(type="checkbox" name="cover_fee" value="1")
+              span Add #[strong#fee-amount $#{(defaultFeeCoverCents / 100).toFixed(2)}] to cover the card processing fee
+            p.form-hint Optional. Card payments cost us a small fee. Adding it means your whole gift reaches the cause.
+
+          .form-group
+            label.donate-check
+              input#anonymous(type="checkbox" name="anonymous" value="1")
+              span Give anonymously
+            p.form-hint We won't record your name or email with this gift. Our payment processor, Stripe, will still ask for an email so it can send your receipt.
+
+          #donor-fields
+            .form-group
+              label(for="donor_name") Your name
+              input#donor_name.form-control(type="text" name="donor_name" required maxlength="100" autocomplete="name")
+
+            .form-group
+              label(for="donor_email") Email address
+              input#donor_email.form-control(type="email" name="donor_email" required maxlength="254" autocomplete="email")
+              p.form-hint We'll email you a thank-you with the details of your gift.
+
+          if hcaptchaSiteKey
+            .form-group
+              .h-captcha(data-sitekey=hcaptchaSiteKey)
+
+          p.donate-total Your card will be charged #[strong#donate-total $#{(defaultCents / 100).toFixed(2)}]
+
+          .form-actions
+            button.btn(type="submit") Continue to payment
+
+    script(src="/js/donate.js")

@@ -20,6 +20,18 @@ async function pruneCampaignVisits() {
   }
 }
 
+// The funds a donor can earmark a gift for (issue #126). Seeded only into an empty table, so
+// a fund an admin later renames or retires is never put back.
+const DEFAULT_DONATION_FUNDS = ['General Fund', 'Heart Wheels', 'Battle of the Birds', 'Charity Partner of the Year'];
+
+async function seedDonationFunds() {
+  const row = await db.get('SELECT COUNT(*) AS c FROM donation_funds');
+  if (row && Number(row.c) > 0) return;
+  for (const [i, name] of DEFAULT_DONATION_FUNDS.entries()) {
+    await db.run('INSERT INTO donation_funds (name, sort_order) VALUES (?, ?)', name, i + 1);
+  }
+}
+
 async function migrate() {
   if (db.dialect === 'pg') {
     await db.exec(toPgSchema(SCHEMA));
@@ -76,9 +88,25 @@ async function migrate() {
       'ALTER TABLE payments ADD COLUMN IF NOT EXISTS voided_at TEXT',
       'ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_status_check',
       "ALTER TABLE payments ADD CONSTRAINT payments_status_check CHECK (status IN ('pending','completed','failed','refunded','voided'))",
-      // emails_log: silent auction email types (issue #119). Same DROP IF EXISTS + ADD pairing.
+      // emails_log: the full list of email types — silent auction (issue #119) and donation
+      // confirmation (issue #126). Same DROP IF EXISTS + ADD pairing. Keep this list, the one in
+      // schema.js and the SQLite rebuild below identical: whichever runs last wins.
+      // donations (issue #126): bring a table left by the old feature/donate-button branch up
+      // to the current shape. On a fresh database every statement is a no-op. An old row was a
+      // named gift with no fee cover, so its gift is the whole amount.
+      'ALTER TABLE donations ADD COLUMN IF NOT EXISTS is_anonymous INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE donations ADD COLUMN IF NOT EXISTS fund_id INTEGER REFERENCES donation_funds(id) ON DELETE SET NULL',
+      'ALTER TABLE donations ADD COLUMN IF NOT EXISTS gift_cents INTEGER',
+      'ALTER TABLE donations ADD COLUMN IF NOT EXISTS fee_cover_cents INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE donations ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL',
+      'UPDATE donations SET gift_cents = amount_cents WHERE gift_cents IS NULL',
+      'ALTER TABLE donations ALTER COLUMN gift_cents SET NOT NULL',
+      'ALTER TABLE donations ALTER COLUMN donor_name DROP NOT NULL',
+      'ALTER TABLE donations ALTER COLUMN donor_email DROP NOT NULL',
+      'ALTER TABLE donations DROP CONSTRAINT IF EXISTS donations_donor_check',
+      'ALTER TABLE donations ADD CONSTRAINT donations_donor_check CHECK ((is_anonymous = 1 AND donor_name IS NULL AND donor_email IS NULL AND member_id IS NULL) OR (is_anonymous = 0 AND donor_name IS NOT NULL AND donor_email IS NOT NULL))',
       'ALTER TABLE emails_log DROP CONSTRAINT IF EXISTS emails_log_email_type_check',
-      "ALTER TABLE emails_log ADD CONSTRAINT emails_log_email_type_check CHECK (email_type IN ('welcome','payment_confirmation','card_delivery','blast','contact','otp','renewal_reminder','auction_otp','auction_outbid','auction_winner'))",
+      "ALTER TABLE emails_log ADD CONSTRAINT emails_log_email_type_check CHECK (email_type IN ('welcome','payment_confirmation','card_delivery','blast','contact','otp','renewal_reminder','auction_otp','auction_outbid','auction_winner','donation_confirmation'))",
     ];
     for (const sql of pgAlters) {
       await db.exec(sql);
@@ -135,6 +163,8 @@ async function migrate() {
       });
     }
 
+    await seedDonationFunds();
+
     await pruneCampaignVisits();
 
     logger.info('PostgreSQL schema creation complete');
@@ -145,15 +175,15 @@ async function migrate() {
   // then runs incremental ALTER TABLEs for existing databases missing newer columns.
   await db.exec(SCHEMA);
 
-  // Migrate emails_log CHECK constraint to the latest list of email types (the silent auction
-  // types, issue #119, are the newest). SQLite can't ALTER constraints, so the table is swapped
+  // Migrate emails_log CHECK constraint to the latest list of email types (donation_confirmation,
+  // issue #126, is the newest). SQLite can't ALTER constraints, so the table is swapped
   // when its DDL lacks the newest type. created_by is carried across when the old table has it —
   // it is otherwise only added by the ALTER further down, and a rebuild that dropped it would
   // lose who sent each existing email.
   const emailsLogSchema = await db.get(
     "SELECT sql FROM sqlite_master WHERE type='table' AND name='emails_log'"
   );
-  if (emailsLogSchema && !emailsLogSchema.sql.includes("'auction_winner'")) {
+  if (emailsLogSchema && !emailsLogSchema.sql.includes("'donation_confirmation'")) {
     const hasCreatedBy = (await db.all('PRAGMA table_info(emails_log)')).some(c => c.name === 'created_by');
     await db.exec(`
       DROP TABLE IF EXISTS emails_log_new;
@@ -165,7 +195,8 @@ async function migrate() {
         body_html TEXT,
         email_type TEXT CHECK (email_type IN
                                ('welcome', 'payment_confirmation', 'card_delivery', 'blast', 'contact', 'otp',
-                                'renewal_reminder', 'auction_otp', 'auction_outbid', 'auction_winner')),
+                                'renewal_reminder', 'auction_otp', 'auction_outbid', 'auction_winner',
+                                'donation_confirmation')),
         status TEXT NOT NULL DEFAULT 'sent',
         error TEXT,
         member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
@@ -190,6 +221,7 @@ async function migrate() {
   }
 
   await migratePaymentsStatusCheck(db);
+  await migrateDonationsShape(db);
 
   // Merge admins into members: add admin-related columns
   try {
@@ -416,9 +448,52 @@ async function migrate() {
     logger.info('Backfilled membership_periods from settings', {periodId, activeMembers: activeMembers.length});
   }
 
+  await seedDonationFunds();
+
   await pruneCampaignVisits();
 
   logger.info('Database migration complete');
+}
+
+/**
+ * Brings a donations table left by the old feature/donate-button branch up to the current
+ * shape (issue #126). That branch was never merged, but any database it ran against — a dev
+ * machine, the Robot database — kept its table, and CREATE TABLE IF NOT EXISTS skips it.
+ *
+ * SQLite cannot drop NOT NULL or add a CHECK in place, so the table is rebuilt: the old one
+ * is set aside, schema.js creates the current one, and the rows are copied across. An old row
+ * was a named gift with no fee cover, so its gift is the whole amount. Nothing references
+ * donations, so unlike payments this needs no foreign-key dance.
+ */
+async function migrateDonationsShape(db) {
+  const columns = await db.all('PRAGMA table_info(donations)');
+  if (!columns.length || columns.some(c => c.name === 'fund_id')) return;
+
+  await db.exec(`
+    BEGIN;
+    DROP TABLE IF EXISTS donations_pre126;
+    ALTER TABLE donations RENAME TO donations_pre126;
+    DROP INDEX IF EXISTS idx_donations_stripe_session;
+    DROP INDEX IF EXISTS idx_donations_member;
+  `);
+  try {
+    await db.exec(SCHEMA);
+    await db.exec(`
+      INSERT INTO donations (id, donor_name, donor_email, is_anonymous, gift_cents, fee_cover_cents,
+                             amount_cents, currency, status, stripe_session_id, stripe_payment_intent,
+                             member_id, created_at, updated_at)
+      SELECT id, donor_name, donor_email, 0, amount_cents, 0,
+             amount_cents, currency, status, stripe_session_id, stripe_payment_intent,
+             member_id, created_at, updated_at
+        FROM donations_pre126;
+      DROP TABLE donations_pre126;
+      COMMIT;
+    `);
+  } catch (err) {
+    await db.exec('ROLLBACK');
+    throw err;
+  }
+  logger.info('Rebuilt donations table to the issue #126 shape');
 }
 
 /**

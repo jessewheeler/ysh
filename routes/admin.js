@@ -33,6 +33,9 @@ const checkInService = require('../services/checkIn');
 const familyDowngrade = require('../services/familyDowngrade');
 const archivedMembersRepo = require('../db/repos/archivedMembers');
 const nflSchedule = require('../services/nflSchedule');
+const donationRepo = require('../db/repos/donations');
+const donationFundsRepo = require('../db/repos/donationFunds');
+const donationsService = require('../services/donations');
 const logger = require('../services/logger');
 const isDevOrTest = ['development', 'test', 'dev'].includes(process.env.NODE_ENV);
 
@@ -490,11 +493,12 @@ router.get('/members/:id', async (req, res, next) => {
       return res.render('admin/members/form', { member });
     }
 
-    const [payments, cards, emails, membershipYears] = await Promise.all([
+    const [payments, cards, emails, membershipYears, donations] = await Promise.all([
       paymentRepo.findByMemberId(member.id),
       cardsRepo.findByMemberId(member.id),
       emailLogRepo.listByMemberId(member.id, 10),
-      membershipYearsRepo.findByMember(member.id)
+      membershipYearsRepo.findByMember(member.id),
+      donationRepo.findByMemberId(member.id)
     ]);
 
     // Get family relationships
@@ -542,6 +546,10 @@ router.get('/members/:id', async (req, res, next) => {
       cards,
       emails,
       membershipYears,
+      donations,
+      donationsTotalCents: donations
+        .filter(d => d.status === 'completed')
+        .reduce((sum, d) => sum + Number(d.gift_cents), 0),
       familyMembers,
       primaryMember,
       familyPrimaries,
@@ -1718,6 +1726,87 @@ router.get('/payments', async (req, res, next) => {
     const { payments, total } = await paymentRepo.listWithMembers({ limit, offset });
     const totalPages = Math.ceil(total / limit);
     res.render('admin/payments', { payments, page, totalPages, total });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Donations (issue #126) ---
+// Reading is open to every admin. Managing the funds a donor can pick is super-admin only,
+// like membership periods: it changes what the public form offers.
+
+router.get('/donations', async (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = 25;
+    const offset = (page - 1) * limit;
+    const [{ donations, total }, summary, byFund, amounts] = await Promise.all([
+      donationRepo.list({ limit, offset }),
+      donationRepo.summary(),
+      donationRepo.totalsByFund(),
+      donationRepo.completedAmounts(),
+    ]);
+    const fees = donationsService.feeSummary(amounts, summary.feeCoverCents);
+    res.render('admin/donations/list', {
+      donations, page, total,
+      totalPages: Math.ceil(total / limit),
+      summary, byFund, fees,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/donations/funds', requireSuperAdmin, async (req, res, next) => {
+  try {
+    res.render('admin/donations/funds', { funds: await donationFundsRepo.listAll() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/donations/funds', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const fund = donationsService.validateFund(req.body);
+    if (fund.error) {
+      req.session.flash_error = fund.error;
+    } else {
+      await donationFundsRepo.create(fund);
+      req.session.flash_success = `Fund "${fund.name}" added.`;
+    }
+    res.redirect('/admin/donations/funds');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/donations/funds/:id', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const fund = donationsService.validateFund(req.body);
+    if (fund.error) {
+      req.session.flash_error = fund.error;
+    } else if (await donationFundsRepo.update(req.params.id, fund)) {
+      req.session.flash_success = `Fund "${fund.name}" saved.`;
+    } else {
+      req.session.flash_error = 'Fund not found.';
+    }
+    res.redirect('/admin/donations/funds');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Retire or restore. A retired fund leaves the public form but keeps its donations.
+router.post('/donations/funds/:id/active', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const makeActive = req.body.is_active === '1';
+    const fund = await donationFundsRepo.setActive(req.params.id, makeActive);
+    if (fund) {
+      req.session.flash_success = `Fund "${fund.name}" ${makeActive ? 'restored' : 'retired'}.`;
+    } else {
+      req.session.flash_error = 'Fund not found.';
+    }
+    res.redirect('/admin/donations/funds');
   } catch (err) {
     next(err);
   }
